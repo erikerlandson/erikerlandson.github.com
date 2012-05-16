@@ -1,0 +1,7 @@
+---
+layout: post
+title: "Interaction between mktime() and tm_isdst - a compute cycle landmine"
+date: 2012-03-19 13:18
+comments: true
+categories: 
+---
