@@ -3,7 +3,7 @@ layout: post
 title: "Driving a Condor Job Renice Policy with Accounting Groups"
 date: 2012-07-27 13:50
 comments: true
-categories: [ computing, condor, renice, accounting groups ]
+categories: [ computing, condor, renice, accounting groups, grid computing, MRG Grid, Red Hat ]
 ---
 
 Condor can run its jobs with a renice priority level specified by `JOB_RENICE_INCREMENT`, which defaults simply to 10, but can in fact be any ClassAd expression, and is evaluated in the context of the job ad corresponding to the job being run.
