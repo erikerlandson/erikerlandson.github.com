@@ -3,7 +3,7 @@ layout: post
 title: "Maintaining Accounting Group Quotas With Preemption Policy"
 date: 2012-06-27 20:33
 comments: true
-categories: [condor, computing, preemption policy, accounting groups]
+categories: [ condor, computing, preemption policy, accounting groups, grid computing, MRG Grid, Red Hat ]
 ---
 
 There is a straightforward technique to leverage a Condor [preemption policy](http://research.cs.wisc.edu/condor/manual/v7.8/3_3Configuration.html#20480) to direct preemptions in a way that helps maintain resource usages as close as possible to the defined [accounting group quotas](http://research.cs.wisc.edu/condor/manual/v7.8/3_4User_Priorities.html#SECTION00447000000000000000).
