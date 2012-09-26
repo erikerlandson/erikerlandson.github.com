@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "Improved Parse Checking for ClassAd Log Files in Condor"
-date: 2012-09-19 10:06
+date: 2012-09-26 10:06
 comments: true
 categories: [ computing, grid computing, condor, MRG Grid, Red Hat, classad, classad log ]
 published: true
