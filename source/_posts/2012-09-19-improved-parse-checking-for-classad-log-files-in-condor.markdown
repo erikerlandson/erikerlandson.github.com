@@ -4,7 +4,7 @@ title: "Improved Parse Checking for ClassAd Log Files in Condor"
 date: 2012-09-19 10:06
 comments: true
 categories: [ computing, grid computing, condor, MRG Grid, Red Hat, classad, classad log ]
-published: false
+published: true
 ---
 
 Condor maintains certain key transactional information using the ClassAd Log system.  For example, both the negotiator's accountant log ("Accountantnew.log") and the scheduler's job queue log ("job_queue.log") are maintained in ClassAd Log format.
