@@ -6,25 +6,10 @@ require 'yaml'
 require 'jekyll'
 require 'date'
 require 'digest/md5'
-#require 'action_view'
 require 'net/http'
 require 'net/https'
 require 'uri'
-#require 'feedparser'
 require 'feedzirra'
-
-#include ActionView::Helpers::DateHelper
-
-# From http://api.rubyonrails.org/classes/ActiveSupport/CoreExtensions/Hash/Keys.html
-class Hash
-  def stringify_keys!
-    keys.each do |key|
-      self[key.to_s] = delete(key)
-    end
-    self
-  end
-end
-
 
 module Jekyll
   class RSSFeedTag < Liquid::Block
@@ -32,9 +17,9 @@ module Jekyll
     include Liquid::StandardFilters
     Syntax = /(#{Liquid::QuotedFragment}+)?/ 
 
+
     def initialize(tag_name, markup, tokens)
-      @variable_name = 'item'
-      @attributes = {}
+      @attributes = { 'title' => 'Blog Feed' }
       
       # Parse parameters
       if markup =~ Syntax
@@ -46,53 +31,40 @@ module Jekyll
         raise SyntaxError.new("Syntax Error in 'rssfeed' - Valid syntax: rssfeed uid:x count:x]")
       end
 
-      @ttl = @attributes.has_key?('ttl') ? @attributes['ttl'].to_i : nil
       @url = @attributes['url']
-      @count = @attributes['count']
-      @name = 'item'
+      @count = @attributes['count'].to_i
+      @title = @attributes['title'].gsub(/\A[']+|[']+\Z/, "")
 
       super
     end
 
+
     def render(context)
       context.registers[:rssfeed] ||= Hash.new(0)
     
-      #collection = RSSFeed.tag(@url, @count)
       feed = Feedzirra::Feed.fetch_and_parse(@url)
-      collection = feed.entries
+      collection = feed.entries.first(@count)
 
       length = collection.length
       result = []
-              
+
+      rr = "<article>\n<header>\n <h1 align=\"center\", class=\"entry-title\"><u>%s</u></h1> </header>\n <div class=\"entry-content\">\n%s</div>\n</article>\n" % [@title,"\n"]
+      result << rr
+
       # loop through found items and render results
       context.stack do
         collection.each_with_index do |item, index|
           attrs = item.instance_variables.inject({}) { |hash,var| hash[var[1..-1].to_sym] = item.instance_variable_get(var); hash }
-          attrs[:link] = attrs[:links].first
-          attrs[:description] = attrs[:content]
-          p attrs
-          #p attrs
-          #p item
-          #next
-          #attrs = item.send('table')
-          context[@variable_name] = attrs.stringify_keys! if attrs.size > 0
-          context['forloop'] = {
-            'name' => @name,
-            'length' => length,
-            'index' => index + 1,
-            'index0' => index,
-            'rindex' => length - index,
-            'rindex0' => length - index -1,
-            'first' => (index == 0),
-            'last' => (index == length - 1) }
-
-          result << render_all(@nodelist, context)
+          rr = "<article>\n<header>\n <h1 class=\"entry-title\"> <a href=\"%s\">%s</a>\n</h1>\n  </header>\n <div class=\"entry-content\">\n%s</div>\n</article>\n" % [attrs[:links].first, attrs[:title], attrs[:content]]
+          #print "\n rr=\n%s\n" % [rr]
+          result << rr
         end
       end
+
       result
     end
+
   end
 end
 
 Liquid::Template.register_tag('rssfeed', Jekyll::RSSFeedTag)
-
