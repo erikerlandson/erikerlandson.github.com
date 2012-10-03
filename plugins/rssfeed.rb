@@ -1,13 +1,4 @@
-require 'open-uri'
-require 'pp'
-require 'ostruct'
-require 'yaml'
 require 'jekyll'
-require 'date'
-require 'digest/md5'
-require 'net/http'
-require 'net/https'
-require 'uri'
 require 'feedzirra'
 
 
