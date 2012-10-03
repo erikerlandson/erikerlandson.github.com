@@ -38,7 +38,7 @@ module Jekyll
       # get the list of feed urls
       @urls = []
       @urls << @attributes['url'] if @attributes.has_key?('url')
-      @urls += load_url_file(@attributes['url_file']) if @attributes.has_key?('url_file')
+      @urls += self.class.load_url_file(@attributes['url_file']) if @attributes.has_key?('url_file')
       # helpfully remove any duplicate urls
       @urls.uniq!
 
@@ -78,7 +78,7 @@ module Jekyll
       # render the html tagging for each post in the feed
       entries.each do |e|
         pt = e.published
-        ts = "<time datetime=\"%s\" pubdate data-updated=\"true\">%s %s<span>%s</span>, %s &nbsp; &mdash; &nbsp;  %s</time>" % [pt.strftime("%FT%T%:z"), pt.strftime("%b"), pt.strftime("%-d"), _th(pt.day), pt.strftime("%Y"), e.author]
+        ts = "<time datetime=\"%s\" pubdate data-updated=\"true\">%s %s<span>%s</span>, %s &nbsp; &mdash; &nbsp;  %s</time>" % [pt.strftime("%FT%T%:z"), pt.strftime("%b"), pt.strftime("%-d"), self.class._th(pt.day), pt.strftime("%Y"), e.author]
         rr = "<article>\n<header>\n <h1 class=\"entry-title\"> <a href=\"%s\">%s</a>\n</h1>\n  <p class=\"meta\">\n%s\n</p>\n</header>\n <div class=\"entry-content\">\n%s</div>\n</article>\n" % [e.url, e.title, ts, e.content]
         result << rr
       end
@@ -88,7 +88,7 @@ module Jekyll
 
 
     # read in a url list from a file
-    def load_url_file(fname)
+    def self.load_url_file(fname)
       # A predefined 'repo root dir' variable would be a better answer
       # however, this appears to work OK, as you have to invoke jekyll from 
       # the top repo dir anyway:
@@ -103,7 +103,7 @@ module Jekyll
     end
 
 
-    def _th(day)
+    def self._th(day)
       return "th" if [11,12,13].include?(day)
       d = day % 10
       return "st" if d == 1
@@ -111,6 +111,7 @@ module Jekyll
       return "rd" if d == 3
       return "th"
     end
+
 
   end
 end
