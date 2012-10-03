@@ -70,6 +70,8 @@ module Jekyll
       # collect html for each entry here:
       result = []
 
+      result << "<div class=\"blog-index\">\n"
+
       # Inserts a blogroll title at the top
       # So far, what looked best was just doing this as an 'empty article', with underlining added
       rr = "<article>\n<header>\n <h1 align=\"center\", class=\"entry-title\"><u>%s</u></h1> </header>\n <div class=\"entry-content\">\n%s</div>\n</article>\n" % [@title,"\n"]
@@ -82,6 +84,8 @@ module Jekyll
         rr = "<article>\n<header>\n <h1 class=\"entry-title\"> <a href=\"%s\">%s</a>\n</h1>\n  <p class=\"meta\">\n%s\n</p>\n</header>\n <div class=\"entry-content\">\n%s</div>\n</article>\n" % [e.url, e.title, ts, e.content]
         result << rr
       end
+
+      result << "</div>\n"
 
       result
     end
