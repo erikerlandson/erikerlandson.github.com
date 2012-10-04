@@ -16,10 +16,14 @@ module Jekyll
     Syntax = /(#{Liquid::QuotedFragment}+)?/ 
 
     def initialize(tag_name, markup, tokens)
+      # This tag is designed to grab its parameters from the yaml front-matter,
+      # so it doesn't expect any params in-line from the markup.  So the constructor
+      # has nothing to do.
       super
     end
 
 
+    # extract parameters from yaml front-matter, which is available via liquid context
     def extract_params(context)
       defaults = { 'title' => 'Blog Feed', 'post_limit' => 5, 'feed_list' => [] }
       @params = defaults.merge(context['page'])
@@ -37,7 +41,7 @@ module Jekyll
       @urls.uniq!
     end
 
-
+    # render feed entries
     def render(context)
       # context['page'] includes any attributes set via yaml front-matter,
       # which we expect to include feed aggregator settings if we are being invoked
