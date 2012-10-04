@@ -10,45 +10,42 @@ end
 
 
 module Jekyll
-  class RSSFeedTag < Liquid::Tag
+  class FeedAggregatorEntries < Liquid::Tag
 
     include Liquid::StandardFilters
     Syntax = /(#{Liquid::QuotedFragment}+)?/ 
 
     def initialize(tag_name, markup, tokens)
-      @attributes = { 'title' => 'Blog Feed', 'post_limit' => 5 }
-
-      # Parse parameters
-      if markup =~ Syntax
-        markup.scan(Liquid::TagAttributes) do |key, value|
-          @attributes[key] = value
-        end
-      else
-        raise SyntaxError.new("Syntax Error in 'rssfeed' - Valid syntax: rssfeed url:<url>")
-      end
-
-      # title to use for the blog feed
-      @title = @attributes['title']
-      # quoted strings from tag argument list have this weird quirk that the quotes are left in
-      @title.gsub!(/\A['"]+|['"]+\Z/, "")
-
-      # max number of posts to take from each feed url
-      @post_limit = @attributes['post_limit'].to_i
-
-      # get the list of feed urls
-      @urls = []
-      @urls << @attributes['url'] if @attributes.has_key?('url')
-      @urls += self.class.load_url_file(@attributes['url_file']) if @attributes.has_key?('url_file')
-      # helpfully remove any duplicate urls
-      @urls.uniq!
-
       super
     end
 
 
+    def extract_params(context)
+      defaults = { 'title' => 'Blog Feed', 'post_limit' => 5, 'feed_list' => [] }
+      # context['page'] includes any attributes set via yaml front-matter,
+      # which we expect to include feed aggregator settings if we are being invoked
+      @params = defaults.merge(context['page'])
+
+      # title to use for the blog feed
+      @title = @params['title']
+      # quoted strings from tag argument list have this weird quirk that the quotes are left in
+      @title.gsub!(/\A['"]+|['"]+\Z/, "")
+
+      # max number of posts to take from each feed url
+      @post_limit = @params['post_limit'].to_i
+
+      # get the list of feed urls
+      @urls = @params['feed_list']
+      @urls.uniq!
+    end
+
+
     def render(context)
+      extract_params(context)
+
       # aggregate all feed urls into a single list of entries
       entries = []
+      authors = []
       @urls.each do |url|
         feed = Feedzirra::Feed.fetch_and_parse(url)
         # take entries, up to the given post limit
@@ -56,9 +53,14 @@ module Jekyll
         # grab author from feed header if it isn't in the entry itself:
         ef.each do |e|
           e.author = feed.author unless e.author
+          authors << e.author
         end
         entries += ef
       end
+
+      # store unique author list
+      authors.uniq!
+      context['feed_member_list'] = authors
 
       # eliminate any duplicate blog entries, by post id
       # (appears to be using entry url for id, which seems reasonable)
@@ -69,8 +71,6 @@ module Jekyll
 
       # collect html for each entry here:
       result = []
-
-      result << "<div class=\"blog-index\">\n"
 
       # Inserts a blogroll title at the top
       # So far, what looked best was just doing this as an 'empty article', with underlining added
@@ -85,27 +85,8 @@ module Jekyll
         result << rr
       end
 
-      result << "</div>\n"
-
       result
     end
-
-
-    # read in a url list from a file
-    def self.load_url_file(fname)
-      # A predefined 'repo root dir' variable would be a better answer
-      # however, this appears to work OK, as you have to invoke jekyll from 
-      # the top repo dir anyway:
-      fqn = Dir.pwd + "/source/" + fname
-      urls = []
-      File.open(fqn).each do |url|
-        # get rid of any trailing nl or cr
-        url.gsub!(/[\n\r]+\Z/, "")
-        urls << url
-      end
-      urls
-    end
-
 
     def self._th(day)
       return "th" if [11,12,13].include?(day)
@@ -116,9 +97,20 @@ module Jekyll
       return "th"
     end
 
-
   end
 end
 
+module FeedAggregatorFilters
+  def feed_member_aside(member_list)
+    r = "<section>\n"
+    r += "<h1>Members</h1>\n"
+    member_list.each do |name|
+      r += "#{name}<br>\n"
+    end
+    r += "</section>\n"
+    r
+  end
+end
 
-Liquid::Template.register_tag('rssfeed', Jekyll::RSSFeedTag)
+Liquid::Template.register_tag('feed_aggregator_entries', Jekyll::FeedAggregatorEntries)
+Liquid::Template.register_filter(FeedAggregatorFilters)
