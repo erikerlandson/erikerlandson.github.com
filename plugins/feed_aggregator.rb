@@ -22,8 +22,6 @@ module Jekyll
 
     def extract_params(context)
       defaults = { 'title' => 'Blog Feed', 'post_limit' => 5, 'feed_list' => [] }
-      # context['page'] includes any attributes set via yaml front-matter,
-      # which we expect to include feed aggregator settings if we are being invoked
       @params = defaults.merge(context['page'])
 
       # title to use for the blog feed
@@ -41,26 +39,48 @@ module Jekyll
 
 
     def render(context)
+      # context['page'] includes any attributes set via yaml front-matter,
+      # which we expect to include feed aggregator settings if we are being invoked
       extract_params(context)
 
       # aggregate all feed urls into a single list of entries
       entries = []
       authors = []
       @urls.each do |url|
-        feed = Feedzirra::Feed.fetch_and_parse(url)
+        begin
+          feed = Feedzirra::Feed.fetch_and_parse(url)
+        rescue
+          feed = nil
+        end
+        if not feed then
+          print "failed to acquire feed url %s\n" % [url]
+          next
+        end
+
         # take entries, up to the given post limit
         ef = feed.entries.first(@post_limit)
-        # grab author from feed header if it isn't in the entry itself:
-        ef.each do |e|
-          e.author = feed.author unless e.author
-          authors << e.author
+        # if no entries, skip this feed
+        next if ef.length < 1
+
+        # if there was no feed author, try to get it from a feed entry
+        if not feed.author then
+          if ef.first.author then
+            feed.author = ef.first.author
+          else
+            # if we found neither, cest la vie
+            feed.author = "Author Unavailable"
+          end
         end
+        # grab author from feed header if it isn't in the entry itself:
+        ef.each { |e| e.author = feed.author unless e.author }
         entries += ef
+        # member info is per-feed:
+        auth = feed.author.split(' ')
+        authors << { 'first' => auth[0], 'last' => auth[1..-1].join(' '), 'url' => feed.url }
       end
 
-      # store unique author list
-      authors.uniq!
-      context['feed_member_list'] = authors
+      # store member list information - will be used to generate an aside with members
+      context['feed_member_info'] = { 'title' => @title, 'authors' => authors }
 
       # eliminate any duplicate blog entries, by post id
       # (appears to be using entry url for id, which seems reasonable)
@@ -101,11 +121,13 @@ module Jekyll
 end
 
 module FeedAggregatorFilters
-  def feed_member_aside(member_list)
+  def feed_member_aside(member_info)
+    member_list = member_info['authors']
+    member_list.sort! { |a,b| [a['last'],a['first']] <=> [b['last'],b['first']] }
     r = "<section>\n"
-    r += "<h1>Members</h1>\n"
-    member_list.each do |name|
-      r += "#{name}<br>\n"
+    r += "<h1>#{member_info['title']} Members</h1>\n"
+    member_list.each do |e|
+      r += "<a href=\"#{e['url']}\">#{e['first']} #{e['last']}</a><br>\n"
     end
     r += "</section>\n"
     r
