@@ -10,7 +10,7 @@ end
 
 
 module Jekyll
-  class RSSFeedTag < Liquid::Block
+  class RSSFeedTag < Liquid::Tag
 
     include Liquid::StandardFilters
     Syntax = /(#{Liquid::QuotedFragment}+)?/ 
