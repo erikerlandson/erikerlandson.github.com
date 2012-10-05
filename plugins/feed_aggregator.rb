@@ -1,6 +1,6 @@
 require 'jekyll'
 require 'feedzirra'
-
+require './plugins/date'
 
 # octopress atom entries don't include author, but I can get it from the feed header,
 # so add another sax parsing rule:
@@ -9,10 +9,12 @@ class Feedzirra::Parser::Atom
 end
 
 
-class FeedAggregatorEntries < Liquid::Tag
+class FeedAggregator < Liquid::Tag
 
   include Liquid::StandardFilters
   Syntax = /(#{Liquid::QuotedFragment}+)?/ 
+
+  include Octopress::Date
 
   def initialize(tag_name, markup, tokens)
     # This tag is designed to grab its parameters from the yaml front-matter,
@@ -82,8 +84,11 @@ class FeedAggregatorEntries < Liquid::Tag
       authors << { 'first' => auth[0], 'last' => auth[1..-1].join(' '), 'url' => feed.url }
     end
 
-    # store member list information - will be used to generate an aside with members
-    context['feed_member_info'] = { 'title' => @title, 'authors' => authors }
+    # make sure author entries are unique with respect to name and url
+    authors.uniq! { |e| [e['last'], e['first'], e['url']] }
+
+    # sort authors by lastname, firstname
+    authors.sort! { |a,b| [a['last'],a['first']] <=> [b['last'],b['first']] }
 
     # eliminate any duplicate blog entries, by post id
     # (appears to be using entry url for id, which seems reasonable)
@@ -92,50 +97,31 @@ class FeedAggregatorEntries < Liquid::Tag
     # sort by pub date, most-recent first
     entries.sort! { |a,b| b.published <=> a.published }
 
-    # collect html for each entry here:
-    result = []
-
-    # Inserts a blogroll title at the top
-    # So far, what looked best was just doing this as an 'empty article', with underlining added
-    rr = "<article>\n<header>\n <h1 align=\"center\", class=\"entry-title\"><u>%s</u></h1> </header>\n <div class=\"entry-content\">\n%s</div>\n</article>\n" % [@title,"\n"]
-    result << rr
-
-    # render the html tagging for each post in the feed
+    posts = []
     entries.each do |e|
-      pt = e.published
-      ts = "<time datetime=\"%s\" pubdate data-updated=\"true\">%s %s<span>%s</span>, %s &nbsp; &mdash; &nbsp;  %s</time>" % [pt.strftime("%FT%T%:z"), pt.strftime("%b"), pt.strftime("%-d"), self.class._th(pt.day), pt.strftime("%Y"), e.author]
-      rr = "<article>\n<header>\n <h1 class=\"entry-title\"> <a href=\"%s\">%s</a>\n</h1>\n  <p class=\"meta\">\n%s\n</p>\n</header>\n <div class=\"entry-content\">\n%s</div>\n</article>\n" % [e.url, e.title, ts, e.content]
-      result << rr
+      posts << {
+        'url' => e.url,
+        'title' => e.title,
+        'author' => e.author,
+        'content' => e.content,
+        'date' => e.published,
+        'date_formatted' => format_date(e.published, context['site']['date_format']),
+        'comments' => 'false'
+      }
     end
 
-    result
-  end
+    # load our feed aggregator structure back into the context so jekyll/liquid can consume it
+    context['feed_aggregator'] = { 
+      'title' => @title,
+      'authors' => authors,
+      'posts' => posts
+    }    
 
-  def self._th(day)
-    return "th" if [11,12,13].include?(day)
-    d = day % 10
-    return "st" if d == 1
-    return "nd" if d == 2
-    return "rd" if d == 3
-    return "th"
+    # This tag is for creating the side effect of entering 'feed_aggregator'
+    # into the liquid context, so it's render 'result' can be empty
+    " "
   end
-
 end
 
 
-module FeedAggregatorFilters
-  def feed_member_aside(member_info)
-    member_list = member_info['authors']
-    member_list.sort! { |a,b| [a['last'],a['first']] <=> [b['last'],b['first']] }
-    r = "<section>\n"
-    r += "<h1>#{member_info['title']} Members</h1>\n"
-    member_list.each do |e|
-      r += "<a href=\"#{e['url']}\">#{e['first']} #{e['last']}</a><br>\n"
-    end
-    r += "</section>\n"
-    r
-  end
-end
-
-Liquid::Template.register_tag('feed_aggregator_entries', FeedAggregatorEntries)
-Liquid::Template.register_filter(FeedAggregatorFilters)
+Liquid::Template.register_tag('feed_aggregator', FeedAggregator)
