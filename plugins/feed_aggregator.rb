@@ -1,38 +1,30 @@
+require 'set'
 require 'jekyll'
 require 'feedzirra'
 require './plugins/date'
 
-# octopress atom entries don't include author, but I can get it from the feed header,
-# so add another sax parsing rule:
 class Feedzirra::Parser::Atom
+  # octopress atom entries don't include author, but I can get it from the feed header,
+  # so add another sax parsing rule:
   element :name, :as => :author
 end
 
+class Feedzirra::Parser::AtomEntry
+  # sax parsing rule to skim post-specific author url.
+  # useful for meta-feeds, and/or any feed with multiple authors
+  element :uri, :as => :author_url
+end
 
-class FeedAggregator < Liquid::Tag
+# A module for compiling feeds into an aggregated feed structure
+module FeedAggregator
+  extend Octopress::Date
 
-  include Liquid::StandardFilters
-  Syntax = /(#{Liquid::QuotedFragment}+)?/ 
-
-  include Octopress::Date
-
-  def initialize(tag_name, markup, tokens)
-    # This tag is designed to grab its parameters from the yaml front-matter,
-    # so it doesn't expect any params in-line from the markup.  So the constructor
-    # has nothing to do.
-    super
-  end
-
-
-  # extract parameters from yaml front-matter, which is available via liquid context
-  def extract_params(context)
+  def self.compile_feeds(site, fa_data)
     defaults = { 'title' => 'Blog Feed', 'post_limit' => 5, 'feed_list' => [] }
-    @params = defaults.merge(context['page'])
+    @params = defaults.merge(fa_data)
 
     # title to use for the blog feed
     @title = @params['title']
-    # quoted strings from tag argument list have this weird quirk that the quotes are left in
-    @title.gsub!(/\A['"]+|['"]+\Z/, "")
 
     # max number of posts to take from each feed url
     @post_limit = @params['post_limit'].to_i
@@ -40,25 +32,18 @@ class FeedAggregator < Liquid::Tag
     # get the list of feed urls
     @urls = @params['feed_list']
     @urls.uniq!
-  end
-
-  # render feed entries
-  def render(context)
-    # context['page'] includes any attributes set via yaml front-matter,
-    # which we expect to include feed aggregator settings if we are being invoked
-    extract_params(context)
 
     # aggregate all feed urls into a single list of entries
     entries = []
-    authors = []
+    authors = Set.new()
     @urls.each do |url|
       begin
         feed = Feedzirra::Feed.fetch_and_parse(url)
       rescue
         feed = nil
       end
-      if not feed then
-        print "failed to acquire feed url %s\n" % [url]
+      if not feed.respond_to?(:entries) then
+        warn "Failed to acquire feed url: %s\n" % [url]
         next
       end
 
@@ -77,17 +62,17 @@ class FeedAggregator < Liquid::Tag
         end
       end
       # grab author from feed header if it isn't in the entry itself:
-      ef.each { |e| e.author = feed.author unless e.author }
+      ef.each do |e|
+        e.author = feed.author unless e.author
+        e.author_url = feed.url unless e.author_url
+        auth = e.author.split(' ')
+        authors << { 'first' => auth[0], 'last' => auth[1..-1].join(' '), 'url' => e.author_url }
+      end
       entries += ef
-      # member info is per-feed:
-      auth = feed.author.split(' ')
-      authors << { 'first' => auth[0], 'last' => auth[1..-1].join(' '), 'url' => feed.url }
     end
 
-    # make sure author entries are unique with respect to name and url
-    authors.uniq! { |e| [e['last'], e['first'], e['url']] }
-
-    # sort authors by lastname, firstname
+    # recast author list to an array, and sort by lastname, firstname
+    authors = authors.to_a
     authors.sort! { |a,b| [a['last'],a['first']] <=> [b['last'],b['first']] }
 
     # eliminate any duplicate blog entries, by post id
@@ -100,28 +85,111 @@ class FeedAggregator < Liquid::Tag
     posts = []
     entries.each do |e|
       posts << {
+        'id' => e.entry_id,
         'url' => e.url,
         'title' => e.title,
         'author' => e.author,
+        'author_url' => e.author_url,
         'content' => e.content,
         'date' => e.published,
-        'date_formatted' => format_date(e.published, context['site']['date_format']),
+        'date_formatted' => format_date(e.published, site.config['date_format']),
         'comments' => 'false'
       }
     end
 
-    # load our feed aggregator structure back into the context so jekyll/liquid can consume it
-    context['feed_aggregator'] = { 
+    # return data from compiling the feeds
+    {
       'title' => @title,
       'authors' => authors,
       'posts' => posts
     }    
-
-    # This tag is for creating the side effect of entering 'feed_aggregator'
-    # into the liquid context, so it's render 'result' can be empty
-    " "
   end
 end
 
 
-Liquid::Template.register_tag('feed_aggregator', FeedAggregator)
+module Jekyll
+
+  class FeedAggregatorPage < Page
+    def initialize(page, data)
+      # start with a naive copy of 'page'
+      page.instance_variables.each {|var| self.instance_variable_set(var, page.instance_variable_get(var))}
+
+      self.process(@name)
+      # fun fact: read_yaml() really reads both front-matter and subsequent content:
+      self.read_yaml(File.join(@base, '_layouts'), 'feed_aggregator_page.html')
+
+      # load these into data, so they are available to Jekyll/Liquid context:
+      @data['title'] = data['title']
+      @data['feed_aggregator'] = data['feed_aggregator']
+    end
+  end
+
+
+  class FeedAggregatorMeta < Page
+    def initialize(page, data)
+      # start with a naive copy of 'page'
+      page.instance_variables.each {|var| self.instance_variable_set(var, page.instance_variable_get(var))}
+
+      path = data['meta_feed']
+      path = 'atom.xml' if path == nil or path == ''
+
+      # now customize path-related stuff based on 'meta_feed' param
+      tdir = File.dirname(path)
+      @dir = tdir if tdir.size > 0 and tdir != '.'
+      if @dir.size > 0  and  @dir[0] != '/' then
+        @dir = '/' + @dir
+      end
+      @ext = File.extname(path)
+      @basename = File.basename(path, @ext)
+      @name = @basename + @ext
+      @url = '/' + @name
+
+      self.process(@name)
+      # read_yaml() really reads both front-matter and subsequent content:
+      self.read_yaml(File.join(@base, '_layouts'), 'feed_aggregator_meta.xml')
+
+      # load these into data, so they are available to Jekyll/Liquid context:
+      @data['title'] = data['title']
+      @data['feed_aggregator'] = data['feed_aggregator']
+    end
+  end
+
+
+  class Site
+    def generate_feed_aggregators
+      # render content for any pages with layout 'feed_aggregator':
+      self.pages.select{|p| p.data['layout']=='feed_aggregator'}.each do |page|
+        fa_data = page.data
+
+        # compile the requested feeds and save the result on fa_data
+        fa_data['feed_aggregator'] = FeedAggregator.compile_feeds(self, page.data)
+
+        # render the feed aggregator page
+        fa_page = FeedAggregatorPage.new(page, fa_data)
+        fa_page.render(self.layouts, site_payload)
+        fa_page.write(self.dest)
+        self.pages << fa_page
+
+        if fa_data.key?('meta_feed') then
+          # a meta feed was requested, so generate that as well
+          fa_meta = FeedAggregatorMeta.new(page, fa_data)
+          fa_meta.render(self.layouts, site_payload)
+          fa_meta.write(self.dest)
+          self.pages << fa_meta
+        end
+      end
+    end
+  end
+
+
+  # Add a generator to render feed aggregator content
+  # This is apparently detected automagically via ruby introspection
+  class GenerateFeedAggregators < Generator
+    safe true
+    priority :low
+
+    def generate(site)
+      site.generate_feed_aggregators
+    end
+  end
+end

@@ -1,7 +1,17 @@
 ---
+# use this layout to generate a feed aggregator page
 layout: feed_aggregator
+
+# page title
 title: Planet Condor
-post_limit: 3
+
+# limit posts from each feed (defaults to 5)
+post_limit: 5
+
+# generate a metafeed (optional)
+meta_feed: atom.xml
+
+# list the feed urls to aggregate
 feed_list:
   - http://erikerlandson.github.com/blog/categories/computing/atom.xml
   - http://timothysc.github.com/atom.xml
