@@ -1,0 +1,380 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Hosting a Blog Feed Aggregator With Octopress - tool monkey</title>
+  <meta name="author" content="Erik Erlandson">
+
+  
+  <meta name="description" content="I have written an Octopress plugin to allow turnkey support for hosting a blog feed aggregator, in Octopress idiomatic style. I will describe the &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://erikerlandson.github.com/blog/2012/10/05/hosting-a-blog-feed-aggregator-with-octopress/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="tool monkey" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+
+  <!-- enables inclusion of MathJax LaTeX: http://greglus.com/blog/2011/11/29/integrate-MathJax-LaTeX-and-MathML-Markup-in-Octopress/ -->
+  <script type="text/javascript"
+    src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">tool monkey</a></h1>
+  
+    <h2>casting doubt on the merits of opposable thumbs since 1969</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:erikerlandson.github.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+  <li><a href="/planet">Planet</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Hosting a Blog Feed Aggregator With Octopress</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-10-05T12:52:00-07:00" pubdate data-updated="true">Oct 5<span>th</span>, 2012</time>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>I have written an Octopress plugin to allow turnkey support for hosting a blog feed aggregator, in Octopress idiomatic style.  I will describe the steps to install it and use it below.  Some of its current features are:</p>
+
+<ul>
+<li>Easy configuration and deployment, providing all feed aggregator parameters as yaml front-matter</li>
+<li>Turn-key generation of feed aggregator pages, in the configured site style</li>
+<li>Optional generation of a &#8216;meta-feed&#8217; in atom.xml format, from aggregated feed entries</li>
+<li>Automatic removal of duplicate feed list urls, and automatic removal of duplicate posts (e.g. if multiple category feeds from the same author are listed)</li>
+<li>Automatic generation of feed author list as an Octopress &#8216;aside&#8217;</li>
+</ul>
+
+
+<h3>Install the feed_aggregator.rb plugin</h3>
+
+<p>Currently, you can obtain a copy of &#8220;feed_aggregator.rb&#8221; here:</p>
+
+<p><a href="https://github.com/erikerlandson/erikerlandson.github.com/blob/source/plugins/feed_aggregator.rb">https://github.com/erikerlandson/erikerlandson.github.com/blob/source/plugins/feed_aggregator.rb</a></p>
+
+<p>Simply copy this file into the plugins directory for your octopress repo:</p>
+
+<pre><code>$ cp feed_aggregator.rb /path/to/your/octopress/repo/plugins
+</code></pre>
+
+<h3>Install feed aggregator layout files</h3>
+
+<p>You can obtain a copy of the layout files here:</p>
+
+<ul>
+<li><a href="https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator.html">https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator.html</a></li>
+<li><a href="https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator_page.html">https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator_page.html</a></li>
+<li><a href="https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator_meta.xml">https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator_meta.xml</a></li>
+</ul>
+
+
+<p>Copy the layouts files to your &#8216;_layouts&#8217; directory:</p>
+
+<pre><code>$ cp feed_aggregator.html /path/to/your/octopress/repo/source/_layouts
+$ cp feed_aggregator_page.html /path/to/your/octopress/repo/source/_layouts
+$ cp feed_aggregator_meta.xml /path/to/your/octopress/repo/source/_layouts
+</code></pre>
+
+<h3>Add feedzirra dependency to the Octopress Gemfile</h3>
+
+<p>Octopress wants its dependencies bundled, so you will want to add this dependency to /path/to/your/octopress/repo/Gemfile:</p>
+
+<pre><code>gem 'feedzirra', '~&gt; 0.1.3'
+</code></pre>
+
+<p>Then update the bundles:</p>
+
+<pre><code>$ bundle update
+</code></pre>
+
+<h3>Create a page for your feed aggregator</h3>
+
+<p>Here is an example feed aggregator:</p>
+
+<pre><code>---
+# use the 'feed_aggregator' layout to generate a feed aggregator page
+layout: feed_aggregator
+
+# Title to display for the feed
+title: My Blog Feed Aggregator
+
+# maximum number of entries from each feed url to display (defaults to 5)
+post_limit: 5
+
+# generate a 'meta-feed' atom file, with the given name 'atom.xml' (meta feeds are optional)
+# (with no directory, generates in same directory as the feed aggregator page)
+meta_feed: atom.xml
+
+# list all urls to aggregate here
+feed_list:
+  - http://blog_site_1.com/atom.xml
+  - http://blog_site_2.com/atom.xml
+  - http://blog_site_3.com/atom.xml
+---
+</code></pre>
+
+<p>As you can see, you only need to supply some yaml front-matter.  Page formatting/rendering is performed automatically from the information in the header.  You must use <code>layout: feed_aggregator</code>, and include the standard <code>title</code> to use for the aggregator title.  <code>post_limit: 5</code> Indicates that at most 5 posts from each feed will be included.  Finally, the <code>feed_list</code> parameter allows you to list each feed url you wish to aggregate.</p>
+
+<p>Once you&#8217;ve created the page, you can publish as usual:</p>
+
+<pre><code>$ rake generate
+$ rake deploy
+</code></pre>
+
+<p>If you want to update your feed automatically, you can set up a cron job:</p>
+
+<pre><code>cd /path/to/octopress/repo
+rake generate
+rake deploy
+</code></pre>
+
+<h3>Screen Shot</h3>
+
+<p>Here is a screen shot of a feed aggregator.  It respects whatever style theme is configured for the site.  The aggregator title is at the top, and a list of contributing authors is automatically generated as an &#8216;aside&#8217;.  Each author name links to the parent blog of the author&#8217;s feed.  In addition to the standard date, the author&#8217;s name is also included.  Post titles link back to the original post url.</p>
+
+<p><img src="/assets/feed_aggregator/screen1.png" alt="Aggregator Screen Shot" /></p>
+
+<h3>Meta feed generation</h3>
+
+<p>You may optionally request that a meta feed, created from the aggregated posts, be generated.  The meta feed is created in atom format.  Following are some examples of specifying meta feed files</p>
+
+<pre><code># Generate a meta feed called 'atom.xml' in the same directory as the feed aggregator page
+# e.g. if the url for the feed aggregator page is  http://blog.site.com/aggregator/index.html, 
+# then the path to the meta-feed will be: http://blog.site.com/aggregator/atom.xml
+meta_feed: atom.xml
+
+# Generate a meta feed called 'wilma.xml' in subdirectory 'flintstones' of the website.
+# the url for this file will be:   http://blog.site.com/flintstones/wilma.xml
+meta_feed: /flintstones/wilma.xml
+
+# url for this will be http://blog.site.com/metafeed.xml
+meta_feed: /metafeed.xml
+
+# Supplying no file name is equivalent to 'meta_feed: atom.xml'
+meta_feed:
+</code></pre>
+
+<h3>To Do</h3>
+
+<ul>
+<li>It might be nice to support the display of an avatar/icon for authors</li>
+<li>Issue a pull request, so the feed aggregator can be included as a standard octopress feature</li>
+</ul>
+
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Erik Erlandson</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-10-05T12:52:00-07:00" pubdate data-updated="true">Oct 5<span>th</span>, 2012</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/blog/'>blog</a>, <a class='category' href='/blog/categories/blog-feed/'>blog feed</a>, <a class='category' href='/blog/categories/computing/'>computing</a>, <a class='category' href='/blog/categories/feed-aggregator/'>feed aggregator</a>, <a class='category' href='/blog/categories/octopress/'>octopress</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://erikerlandson.github.com/blog/2012/10/05/hosting-a-blog-feed-aggregator-with-octopress/" data-via="" data-counturl="http://erikerlandson.github.com/blog/2012/10/05/hosting-a-blog-feed-aggregator-with-octopress/" >Tweet</a>
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2012/09/26/improved-parse-checking-for-classad-log-files-in-condor/" title="Previous Post: Improved Parse Checking for ClassAd Log Files in Condor">&laquo; Improved Parse Checking for ClassAd Log Files in Condor</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>About The Author</h1>
+  <p>Erik is a senior software engineer at <a href="http://www.redhat.com">Red Hat</a> who works as a developer on the <a href="http://www.redhat.com/products/mrg/grid/">Red Hat Enterprise MRG Grid</a> suite.</p>
+</section>
+<section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2012/10/05/hosting-a-blog-feed-aggregator-with-octopress/">Hosting a Blog Feed Aggregator With Octopress</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2012/09/26/improved-parse-checking-for-classad-log-files-in-condor/">Improved Parse Checking for ClassAd Log Files in Condor</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2012/07/27/driving-a-condor-job-renice-policy-with-accounting-groups/">Driving a Condor Job Renice Policy with Accounting Groups</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2012/07/19/lifo-and-fifo-preemption-policies-for-a-condor-pool/">LIFO and FIFO Preemption Policies for a Condor Pool</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2012/07/10/configuring-minimum-and-maximum-resources-for-mission-critical-jobs-in-a-condor-pool/">Configuring Minimum and Maximum Resources for Mission Critical Jobs in a Condor Pool</a>
+      </li>
+    
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/erikerlandson">@erikerlandson</a> on GitHub
+  
+  <script type="text/javascript">
+    $.domReady(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'erikerlandson',
+            count: 0,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2012 - Erik Erlandson -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+
+
+
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>

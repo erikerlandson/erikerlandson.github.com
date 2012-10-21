@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: personal | tool monkey]]></title>
+  <link href="http://erikerlandson.github.com/blog/categories/personal/atom.xml" rel="self"/>
+  <link href="http://erikerlandson.github.com/"/>
+  <updated>2012-10-21T13:29:30-07:00</updated>
+  <id>http://erikerlandson.github.com/</id>
+  <author>
+    <name><![CDATA[Erik Erlandson]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Don't try to stop me. I'm on a rampage.]]></title>
+    <link href="http://erikerlandson.github.com/blog/2012/03/19/dont-try-to-stop-me/"/>
+    <updated>2012-03-19T12:08:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2012/03/19/dont-try-to-stop-me</id>
+    <content type="html"><![CDATA[<p>In which I join the 21st century, kicking and screaming.</p>
+]]></content>
+  </entry>
+  
+</feed>

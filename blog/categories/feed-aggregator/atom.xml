@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: feed aggregator | tool monkey]]></title>
+  <link href="http://erikerlandson.github.com/blog/categories/feed-aggregator/atom.xml" rel="self"/>
+  <link href="http://erikerlandson.github.com/"/>
+  <updated>2012-10-21T13:29:30-07:00</updated>
+  <id>http://erikerlandson.github.com/</id>
+  <author>
+    <name><![CDATA[Erik Erlandson]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Hosting a Blog Feed Aggregator With Octopress]]></title>
+    <link href="http://erikerlandson.github.com/blog/2012/10/05/hosting-a-blog-feed-aggregator-with-octopress/"/>
+    <updated>2012-10-05T12:52:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2012/10/05/hosting-a-blog-feed-aggregator-with-octopress</id>
+    <content type="html"><![CDATA[<p>I have written an Octopress plugin to allow turnkey support for hosting a blog feed aggregator, in Octopress idiomatic style.  I will describe the steps to install it and use it below.  Some of its current features are:</p>
+
+<ul>
+<li>Easy configuration and deployment, providing all feed aggregator parameters as yaml front-matter</li>
+<li>Turn-key generation of feed aggregator pages, in the configured site style</li>
+<li>Optional generation of a 'meta-feed' in atom.xml format, from aggregated feed entries</li>
+<li>Automatic removal of duplicate feed list urls, and automatic removal of duplicate posts (e.g. if multiple category feeds from the same author are listed)</li>
+<li>Automatic generation of feed author list as an Octopress 'aside'</li>
+</ul>
+
+
+<h3>Install the feed_aggregator.rb plugin</h3>
+
+<p>Currently, you can obtain a copy of "feed_aggregator.rb" here:</p>
+
+<p><a href="https://github.com/erikerlandson/erikerlandson.github.com/blob/source/plugins/feed_aggregator.rb">https://github.com/erikerlandson/erikerlandson.github.com/blob/source/plugins/feed_aggregator.rb</a></p>
+
+<p>Simply copy this file into the plugins directory for your octopress repo:</p>
+
+<pre><code>$ cp feed_aggregator.rb /path/to/your/octopress/repo/plugins
+</code></pre>
+
+<h3>Install feed aggregator layout files</h3>
+
+<p>You can obtain a copy of the layout files here:</p>
+
+<ul>
+<li><a href="https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator.html">https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator.html</a></li>
+<li><a href="https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator_page.html">https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator_page.html</a></li>
+<li><a href="https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator_meta.xml">https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator_meta.xml</a></li>
+</ul>
+
+
+<p>Copy the layouts files to your '_layouts' directory:</p>
+
+<pre><code>$ cp feed_aggregator.html /path/to/your/octopress/repo/source/_layouts
+$ cp feed_aggregator_page.html /path/to/your/octopress/repo/source/_layouts
+$ cp feed_aggregator_meta.xml /path/to/your/octopress/repo/source/_layouts
+</code></pre>
+
+<h3>Add feedzirra dependency to the Octopress Gemfile</h3>
+
+<p>Octopress wants its dependencies bundled, so you will want to add this dependency to /path/to/your/octopress/repo/Gemfile:</p>
+
+<pre><code>gem 'feedzirra', '~&gt; 0.1.3'
+</code></pre>
+
+<p>Then update the bundles:</p>
+
+<pre><code>$ bundle update
+</code></pre>
+
+<h3>Create a page for your feed aggregator</h3>
+
+<p>Here is an example feed aggregator:</p>
+
+<pre><code>---
+# use the 'feed_aggregator' layout to generate a feed aggregator page
+layout: feed_aggregator
+
+# Title to display for the feed
+title: My Blog Feed Aggregator
+
+# maximum number of entries from each feed url to display (defaults to 5)
+post_limit: 5
+
+# generate a 'meta-feed' atom file, with the given name 'atom.xml' (meta feeds are optional)
+# (with no directory, generates in same directory as the feed aggregator page)
+meta_feed: atom.xml
+
+# list all urls to aggregate here
+feed_list:
+  - http://blog_site_1.com/atom.xml
+  - http://blog_site_2.com/atom.xml
+  - http://blog_site_3.com/atom.xml
+---
+</code></pre>
+
+<p>As you can see, you only need to supply some yaml front-matter.  Page formatting/rendering is performed automatically from the information in the header.  You must use <code>layout: feed_aggregator</code>, and include the standard <code>title</code> to use for the aggregator title.  <code>post_limit: 5</code> Indicates that at most 5 posts from each feed will be included.  Finally, the <code>feed_list</code> parameter allows you to list each feed url you wish to aggregate.</p>
+
+<p>Once you've created the page, you can publish as usual:</p>
+
+<pre><code>$ rake generate
+$ rake deploy
+</code></pre>
+
+<p>If you want to update your feed automatically, you can set up a cron job:</p>
+
+<pre><code>cd /path/to/octopress/repo
+rake generate
+rake deploy
+</code></pre>
+
+<h3>Screen Shot</h3>
+
+<p>Here is a screen shot of a feed aggregator.  It respects whatever style theme is configured for the site.  The aggregator title is at the top, and a list of contributing authors is automatically generated as an 'aside'.  Each author name links to the parent blog of the author's feed.  In addition to the standard date, the author's name is also included.  Post titles link back to the original post url.</p>
+
+<p><img src="/assets/feed_aggregator/screen1.png" alt="Aggregator Screen Shot" /></p>
+
+<h3>Meta feed generation</h3>
+
+<p>You may optionally request that a meta feed, created from the aggregated posts, be generated.  The meta feed is created in atom format.  Following are some examples of specifying meta feed files</p>
+
+<pre><code># Generate a meta feed called 'atom.xml' in the same directory as the feed aggregator page
+# e.g. if the url for the feed aggregator page is  http://blog.site.com/aggregator/index.html, 
+# then the path to the meta-feed will be: http://blog.site.com/aggregator/atom.xml
+meta_feed: atom.xml
+
+# Generate a meta feed called 'wilma.xml' in subdirectory 'flintstones' of the website.
+# the url for this file will be:   http://blog.site.com/flintstones/wilma.xml
+meta_feed: /flintstones/wilma.xml
+
+# url for this will be http://blog.site.com/metafeed.xml
+meta_feed: /metafeed.xml
+
+# Supplying no file name is equivalent to 'meta_feed: atom.xml'
+meta_feed:
+</code></pre>
+
+<h3>To Do</h3>
+
+<ul>
+<li>It might be nice to support the display of an avatar/icon for authors</li>
+<li>Issue a pull request, so the feed aggregator can be included as a standard octopress feature</li>
+</ul>
+
+]]></content>
+  </entry>
+  
+</feed>

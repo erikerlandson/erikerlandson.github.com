@@ -1,0 +1,1835 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Planet Condor - tool monkey</title>
+  <meta name="author" content="Erik Erlandson">
+
+  
+  <meta name="description" content="In an earlier post I talked about using Cluster Suite
+to manage high availability schedulers and referenced the command line tools
+available perform &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://erikerlandson.github.com/planet/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="tool monkey" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+
+  <!-- enables inclusion of MathJax LaTeX: http://greglus.com/blog/2011/11/29/integrate-MathJax-LaTeX-and-MathML-Markup-in-Octopress/ -->
+  <script type="text/javascript"
+    src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">tool monkey</a></h1>
+  
+    <h2>casting doubt on the merits of opposable thumbs since 1969</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:erikerlandson.github.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+  <li><a href="/planet">Planet</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      
+
+<br>
+<h1 align="center"><u> Planet Condor </u></h1>
+
+<div class=\"blog-index\">
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://rrati.github.com/blog/2012/10/18/using-cluster-suites-gui-to-configure-high-availability-schedulers/">Using Cluster Suite's GUI to configure High Availability Schedulers </a></h1>
+      <p class="meta">
+        <time datetime="2012-10-18T17:20:00Z" pubdate data-updated="true">Oct 18<span>th</span>, 2012  &nbsp; &mdash; &nbsp; Robert Rati</time>
+      </p>
+    </header>
+    <div class="entry-content"><p>In an <a href="http://rrati.github.com/blog/2012/09/26/using-cluster-suite-to-manage-a-high-availability-scheduler/">earlier post</a> I talked about using Cluster Suite
+to manage high availability schedulers and referenced the command line tools
+available perform the configuration.  I'd like to focus on using the GUI that
+is part of Cluster Suite to configure an HA schedd.  It's a pretty simple
+process but does require you run a wallaby shell command to complete the
+configuration.</p>
+
+<p>The first thing you need to do is create or import your cluster in the GUI.
+If you already have a cluster in the GUI then make sure the nodes you want to
+be part of a HA schedd configuration are part of the cluster.</p>
+
+<p>The next step is to create a restricted Failover Domain.  Nodes in this domain
+will run the schedd service you create, and making it restricted ensures that
+no nodes outside the Failover Domain will run the service.  If a node in the
+Failover Domain isn't available then the service won't run.</p>
+
+<p>The third step is to create a service that will comprise your schedd. Make
+sure that the relocation policy on the service is Relocate and that it is
+configured to use whatever Failover Domain you have already setup.  The
+service will contain 2 resources in a parent-child configuration.  The parent
+service is the NFS Mount and the child service is a condor instance resource.
+This is what sets up the dependency between the NFS Mount being required for
+the condor instance to run.  When the resources are configured like this it
+means the parent must be functioning for the child to operate.</p>
+
+<p>Finally, you need to sync the cluster configuration with wallaby.  This is
+easily accomplished by logging into a machine in the cluster and running:</p>
+
+<pre><code>wallaby cluster-sync-to-store
+</code></pre>
+
+<p>That wallaby shell command will inspect the cluster configuration and
+configure wallaby to match it.  It can handle any number of schedd
+configurations so you don't need to run it once per setup.  However, until
+the cluster-sync-to-store command is executed, the schedd service you created
+can't and won't run.</p>
+
+<p>Start your service or wait for Cluster Suite to do it for you and you'll find
+an HA schedd in your pool.</p>
+
+<p>You can get a video of the process as <a href="http://rrati.fedorapeople.org/videos/cs_gui_schedd.ogv">ogv</a> or <a href="http://rrati.fedorapeople.org/videos/cs_gui_schedd.mp4">mp4</a> if the inline video doesn't work.</p>
+
+<p><video width='800' height='600' preload='none' controls poster=''><source src='http://rrati.fedorapeople.org/videos/cs_gui_schedd.mp4' type='video/mp4; codecs="avc1.42E01E, mp4a.40.2"'/></video></p>
+</div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://tmckayus.github.com/blog/2012/10/10/ldap-credentials/">Credentials in LDAP URLs when Anonymous Search is Disabled</a></h1>
+      <p class="meta">
+        <time datetime="2012-10-10T20:55:00Z" pubdate data-updated="true">Oct 10<span>th</span>, 2012  &nbsp; &mdash; &nbsp; Trevor McKay</time>
+      </p>
+    </header>
+    <div class="entry-content"><p>Cumin authenticates logins against LDAP using a two step process:</p>
+
+<ul>
+<li>Search for LDAP entries based on the login name and the search filter in the LDAP URL</li>
+<li>Attempt a simple bind operation using the distinguished names (dn) in returned entries and the password</li>
+</ul>
+
+
+<p>If anonymous access is disabled by the LDAP server, the first step will fail.  In this case, Cumin needs to bind to the server with credentials before doing the search for user records.  Happily, the URL syntax allows for credentials in the URL and Cumin will use them if provided to bind before the search.</p>
+
+<h3>Extra Attributes</h3>
+
+<p>The credentials for an initial bind can be set using LDAP extensions supported by the ldapurl module.  There are two additional attributes:</p>
+
+<ul>
+<li>bindname (a formal dn corresponding to an LDAP entry)</li>
+<li>X-BINDPW (a password that will work for that entry)</li>
+</ul>
+
+
+<p>These attributes follow the filter specification and are separated by a comma.  Any comma (,) characters present in the bindname value must be html-escaped because the URL parser will see them as attribute separators.  Futhermore, the % character in the escape code for a comma must be escaped itself to prevent Python from seeing it as a string substituion sequence.  Simple, right?</p>
+
+<h3>An Example</h3>
+
+<p>Let&#8217;s assume the following:</p>
+
+<ul>
+<li>The LDAP server is at example.com:389</li>
+<li>The search dn is ou=People,dc=example,dc=com</li>
+<li>The search scope is sub</li>
+<li>The filter compares uid to username (this is actually the default)</li>
+<li>The dn for an initial bind is uid=joeuser,ou=People,dc=example,dc=com</li>
+<li>The password for the initial bind is joepassword</li>
+</ul>
+
+
+<p>The LDAP URL in the Cumin configuration file would like like this:</p>
+
+<pre><code>auth: ldap://example.com:389/ou=People,dc=example,dc=com??sub?(&amp;(uid=%%s))?bindname=uid=joeuser%%2cou=People%%2cdc=example%%2cdc=com,X-BINDPW=joespassword  
+</code></pre>
+
+<p>Note in particular the %%2c substrings in the URL.  These are the commas in the bindname value.  In the interest of full disclosure, let me  be the first to say &#8220;yuck&#8221;.  But it works!</p>
+
+<h3>Caution!</h3>
+
+<p>LDAP credentials specified as part of a URL in the cumin configuration file will be visible to anyone who has access to the configuration file.  When Cumin is installed as a package the configuration file will be located at <code>/etc/cumin/cumin.conf</code> and will only be readable by the <code>cumin</code> user.  This should be adequate to protect the credentials as long as the permissions on that file are not changed.</p>
+
+<p>However, if Cumin is run from sources in a development instance, alternate configuration files are possible.  Care should be taken to protect those configuration files if they contain credentials.</p>
+
+<p>The Cumin project wiki can be found <a href="http://fedorahosted.org/grid/wiki/Cumin">here</a></p>
+</div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://erikerlandson.github.com/blog/2012/10/05/hosting-a-blog-feed-aggregator-with-octopress/">Hosting a Blog Feed Aggregator With Octopress</a></h1>
+      <p class="meta">
+        <time datetime="2012-10-05T19:52:00Z" pubdate data-updated="true">Oct 5<span>th</span>, 2012  &nbsp; &mdash; &nbsp; Erik Erlandson</time>
+      </p>
+    </header>
+    <div class="entry-content"><p>I have written an Octopress plugin to allow turnkey support for hosting a blog feed aggregator, in Octopress idiomatic style.  I will describe the steps to install it and use it below.  Some of its current features are:</p>
+
+<ul>
+<li>Easy configuration and deployment, providing all feed aggregator parameters as yaml front-matter</li>
+<li>Turn-key generation of feed aggregator pages, in the configured site style</li>
+<li>Optional generation of a 'meta-feed' in atom.xml format, from aggregated feed entries</li>
+<li>Automatic removal of duplicate feed list urls, and automatic removal of duplicate posts (e.g. if multiple category feeds from the same author are listed)</li>
+<li>Automatic generation of feed author list as an Octopress 'aside'</li>
+</ul>
+
+
+<h3>Install the feed_aggregator.rb plugin</h3>
+
+<p>Currently, you can obtain a copy of "feed_aggregator.rb" here:</p>
+
+<p><a href="https://github.com/erikerlandson/erikerlandson.github.com/blob/source/plugins/feed_aggregator.rb">https://github.com/erikerlandson/erikerlandson.github.com/blob/source/plugins/feed_aggregator.rb</a></p>
+
+<p>Simply copy this file into the plugins directory for your octopress repo:</p>
+
+<pre><code>$ cp feed_aggregator.rb /path/to/your/octopress/repo/plugins
+</code></pre>
+
+<h3>Install feed aggregator layout files</h3>
+
+<p>You can obtain a copy of the layout files here:</p>
+
+<ul>
+<li><a href="https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator.html">https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator.html</a></li>
+<li><a href="https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator_page.html">https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator_page.html</a></li>
+<li><a href="https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator_meta.xml">https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator_meta.xml</a></li>
+</ul>
+
+
+<p>Copy the layouts files to your '_layouts' directory:</p>
+
+<pre><code>$ cp feed_aggregator.html /path/to/your/octopress/repo/source/_layouts
+$ cp feed_aggregator_page.html /path/to/your/octopress/repo/source/_layouts
+$ cp feed_aggregator_meta.xml /path/to/your/octopress/repo/source/_layouts
+</code></pre>
+
+<h3>Add feedzirra dependency to the Octopress Gemfile</h3>
+
+<p>Octopress wants its dependencies bundled, so you will want to add this dependency to /path/to/your/octopress/repo/Gemfile:</p>
+
+<pre><code>gem 'feedzirra', '~&gt; 0.1.3'
+</code></pre>
+
+<p>Then update the bundles:</p>
+
+<pre><code>$ bundle update
+</code></pre>
+
+<h3>Create a page for your feed aggregator</h3>
+
+<p>Here is an example feed aggregator:</p>
+
+<pre><code>---
+# use the 'feed_aggregator' layout to generate a feed aggregator page
+layout: feed_aggregator
+
+# Title to display for the feed
+title: My Blog Feed Aggregator
+
+# maximum number of entries from each feed url to display (defaults to 5)
+post_limit: 5
+
+# generate a 'meta-feed' atom file, with the given name 'atom.xml' (meta feeds are optional)
+# (with no directory, generates in same directory as the feed aggregator page)
+meta_feed: atom.xml
+
+# list all urls to aggregate here
+feed_list:
+  - http://blog_site_1.com/atom.xml
+  - http://blog_site_2.com/atom.xml
+  - http://blog_site_3.com/atom.xml
+---
+</code></pre>
+
+<p>As you can see, you only need to supply some yaml front-matter.  Page formatting/rendering is performed automatically from the information in the header.  You must use <code>layout: feed_aggregator</code>, and include the standard <code>title</code> to use for the aggregator title.  <code>post_limit: 5</code> Indicates that at most 5 posts from each feed will be included.  Finally, the <code>feed_list</code> parameter allows you to list each feed url you wish to aggregate.</p>
+
+<p>Once you've created the page, you can publish as usual:</p>
+
+<pre><code>$ rake generate
+$ rake deploy
+</code></pre>
+
+<p>If you want to update your feed automatically, you can set up a cron job:</p>
+
+<pre><code>cd /path/to/octopress/repo
+rake generate
+rake deploy
+</code></pre>
+
+<h3>Screen Shot</h3>
+
+<p>Here is a screen shot of a feed aggregator.  It respects whatever style theme is configured for the site.  The aggregator title is at the top, and a list of contributing authors is automatically generated as an 'aside'.  Each author name links to the parent blog of the author's feed.  In addition to the standard date, the author's name is also included.  Post titles link back to the original post url.</p>
+
+<p><img src="/assets/feed_aggregator/screen1.png" alt="Aggregator Screen Shot" /></p>
+
+<h3>Meta feed generation</h3>
+
+<p>You may optionally request that a meta feed, created from the aggregated posts, be generated.  The meta feed is created in atom format.  Following are some examples of specifying meta feed files</p>
+
+<pre><code># Generate a meta feed called 'atom.xml' in the same directory as the feed aggregator page
+# e.g. if the url for the feed aggregator page is  http://blog.site.com/aggregator/index.html, 
+# then the path to the meta-feed will be: http://blog.site.com/aggregator/atom.xml
+meta_feed: atom.xml
+
+# Generate a meta feed called 'wilma.xml' in subdirectory 'flintstones' of the website.
+# the url for this file will be:   http://blog.site.com/flintstones/wilma.xml
+meta_feed: /flintstones/wilma.xml
+
+# url for this will be http://blog.site.com/metafeed.xml
+meta_feed: /metafeed.xml
+
+# Supplying no file name is equivalent to 'meta_feed: atom.xml'
+meta_feed:
+</code></pre>
+
+<h3>To Do</h3>
+
+<ul>
+<li>It might be nice to support the display of an avatar/icon for authors</li>
+<li>Issue a pull request, so the feed aggregator can be included as a standard octopress feature</li>
+</ul>
+
+</div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://rrati.github.com/blog/2012/09/26/using-cluster-suite-to-manage-a-high-availability-scheduler/">Using Cluster Suite to Manage a High Availability Scheduler</a></h1>
+      <p class="meta">
+        <time datetime="2012-09-26T19:53:00Z" pubdate data-updated="true">Sep 26<span>th</span>, 2012  &nbsp; &mdash; &nbsp; Robert Rati</time>
+      </p>
+    </header>
+    <div class="entry-content"><p>Condor provides simple and easy to configure HA functionality for the schedd
+that relies upon shared storage (usually NFS).  The shared store is used to
+store the job queue log and coordinate which node is running the schedd.  This
+means that each node that can run a particular schedd not only have condor
+configured but the node needs to be configured to access the shared storage.</p>
+
+<p>For most people condor's native HA management of the schedd is probably
+enough.  However, using Cluster Suite to manage the schedd provides some
+additional control and protects against job queue corruption that can occur
+in rare instances due to issues with the shared storage mechanism.</p>
+
+<p>Condor even provides all the tools necessary to hook into Cluster Suite,
+including a new set of commands for the wallaby shell that make configuration
+and management tasks as easy as a single command.  While a functioning wallaby
+setup isn't required to work with Cluster Suite, I would highly recommended
+using it.  The wallaby shell commands greatly simplify configuring both
+Cluster Suite and condor nodes (through wallaby).</p>
+
+<p>There are two tools that condor provides for integrating with Cluster
+Suite.  One is the set of wallaby shell commands I already mentioned.  The
+other is a Resource Agent for condor, which gives Cluster Suite control over
+the schedd.</p>
+
+<p>With the above pieces in place and a fully functional wallaby setup,
+configuration of a schedd is as simple as:</p>
+
+<pre><code>wallaby cluster-create name=&lt;name&gt; spool=&lt;spool&gt; server=&lt;server&gt; export=&lt;export&gt; node1 node2 ...
+</code></pre>
+
+<p>With that single command, the wallaby shell command will configure Cluster
+Suite to run an HA schedd to run on the list of nodes provided.  It will also
+configure those same nodes in wallaby to run an HA schedd.  Seems nice, but
+what are the advantages?  Plenty.</p>
+
+<p>You gain a lot of control over which node is running the schedd.  With
+condor's native mechanism, it's pot luck which node will run the schedd.  All
+nodes point to the same shared storage and whoever gets there first will run
+the schedd.  Every time.  If a specific node is having problems that cause
+the schedd to crash, it could continually win the race to run the schedd
+leaving your highly available schedd not very available.</p>
+
+<p>Cluster Suite doesn't rely upon the shared storage to determine which node
+is going to run the schedd.  It has a set of tools, including a GUI, that
+allow you to move a schedd from one node to another at any time.  In addition
+to that, you can specify parameters that control when Cluster Suite will
+decide to move the schedd to another node instead of restarting it on the
+same machine.  For example, I can tell Cluster Suite to move the schedd to
+another machine if it restarts 3 times in 60 seconds.</p>
+
+<p>Cluster Suite also manages the shared storage.  I don't have to configure
+each node to mount the shared storage at the same mount point and ensure it
+will be mounted at boot.  Cluster Suite creates the mount point on the machine
+and mounts the shared storage when it starts the schedd.  This means the
+shared store is only mounted on the node running the schedd, which removes
+the job queue corruption that can occur if 2 HA schedds run at the same time
+on 2 different machines.</p>
+
+<p>Having Cluster Suite manage the shared storage for an HA schedd provides
+another benefit as well.  Access to the shared storage becomes required for
+the schedd to run.  If there is an interruption in accessing the shared
+storage on a node running the schedd Cluster Suite will shutdown the schedd
+and start it on another node.  This means no more split brain.</p>
+
+<p>Are there any downsides to using Cluster Suite to manage my schedds? Not many
+actually.  Obviously you need to have Cluster Suite installed on each node
+that will be part of an HA schedd configuration, so there's an additional
+disk space/memory requirement.  The biggest issue I've found is that since
+the condor_master will not be managing the schedds, none of the daemon
+management commands will work (ie condor_on|off|restart, etc).  Instead you
+would need to use Cluster Suite's tools for those tasks.</p>
+
+<p>You will also have to setup fencing in Cluster Suite for everything to work
+correctly, which might mean new hardware if you don't have a remotely
+manageable power setup.  If Cluster Suite can't fence a node when it
+determines it needs to it will shut down the service completely to avoid
+corruption.  A way to handle this if you don't have the power setup is to
+use virtual machines for your schedd nodes.  Cluster Suite has a means to do
+fencing without needing an external power management setup for virtual machines.</p>
+</div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://erikerlandson.github.com/blog/2012/09/26/improved-parse-checking-for-classad-log-files-in-condor/">Improved Parse Checking for ClassAd Log Files in Condor</a></h1>
+      <p class="meta">
+        <time datetime="2012-09-26T17:06:00Z" pubdate data-updated="true">Sep 26<span>th</span>, 2012  &nbsp; &mdash; &nbsp; Erik Erlandson</time>
+      </p>
+    </header>
+    <div class="entry-content"><p>Condor maintains certain key transactional information using the ClassAd Log system.  For example, both the negotiator's accountant log ("Accountantnew.log") and the scheduler's job queue log ("job_queue.log") are maintained in ClassAd Log format.</p>
+
+<p>As of <a href="http://www.redhat.com/products/mrg/grid/">Red Hat Grid 2.2</a> (upstream: <a href="http://research.cs.wisc.edu/condor/">condor 7.9.0</a>), the ClassAd Log system provides significantly improved parse checking.  This upgraded format checking allows a much wider variety of log corruptions to be detected, and also provides detailed information on the location of corruptions encountered.</p>
+
+<h3>ClassAd Log Format</h3>
+
+<p>A bit of familiarity with ClassAd Log format will aid in understanding subsequent discussion.  The ClassAd Log system serializes a ClassAd collection history as a sequence of tuples:  <code>opcode, [key, [args]]</code>.  For example, here is an annotated ClassAd log excerpt (NOTE: annotations or comments are illegal in an actual file):</p>
+
+<pre><code>105                               &lt;- open a transaction
+103 1.0 LastSuspensionTime 0      &lt;- for classad '1.0', set LastSuspentionTime to 0
+103 1.0 CurrentHosts 1            &lt;- for classad '1.0', set CurrentHosts to 1
+106                               &lt;- close the transaction
+</code></pre>
+
+<p>ClassAd Log parse checking works by detecting any occurrence of an invalid op-code, or any invalid ClassAd expression in the RHS of an attribute update operation (opcode 103, as in the example above)</p>
+
+<h3>Examples of Parse Failure Detection</h3>
+
+<p>Consider a ClassAd Log with a corrupted op-code 'ZMG' (in this case, not even a proper integer):</p>
+
+<pre><code>107 1 CreationTimestamp 1334245749
+101 0.0 Job Machine
+103 0.0 NextClusterNum 1
+105
+ZMG 1.0 JobStatus 2                        &lt;- Oh no, a bad opcode!
+103 1.0 EnteredCurrentStatus 1334245771
+103 1.0 LastSuspensionTime 0
+103 1.0 CurrentHosts 1
+106
+105
+103 1.1 LastJobStatus 1
+103 1.1 JobStatus 2
+</code></pre>
+
+<p>Parse checking will result in the following log message in the scheduler, which provides its assessment of what operation line/tuple it found the corruption, and the following 3 lines for additional context:</p>
+
+<pre><code>09/12/12 15:30:35 WARNING: Encountered corrupt log record 5 (byte offset 89)
+09/12/12 15:30:35 Lines following corrupt log record 5 (up to 3):
+09/12/12 15:30:35     103 1.0 EnteredCurrentStatus 1334245771
+09/12/12 15:30:35     103 1.0 LastSuspensionTime 0
+09/12/12 15:30:35     103 1.0 CurrentHosts 1
+09/12/12 15:30:35 ERROR "Error: corrupt log record 5 (byte offset 89) occurred inside closed transaction, recovery failed" at line 1136 in file /home/eje/git/grid/src/condor_utils/classad_log.cpp
+</code></pre>
+
+<p>Note that here the scheduler halted with an exception, as strict parsing was enabled, and the error was inside a completed transaction.</p>
+
+<p>Here is a second example that contains a badly-formed ClassAd expression:</p>
+
+<pre><code>107 1 CreationTimestamp 1334245749
+101 0.0 Job Machine
+103 0.0 NextClusterNum 1
+105
+103 1.0 JobStatus 2
+103 1.0 EnteredCurrentStatus 1334245749
+103 1.0 LastSuspensionTime 0
+103 1.0 CurrentHosts 1
+106
+105
+103 1.1 LastJobStatus 1 + eek!             &lt;- bad ClassAd expr!
+103 1.1 JobStatus 2
+</code></pre>
+
+<p>Note that parse errors detected in unterminated transactions (the last transaction in a file may be uncompleted) are considered non-fatal:</p>
+
+<pre><code>09/12/12 15:43:29 WARNING: Encountered corrupt log record 11 (byte offset 211)
+09/12/12 15:43:29 Lines following corrupt log record 11 (up to 3):
+09/12/12 15:43:29     103 1.1 JobStatus 2
+09/12/12 15:43:29 Detected unterminated log entry in ClassAd Log /home/eje/condor/local/spool/job_queue.log. Forcing rotation.
+</code></pre>
+
+<h3>Disabling Strict Parse Checking</h3>
+
+<p>Strict parse checking means that detected errors are fatal (unless in an unterminated transaction).  One consequence of the former lax error checking for Classad Log files is that some log file output was generated that was not properly formed.  Most such instances have been identified and corrected.  However, in order to accomodate legacy ClassAd Log files and any hidden bugs in log output generation, a condor configuration variable has been provided to disable strict checking:</p>
+
+<pre><code># Disable strict parsing: parse errors will not be fatal
+CLASSAD_LOG_STRICT_PARSING = False
+</code></pre>
+
+<p>In Red Hat Grid 2.2, <code>CLASSAD_LOG_STRICT_PARSING</code> defaults to <code>False</code>.  In the upstream condor repository, the default value has been set to <code>True</code>, in order to allow strict parsing failures to capture any remaining infrequent bugs in ClassAd log generation.</p>
+
+<p>Note that strict checking can also be disabled or enabled <em>selectively</em>.  For example, this configuration disables strict checking only on the negotiator:</p>
+
+<pre><code>CLASSAD_LOG_STRICT_PARSING = True
+NEGOTIATOR.CLASSAD_LOG_STRICT_PARSING = False
+</code></pre>
+
+<h3>Categories of Undetectable Corruption</h3>
+
+<p>In the ClassAd Log format, the key is considered an arbitrary string.  Therefore, any corruption that alters a key value is not detectable:</p>
+
+<pre><code>103 1.rats! LastSuspensionTime 0   &lt;- weird key '1.rats!' will go undetected
+</code></pre>
+
+<p>Similarly, ClassAd attribute names are by nature arbitrary, and so corruptions to a name can go undetected:</p>
+
+<pre><code>103 1.0 LastOopsie 0   &lt;- LastOopsie is a valid attribute name
+</code></pre>
+</div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://tmckayus.github.com/blog/2012/09/24/ldap-auth/">Integrating Cumin with LDAP for Authentication</a></h1>
+      <p class="meta">
+        <time datetime="2012-09-24T16:41:00Z" pubdate data-updated="true">Sep 24<span>th</span>, 2012  &nbsp; &mdash; &nbsp; Trevor McKay</time>
+      </p>
+    </header>
+    <div class="entry-content"><p>Past versions of Cumin have relied on a local database for storing user accounts.  However, that solution adds extra maintenance for site administrators who already have or plan to have a central authentication mechanism for their users.  Consequently, development is ongoing to integrate Cumin with common central auth mechanisms.  LDAP integration is available now, with support for other technologies planned for the future.</p>
+
+<h3>How will central authentication work with Cumin?</h3>
+
+<p>Let&#8217;s call an instance of a supported authentication scheme an “authenticator”.  The PostgreSQL database installed with Cumin is the default authenticator – it will always be checked first whenever Cumin attempts to authenticate a user.  If Cumin cannot authenticate the user via PostgreSQL, it will try other authenticators (i.e., LDAP repositories) specified in the cumin configuration file in listed order until the user is authenticated or the list of authenticators is exhausted.</p>
+
+<h4>A current limitation</h4>
+
+<p>There is one limitation in the initial LDAP support which makes the PostgreSQL user database indispensable:  username and password may be specified in an LDAP repository, but the user role value can only explicitly be set in the PostgreSQL database (roles will be covered further in another blog post).  This means that the <code>admin</code> role must be applied to users in the local database via the <code>cumin-admin</code> script.  Non-admin users will default to the <code>user</code> role and no such entry will be needed.  In the future, support for role values in LDAP is planned and local entries for admins will not be necessary.</p>
+
+<h3>Miscellaneous Benefits, Implications, and Warnings</h3>
+
+<ul>
+<li><p>The local PostgreSQL user database may be very sparsely populated, containing only admin role assignments for certain users.  If a site has few Cumin administrators or uses a single shared administration account, overhead for managing the PostgreSQL user database will be very low indeed.</p></li>
+<li><p>An entry for a user may be made in the PostgreSQL database at any time to occlude any and all LDAP repository entries for that user.  Using this feature, an admin could override a password to lock out a particular account or diagnose problems within that account, etc.</p></li>
+<li><p>Multiple LDAP repositories may be specified as authenticators, and the same repository may be specified multiple times with different search criteria.  This allows the same user to be authenticated by alternative servers or different criteria in priority order.</p></li>
+<li><p>Cumin supports LDAP connections over SSL as well as SSL between the browser and the web server.  In order for LDAP passwords to remain secure, SSL <strong><em>must be</em></strong> used on both network legs.</p></li>
+</ul>
+
+
+<h6>Documentation</h6>
+
+<p>The <a href="http://docs.redhat.com/docs/en-US/Red_Hat_Enterprise_MRG/index.html">Management Console Installation Guide</a> contains everything you need to know to configure Cumin for LDAP authentication.</p>
+
+<p> Here is a link to the <a href="http://fedorahosted.org/grid/wiki/Cumin">Cumin project wiki</a></p>
+</div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://tmckayus.github.com/blog/2012/09/24/new-post/">So What is Cumin Anyway?</a></h1>
+      <p class="meta">
+        <time datetime="2012-09-24T16:07:00Z" pubdate data-updated="true">Sep 24<span>th</span>, 2012  &nbsp; &mdash; &nbsp; Trevor McKay</time>
+      </p>
+    </header>
+    <div class="entry-content"><p>Cumin is a Python web UI developed in the Fedora community for managing Condor pools and Qpid messaging brokers.  It is packaged for Fedora but may be run from sources and would probably be easy to port to other Linux distributions (or just run Fedora on a node or two in a heterogeneous environment!)  The current development focus for Cumin is on expanding the Condor management facilities.</p>
+
+<h3>Condor Management Facilities</h3>
+
+<p>Cumin is designed to meet the needs of a variety of Condor users.  Non-admin end users are given a streamlined interface to create and manage their own submissions.  The administrative views allow System Admins to monitor pool resources and Condor infrastructure while Operational Admins may be more interested in the workload running on the pool.  Cumin has development hooks which make it possible to create customized presentations for different user and site profiles.</p>
+
+<h3>Qpid Management Facilities</h3>
+
+<p>Cumin&#8217;s Qpid messaging views allow management of a Qpid deployment.  Users have visibility to message queues, exchanges, connections, and broker links.  Many of the tasks that can be done from the Qpid command line tools can also be done through Cumin.</p>
+
+<h3>How to Get Started</h3>
+
+<p><a href="http://fedorahosted.org/grid/wiki/Cumin" title="http://fedorahosted.org/grid/wiki/Cumin">The Cumin project wiki</a> can be found <a href="http://fedorahosted.org/grid/wiki/Cumin" title="http://fedorahosted.org/grid/wiki/Cumin">here</a>, including user and developer mailing lists, install guides,  and links to documentation.  If you have any questions or comments, please do not hesitate to hit the Cumin mailing lists!</p>
+</div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://timothysc.github.com/blog/2012/09/21/condor-n-overt/">Elastic Grid with Condor and oVirt Integration</a></h1>
+      <p class="meta">
+        <time datetime="2012-09-21T08:50:00Z" pubdate data-updated="true">Sep 21<span>st</span>, 2012  &nbsp; &mdash; &nbsp; Timothy St. Clair</time>
+      </p>
+    </header>
+    <div class="entry-content"><h2>Background</h2>
+
+<p>Gone are the days where an IT administrator could procure a dedicated compute cluster for a single task, so it is often the case where admins are asked to do more with existing resources where possible, especially those which are underutilized.  There are several existing solutions to oversubscription, but few that remain &#8220;general purpose&#8221; while adapting to the environment as the load within the cluster changes.  Enter Condor, which has been most well known for its batch processing capabilities, but can also be leveraged in many ways as an IaaS tool when coupled with oVirt.</p>
+
+<p>There have been numerous refs in the past to using the <a href="http://youtu.be/kPi8ickYN84">two tools together</a>, but in this post we will explore the idea of using Condor&#8217;s integration with oVirt to spin the resources directly from Condor, and briefly cover how administrators could use this capability to spin resources &#8220;on demand&#8221;.</p>
+
+<hr />
+
+<h2>Setup</h2>
+
+<p>Before you begin, you will need to configure <a href="http://www.ovirt.org/">oVirt</a> and a <a href="http://deltacloud.apache.org/">deltacloud server</a> such that your preconfigured images can be spun via the deltacloud api remotely.  To verify, you can run a simple test program to ensure that it works from a remote machine, as if it were run from condor.</p>
+
+<figure class='code'><figcaption><span> (deltacloud_test.c)</span> <a href='http://timothysc.github.com/downloads/code/c/deltacloud_test.c'>download</a></figcaption>
+ <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="cp">#include &lt;stdio.h&gt;</span>
+</span><span class='line'><span class="cp">#include &lt;stdlib.h&gt;</span>
+</span><span class='line'><span class="cp">#include &lt;libdeltacloud/libdeltacloud.h&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="kt">int</span> <span class="nf">main</span><span class="p">()</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>        <span class="k">struct</span> <span class="n">deltacloud_api</span> <span class="n">api</span><span class="p">;</span>
+</span><span class='line'>        <span class="k">struct</span> <span class="n">deltacloud_instance</span> <span class="n">instance</span><span class="p">;</span>
+</span><span class='line'>        <span class="kt">int</span> <span class="n">ret</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'>        <span class="c1">// replace url and email with your domain info.</span>
+</span><span class='line'>        <span class="k">if</span> <span class="p">(</span><span class="n">deltacloud_initialize</span><span class="p">(</span><span class="o">&amp;</span><span class="n">api</span><span class="p">,</span> <span class="s">&quot;http://ovirt.yourdomain.com:3002/api&quot;</span><span class="p">,</span> <span class="s">&quot;vdcadmin@ovirt.yourdomain.com&quot;</span><span class="p">,</span> <span class="s">&quot;123456&quot;</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span>
+</span><span class='line'>        <span class="p">{</span>
+</span><span class='line'>                <span class="n">fprintf</span><span class="p">(</span><span class="n">stderr</span><span class="p">,</span> <span class="s">&quot;Failed to initialize libdeltacloud: %s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">deltacloud_get_last_error_string</span><span class="p">());</span>
+</span><span class='line'>                <span class="k">return</span> <span class="mi">1</span><span class="p">;</span>
+</span><span class='line'>        <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'>        <span class="c1">// get the instance directly by name, replace with your image name</span>
+</span><span class='line'>        <span class="k">if</span> <span class="p">(</span> <span class="n">deltacloud_get_instance_by_name</span><span class="p">(</span><span class="o">&amp;</span><span class="n">api</span><span class="p">,</span> <span class="s">&quot;kvm_test_image_64&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">instance</span><span class="p">)</span> <span class="p">)</span>
+</span><span class='line'>        <span class="p">{</span>
+</span><span class='line'>                <span class="n">fprintf</span><span class="p">(</span><span class="n">stderr</span><span class="p">,</span> <span class="s">&quot;Failed to get deltacloud instances: %s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">deltacloud_get_last_error_string</span><span class="p">());</span>
+</span><span class='line'>                <span class="k">return</span> <span class="n">ret</span><span class="p">;</span>
+</span><span class='line'>        <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'>        <span class="n">printf</span><span class="p">(</span><span class="s">&quot;We did it!</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+</span><span class='line'>        <span class="n">printf</span><span class="p">(</span><span class="s">&quot;---Here are the details---</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+</span><span class='line'>        <span class="n">printf</span><span class="p">(</span><span class="s">&quot;href =%s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="n">instance</span><span class="p">.</span><span class="n">href</span><span class="p">);</span>
+</span><span class='line'>        <span class="n">printf</span><span class="p">(</span><span class="s">&quot;id =%s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="n">instance</span><span class="p">.</span><span class="n">id</span><span class="p">);</span>
+</span><span class='line'>        <span class="n">printf</span><span class="p">(</span><span class="s">&quot;name =%s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="n">instance</span><span class="p">.</span><span class="n">name</span><span class="p">);</span>
+</span><span class='line'>        <span class="n">printf</span><span class="p">(</span><span class="s">&quot;owner_id =%s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="n">instance</span><span class="p">.</span><span class="n">owner_id</span><span class="p">);</span>
+</span><span class='line'>        <span class="n">printf</span><span class="p">(</span><span class="s">&quot;image_id =%s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="n">instance</span><span class="p">.</span><span class="n">image_id</span><span class="p">);</span>
+</span><span class='line'>        <span class="n">printf</span><span class="p">(</span><span class="s">&quot;image_href =%s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="n">instance</span><span class="p">.</span><span class="n">image_href</span><span class="p">);</span>
+</span><span class='line'>        <span class="n">printf</span><span class="p">(</span><span class="s">&quot;realm_id =%s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="n">instance</span><span class="p">.</span><span class="n">realm_id</span><span class="p">);</span>
+</span><span class='line'>        <span class="n">printf</span><span class="p">(</span><span class="s">&quot;realm_href =%s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="n">instance</span><span class="p">.</span><span class="n">realm_href</span><span class="p">);</span>
+</span><span class='line'>        <span class="n">printf</span><span class="p">(</span><span class="s">&quot;state =%s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="n">instance</span><span class="p">.</span><span class="n">state</span><span class="p">);</span>
+</span><span class='line'>        <span class="n">printf</span><span class="p">(</span><span class="s">&quot;launch_time =%s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="n">instance</span><span class="p">.</span><span class="n">launch_time</span><span class="p">);</span>
+</span><span class='line'>
+</span><span class='line'>        <span class="c1">// from here we can start the instance itself.</span>
+</span><span class='line'>        <span class="c1">// deltacloud_instance_start(&amp;api, &amp;instance)</span>
+</span><span class='line'>
+</span><span class='line'>        <span class="n">ret</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'>        <span class="n">deltacloud_free</span><span class="p">(</span><span class="o">&amp;</span><span class="n">api</span><span class="p">);</span>
+</span><span class='line'>        <span class="k">return</span> <span class="n">ret</span><span class="p">;</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Once this is done, you will then need to install condor-deltacloud-gahp on the submit machines where you want to spin the resources.</p>
+
+<hr />
+
+<h2>Spinning a oVirt Instance with Condor</h2>
+
+<p>Provided you&#8217;ve setup all the pieces above, you should be able to just submit a grid universe job which referenced the images that you wish to start up.</p>
+
+<pre><code>universe = grid
+grid_resource = deltacloud http://ovirt.yourdomain.com:3002/api
+executable = ovirt_spin_test
+deltacloud_username = vdcadmin@ovirt.yourdomain.com
+deltacloud_password_file = user_pwd
+
+# Just specify the rhevm instance name
+deltacloud_instance_name = kvm_test_image_64
+
+log = job_deltacloud_basic_$(cluster)_$(process).log
+notification = NEVER
+queue
+</code></pre>
+
+<hr />
+
+<h2>Potential Use Cases</h2>
+
+<p>Given the tight level of integration from Condor and oVirt via deltacloud there are a liteny of use cases which could be crafted by administrators to enable the auto spinning of images from condor, which include:</p>
+
+<ul>
+<li>Using the JobRouter to configure for overflow</li>
+<li>Using condor-cron to spin images based on time based activites</li>
+<li>Using DAGMan workflows along with a monitoring activity to spin and clean resources, based on availability</li>
+</ul>
+
+</div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://rrati.github.com/blog/2012/09/18/putting-it-together/">Putting It Together</a></h1>
+      <p class="meta">
+        <time datetime="2012-09-18T12:59:00Z" pubdate data-updated="true">Sep 18<span>th</span>, 2012  &nbsp; &mdash; &nbsp; Robert Rati</time>
+      </p>
+    </header>
+    <div class="entry-content"><p>Condor already provides the ability to integrate with numerous computing
+resources, and I will be discussing ways for it to do so with other bits
+and pieces to enhance existing or provide new functionality.</p>
+</div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://getwallaby.com/2012/09/authorization-for-wallaby-clients/">Authorization for Wallaby clients</a></h1>
+      <p class="meta">
+        <time datetime="2012-09-12T22:30:00Z" pubdate data-updated="true">Sep 12<span>th</span>, 2012  &nbsp; &mdash; &nbsp; William Benton</time>
+      </p>
+    </header>
+    <div class="entry-content"><p>Wallaby 0.16.0, which updates the Wallaby API version to 20101031.6, includes support for authorizing broker users with various roles that can interact with Wallaby in different ways.  This post will explain how the authorization support works and show how to get started using it.  If you just want to get started using Wallaby with authorization support as quickly as possible, skip ahead to the section titled &#8220;Getting Started&#8221; below.  Detailed information about which role is required for each Wallaby API method is <a href="http://getwallaby.com/api-roles/">available here</a>.</p>
+
+<h2>Overview</h2>
+
+<p>Users must authenticate to the AMQP broker before using Wallaby (although some installations may allow users to authenticate as &#8220;anonymous&#8221;), but previous versions of Wallaby implicitly authorized any user who had authenticated to the broker to perform any action.  Wallaby now includes a database mapping from user names to <em>roles</em>, which allows installations to define how each broker user can interact with Wallaby.  Each method is annotated with the role required to invoke it, and each method invocation is checked to ensure that the currently-authenticated user is authorized to assume the role required by the method.  The roles Wallaby recognizes are <code>NONE</code>, <code>READ</code>, <code>WRITE</code>, or <code>ADMIN</code>, where each role includes all of the capabilities of the role that preceded it.</p>
+
+<p>If <code>WALLABY_USERDB_NAME</code> is set in the Wallaby agent&#8217;s environment upon startup and represents a valid pathname, Wallaby will use that as the location of the user-role database.  If this variable is set to a valid pathname but no file exists at that pathname, the Wallaby user-role database will be created upon agent startup.  If <code>WALLABY_USERDB_NAME</code> is not set, the user-role database will be initialized in memory only and thus will not persist across agent restarts.</p>
+
+<h3>Standard authorization</h3>
+
+<p>When Wallaby is about to service an API request, it:</p>
+
+<ol>
+<li><p>checks the role required to invoke the method.</p></li>
+<li><p>checks the authorization level specified for the user.  There are several possibilities under which a user could be authorized to invoke a method:</p>
+
+<ul>
+<li>the user is explicitly authorized for a role that includes the required role (e.g. the user has an <code>ADMIN</code> role but the method only requires <code>READ</code>);</li>
+<li>the user is implicitly authorized for a role that includes the required role (e.g. there is an entry for the wildcard user <code>*</code> giving it <code>READ</code> access and the method requires <code>READ</code> access)</li>
+<li>the role database is empty, in which case all authenticated users are implicitly authorized for all actions (this is the same behavior as in older versions of Wallaby)</li>
+<li>the invocation is of a user-role database maintenance method and the client is authorized via shared secret (see below)</li>
+</ul>
+</li>
+<li><p>if none of the conditions of the above step hold, the method invocation is unauthorized and fails with an API-level error.  If the API method is invoked over the Ruby client library, it will raise an exception.  If it is invoked via a <code>wallaby</code> shell command-line tool, it will print a human-readable error message and exit with a nonzero exit status.</p></li>
+<li><p>if the user is authorized to invoke the method, invocation proceeds normally.</p></li>
+</ol>
+
+
+<h3>Authorization with secret-based authentication</h3>
+
+<p>This version of the Wallaby API introduces three new methods:  <code>Store#set_user_privs</code>, <code>Store#del_user</code>, and <code>Store#users</code>.  These enable updating and reading the user-role database; the first two require <code>ADMIN</code> access, while the last requires <code>READ</code> access.  Because changes in the user-role database may result in an administrator inadvertently removing administrator rights from his or her broker user, Wallaby provides another mechanism to authorize access to these methods.  Each of these three methods supports a special <code>secret</code> option in its <code>options</code> argument.  When the Wallaby service starts up, it loads a secret string from a file.  Clients that supply the correct secret as an option to one of these calls will be authorized to invoke these calls, even if the broker user making the invocation is not authorized by the user-role database.</p>
+
+<p>The pathname to the secret file is given by the environment variable <code>WALLABY_SECRET_FILE</code>.  If this variable is unset upon agent startup, Wallaby will not use a shared secret (and secret-based authorization will not be available to API clients).  It this variable is set and names an existing file that the Wallaby agent user can read, the Wallaby shared secret will be set to the entire contents of this file.  If this variable is set and names a nonexistent file in a path that does exist, Wallaby will create a file at this path upon startup with a randomly-generated secret (consisting of a digest hash of some data read from <code>/dev/urandom</code>).  If this variable is set to a pathname that includes nonexistent directory components, the Wallaby agent will raise an error.  If you create your own secret file, ensure that it is only readable by the UNIX user that the Wallaby agent runs as (typically <code>wallaby</code>).</p>
+
+<h3>Caveats</h3>
+
+<p>The Wallaby agent&#8217;s authorization support is designed to prevent broker users from altering Condor pool configurations in excess of their authority.  It is not intended to keep all configuration data strictly confidential.  (This is not as bad as it might sound, since Wallaby-generated configurations are available for inspection by Condor users.)  Furthermore, due to technical limitations, it is not possible to protect object property accesses over the API with the same authorization support that we use for API method invocations.  Therefore, if concealing configuration data from some subset of users is important for your installation, you should prevent these users from authenticating to the broker that the Wallaby agent runs on.</p>
+
+<h2>Getting started</h2>
+
+<p>Here is a quick overview of how to get started with auth-enabled Wallaby:</p>
+
+<ol>
+<li>Stop your running Wallaby and restart your broker before starting the new Wallaby (this is necessary to pick up the new API methods).  Set <code>WALLABY_USERDB_NAME</code> in your environment to a path where you can store the user-role database.  Install and start your new Wallaby.</li>
+<li>If you&#8217;re using the RPM package, it will create a &#8220;secret file&#8221; for you in <code>/var/lib/wallaby/secret</code>.  If not, you will need to set <code>WALLABY_SECRET_FILE</code> in the environment to specify a location for this secret file and then restart Wallaby.  The Wallaby secret is a special token that can be passed to certain API methods (specifically, those related to user database management) in order to authorize users who aren&#8217;t authorized in the user database.</li>
+<li>Try using some of the new shell commands:  <code>wallaby set-user-role</code>, <code>wallaby list-users</code>, and <code>wallaby delete-user</code>.</li>
+<li>Make sure that you have a secret in your secret file.  Make a note of it.  Try setting the role for your current broker user to <code>READ</code> or <code>NONE</code> (e.g. &#8220;wallaby set-user-role anonymous NONE&#8221;) and then see what happens when you try and run some other Wallaby shell commands.  You can recover from this by passing the Wallaby secret to &#8220;wallaby set-user-role&#8221;; see its online help for details.</li>
+</ol>
+
+
+<p>The default user database is empty, which will result in the same behavior as in older versions of Wallaby (viz., all actions are available to all broker users), but only until a user role is added, at which point all actions must be explicitly or implicitly authorized.</p>
+
+<p><em>This article is cross-posted from <a href="http://chapeau.freevariable.com/2012/09/authorization-for-wallaby-clients.html">Chapeau</a></em></p>
+</div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://chapeau.freevariable.com/2012/09/authorization-for-wallaby-clients.html">Authorization for Wallaby clients</a></h1>
+      <p class="meta">
+        <time datetime="2012-09-12T22:23:18Z" pubdate data-updated="true">Sep 12<span>th</span>, 2012  &nbsp; &mdash; &nbsp; Will Benton</time>
+      </p>
+    </header>
+    <div class="entry-content">
+        <p>Wallaby 0.16.0, which updates the Wallaby API version to 20101031.6, includes support for authorizing broker users with various roles that can interact with Wallaby in different ways.  This post will explain how the authorization support works and show how to get started using it.  If you just want to get started using Wallaby with authorization support as quickly as possible, skip ahead to the section titled &#8220;Getting Started&#8221; below.  Detailed information about which role is required for each Wallaby API method is after the jump.</p>
+
+<h2>Overview</h2>
+
+<p>Users must authenticate to the AMQP broker before using Wallaby (although some installations may allow users to authenticate as &#8220;anonymous&#8221;), but previous versions of Wallaby implicitly authorized any user who had authenticated to the broker to perform any action.  Wallaby now includes a database mapping from user names to <em>roles</em>, which allows installations to define how each broker user can interact with Wallaby.  Each method is annotated with the role required to invoke it, and each method invocation is checked to ensure that the currently-authenticated user is authorized to assume the role required by the method.  The roles Wallaby recognizes are <code>NONE</code>, <code>READ</code>, <code>WRITE</code>, or <code>ADMIN</code>, where each role includes all of the capabilities of the role that preceded it.</p>
+
+<p>If <code>WALLABY_USERDB_NAME</code> is set in the Wallaby agent&#8217;s environment upon startup and represents a valid pathname, Wallaby will use that as the location of the user-role database.  If this variable is set to a valid pathname but no file exists at that pathname, the Wallaby user-role database will be created upon agent startup.  If <code>WALLABY_USERDB_NAME</code> is not set, the user-role database will be initialized in memory only and thus will not persist across agent restarts.</p>
+
+<h3>Standard authorization</h3>
+
+<p>When Wallaby is about to service an API request, it:</p>
+
+<ol>
+<li>checks the role required to invoke the method.</li>
+<li>checks the authorization level specified for the user.  There are several possibilities under which a user could be authorized to invoke a method:
+<ul>
+<li>the user is explicitly authorized for a role that includes the required role (e.g. the user has an <code>ADMIN</code> role but the method only requires <code>READ</code>);</li>
+<li>the user is implicitly authorized for a role that includes the required role (e.g. there is an entry for the wildcard user <code>*</code> giving it <code>READ</code> access and the method requires <code>READ</code> access)</li>
+<li>the role database is empty, in which case all authenticated users are implicitly authorized for all actions (this is the same behavior as in older versions of Wallaby)</li>
+<li>the invocation is of a user-role database maintenance method and the client is authorized via shared secret (see below)</li>
+</ul></li>
+<li>if none of the conditions of the above step hold, the method invocation is unauthorized and fails with an API-level error.  If the API method is invoked over the Ruby client library, it will raise an exception.  If it is invoked via a <code>wallaby</code> shell command-line tool, it will print a human-readable error message and exit with a nonzero exit status.</li>
+<li>if the user is authorized to invoke the method, invocation proceeds normally.</li>
+</ol>
+
+<h3>Authorization with secret-based authentication</h3>
+
+<p>This version of the Wallaby API introduces three new methods:  <code>Store#set_user_privs</code>, <code>Store#del_user</code>, and <code>Store#users</code>.  These enable updating and reading the user-role database; the first two require <code>ADMIN</code> access, while the last requires <code>READ</code> access.  Because changes in the user-role database may result in an administrator inadvertently removing administrator rights from his or her broker user, Wallaby provides another mechanism to authorize access to these methods.  Each of these three methods supports a special <code>secret</code> option in its <code>options</code> argument.  When the Wallaby service starts up, it loads a secret string from a file.  Clients that supply the correct secret as an option to one of these calls will be authorized to invoke these calls, even if the broker user making the invocation is not authorized by the user-role database.</p>
+
+<p>The pathname to the secret file is given by the environment variable <code>WALLABY_SECRET_FILE</code>.  If this variable is unset upon agent startup, Wallaby will not use a shared secret (and secret-based authorization will not be available to API clients).  It this variable is set and names an existing file that the Wallaby agent user can read, the Wallaby shared secret will be set to the entire contents of this file.  If this variable is set and names a nonexistent file in a path that does exist, Wallaby will create a file at this path upon startup with a randomly-generated secret (consisting of a digest hash of some data read from <code>/dev/urandom</code>).  If this variable is set to a pathname that includes nonexistent directory components, the Wallaby agent will raise an error.  If you create your own secret file, ensure that it is only readable by the UNIX user that the Wallaby agent runs as (typically <code>wallaby</code>).</p>
+
+<h3>Caveats</h3>
+
+<p>The Wallaby agent&#8217;s authorization support is designed to prevent broker users from altering Condor pool configurations in excess of their authority.  It is not intended to keep all configuration data strictly confidential.  (This is not as bad as it might sound, since Wallaby-generated configurations are available for inspection by Condor users.)  Furthermore, due to technical limitations, it is not possible to protect object property accesses over the API with the same authorization support that we use for API method invocations.  Therefore, if concealing configuration data from some subset of users is important for your installation, you should prevent these users from authenticating to the broker that the Wallaby agent runs on.</p>
+
+<h2>Getting started</h2>
+
+<p>Here is a quick overview of how to get started with auth-enabled Wallaby:</p>
+
+<ol>
+<li>Stop your running Wallaby and restart your broker before starting the new Wallaby (this is necessary to pick up the new API methods).  Set <code>WALLABY_USERDB_NAME</code> in your environment to a path where you can store the user-role database.  Install and start your new Wallaby.</li>
+<li>If you&#8217;re using the RPM package, it will create a &#8220;secret file&#8221; for you in <code>/var/lib/wallaby/secret</code>.  If not, you will need to set <code>WALLABY_SECRET_FILE</code> in the environment to specify a location for this secret file and then restart Wallaby.  The Wallaby secret is a special token that can be passed to certain API methods (specifically, those related to user database management) in order to authorize users who aren&#8217;t authorized in the user database.</li>
+<li>Try using some of the new shell commands:  <code>wallaby set-user-role</code>, <code>wallaby list-users</code>, and <code>wallaby delete-user</code>.</li>
+<li>Make sure that you have a secret in your secret file.  Make a note of it.  Try setting the role for your current broker user to <code>READ</code> or <code>NONE</code> (e.g. &#8220;wallaby set-user-role anonymous NONE&#8221;) and then see what happens when you try and run some other Wallaby shell commands.  You can recover from this by passing the Wallaby secret to &#8220;wallaby set-user-role&#8221;; see its online help for details.</li>
+</ol>
+
+<p>The default user database is empty, which will result in the same behavior as in older versions of Wallaby (viz., all actions are available to all broker users), but only until a user role is added, at which point all actions must be explicitly or implicitly authorized.</p>
+
+        <h2>Permissions required for API methods</h2>
+
+<ul>
+<li><code>Feature#annotation</code> requires at least <code>READ</code> access</li>
+<li><code>Feature#clearParams</code> requires at least <code>WRITE</code> access</li>
+<li><code>Feature#explain</code> requires at least <code>READ</code> access</li>
+<li><code>Feature#modifyConflicts</code> requires at least <code>WRITE</code> access</li>
+<li><code>Feature#modifyDepends</code> requires at least <code>WRITE</code> access</li>
+<li><code>Feature#modifyIncludedFeatures</code> requires at least <code>WRITE</code> access</li>
+<li><code>Feature#modifyParams</code> requires at least <code>WRITE</code> access</li>
+<li><code>Feature#setAnnotation</code> requires at least <code>WRITE</code> access</li>
+<li><code>Feature#setName</code> requires at least <code>WRITE</code> access</li>
+<li><code>Group#addFeature</code> requires at least <code>WRITE</code> access</li>
+<li><code>Group#annotation</code> requires at least <code>READ</code> access</li>
+<li><code>Group#clearFeatures</code> requires at least <code>WRITE</code> access</li>
+<li><code>Group#clearParams</code> requires at least <code>WRITE</code> access</li>
+<li><code>Group#explain</code> requires at least <code>READ</code> access</li>
+<li><code>Group#getConfig</code> requires at least <code>READ</code> access</li>
+<li><code>Group#membership</code> requires at least <code>READ</code> access</li>
+<li><code>Group#modifyFeatures</code> requires at least <code>WRITE</code> access</li>
+<li><code>Group#modifyParams</code> requires at least <code>WRITE</code> access</li>
+<li><code>Group#removeFeature</code> requires at least <code>WRITE</code> access</li>
+<li><code>Group#setAnnotation</code> requires at least <code>WRITE</code> access</li>
+<li><code>Group#setName</code> requires at least <code>WRITE</code> access</li>
+<li><code>Node#annotation</code> requires at least <code>READ</code> access</li>
+<li><code>Node#checkConfigVersion</code> requires at least <code>READ</code> access</li>
+<li><code>Node#checkin</code> requires at least <code>READ</code> access</li>
+<li><code>Node#explain</code> requires at least <code>READ</code> access</li>
+<li><code>Node#getConfig</code> requires at least <code>READ</code> access</li>
+<li><code>Node#makeProvisioned</code> requires at least <code>WRITE</code> access</li>
+<li><code>Node#makeUnprovisioned</code> requires at least <code>WRITE</code> access</li>
+<li><code>Node#modifyMemberships</code> requires at least <code>WRITE</code> access</li>
+<li><code>Node#setAnnotation</code> requires at least <code>WRITE</code> access</li>
+<li><code>Node#whatChanged</code> requires at least <code>READ</code> access</li>
+<li><code>Parameter#annotation</code> requires at least <code>READ</code> access</li>
+<li><code>Parameter#modifyConflicts</code> requires at least <code>WRITE</code> access</li>
+<li><code>Parameter#modifyDepends</code> requires at least <code>WRITE</code> access</li>
+<li><code>Parameter#setAnnotation</code> requires at least <code>WRITE</code> access</li>
+<li><code>Parameter#setDefault</code> requires at least <code>WRITE</code> access</li>
+<li><code>Parameter#setDescription</code> requires at least <code>WRITE</code> access</li>
+<li><code>Parameter#setKind</code> requires at least <code>WRITE</code> access</li>
+<li><code>Parameter#setMustChange</code> requires at least <code>WRITE</code> access</li>
+<li><code>Parameter#setRequiresRestart</code> requires at least <code>WRITE</code> access</li>
+<li><code>Parameter#setVisibilityLevel</code> requires at least <code>WRITE</code> access</li>
+<li><code>Store#activateConfiguration</code> requires at least <code>ADMIN</code> access</li>
+<li><code>Store#addExplicitGroup</code> requires at least <code>WRITE</code> access</li>
+<li><code>Store#addFeature</code> requires at least <code>WRITE</code> access</li>
+<li><code>Store#addNode</code> requires at least <code>WRITE</code> access</li>
+<li><code>Store#addNodeWithOptions</code> requires at least <code>WRITE</code> access</li>
+<li><code>Store#addParam</code> requires at least <code>WRITE</code> access</li>
+<li><code>Store#addSubsys</code> requires at least <code>WRITE</code> access</li>
+<li><code>Store#affectedEntities</code> requires at least <code>READ</code> access</li>
+<li><code>Store#affectedNodes</code> requires at least <code>READ</code> access</li>
+<li><code>Store#checkFeatureValidity</code> requires at least <code>READ</code> access</li>
+<li><code>Store#checkGroupValidity</code> requires at least <code>READ</code> access</li>
+<li><code>Store#checkNodeValidity</code> requires at least <code>READ</code> access</li>
+<li><code>Store#checkParameterValidity</code> requires at least <code>READ</code> access</li>
+<li><code>Store#checkSubsystemValidity</code> requires at least <code>READ</code> access</li>
+<li><code>Store#getDefaultGroup</code> requires at least <code>READ</code> access</li>
+<li><code>Store#getFeature</code> requires at least <code>READ</code> access</li>
+<li><code>Store#getGroup</code> requires at least <code>WRITE</code> access</li>
+<li><code>Store#getGroupByName</code> requires at least <code>READ</code> access</li>
+<li><code>Store#getMustChangeParams</code> requires at least <code>READ</code> access</li>
+<li><code>Store#getNode</code> requires at least <code>READ</code> access</li>
+<li><code>Store#getParam</code> requires at least <code>READ</code> access</li>
+<li><code>Store#getSkeletonGroup</code> requires at least <code>READ</code> access</li>
+<li><code>Store#getSubsys</code> requires at least <code>READ</code> access</li>
+<li><code>Store#loadSnapshot</code> requires at least <code>WRITE</code> access</li>
+<li><code>Store#makeSnapshot</code> requires at least <code>WRITE</code> access</li>
+<li><code>Store#makeSnapshotWithOptions</code> requires at least <code>WRITE</code> access</li>
+<li><code>Store#removeFeature</code> requires at least <code>WRITE</code> access</li>
+<li><code>Store#removeGroup</code> requires at least <code>WRITE</code> access</li>
+<li><code>Store#removeNode</code> requires at least <code>WRITE</code> access</li>
+<li><code>Store#removeParam</code> requires at least <code>WRITE</code> access</li>
+<li><code>Store#removeSnapshot</code> requires at least <code>ADMIN</code> access</li>
+<li><code>Store#removeSubsys</code> requires at least <code>WRITE</code> access</li>
+<li><code>Store#storeinit</code> requires at least <code>ADMIN</code> access</li>
+<li><code>Store#validateConfiguration</code> requires at least <code>READ</code> access</li>
+<li><code>Subsystem#annotation</code> requires at least <code>READ</code> access</li>
+<li><code>Subsystem#modifyParams</code> requires at least <code>WRITE</code> access</li>
+<li><code>Subsystem#setAnnotation</code> requires at least <code>WRITE</code> access</li>
+</ul>
+
+<h2>Permissions required for Wallaby shell commands</h2>
+
+<h3>Commands available to any broker user</h3>
+
+<ul>
+<li><code>apropos</code>:  Provides a list of parameters that contain KEYWORD in their descriptions.</li>
+<li><code>console</code>:  Provides an interactive wallaby environment.  (<strong>N.B.</strong>:  individual API methods invoked from within the console environment may still fail if the user is not authorized.)</li>
+<li><code>help</code>:  Provides brief documentation for wallaby shell commands.</li>
+<li><code>inventory</code>:  Lists a (non-strict) subset of wallaby-managed nodes.</li>
+<li><code>list-features</code>:  Lists all the feature names in the store.</li>
+<li><code>list-groups</code>:  Lists all the group names in the store.</li>
+<li><code>list-nodes</code>:  Lists all the node names in the store.</li>
+<li><code>list-params</code>:  Lists all the parameter names in the store.</li>
+<li><code>list-snapshots</code>:  Lists snapshots in the store.</li>
+<li><code>list-subsystems</code>:  Lists all the subsystem names in the store.</li>
+<li><code>new-command</code>:  Generates Ruby files containing templates for new wallaby shell commands</li>
+<li><code>sanitize</code>:  Obfuscates potentially-sensitive entity names in a wallaby database dump.</li>
+<li><code>shebang</code>:  Provides an interpreter for wallaby scripts.  (<strong>N.B.</strong>:  individual API methods invoked from within the script environment may still fail if the user is not authorized.)</li>
+<li><code>show-feature</code>:  Displays the properties of a feature.</li>
+<li><code>show-node</code>:  Displays the properties of a node.</li>
+<li><code>show-param</code>:  Displays metadata about a parameter in the store.</li>
+<li><code>show-subsystem</code>:  Displays the properties of a subsystem.</li>
+</ul>
+
+<h3>Commands requiring <code>READ</code> access</h3>
+
+<ul>
+<li><code>dump</code>:  Dumps a wallaby snapshot to a file.</li>
+<li><code>explain</code>:  Outputs an annotated display of a node&#8217;s current configuration.</li>
+<li><code>http-server</code>:  Provides a HTTP service gateway to wallaby node configurations.</li>
+<li><code>list-users</code>:  Lists Wallaby roles for broker users.</li>
+<li><code>show-group</code>:  Displays the properties of a group. (<strong>N.B.</strong>:  unlike the other <code>show-*</code> commands, this invokes an API method and not merely API object property accessors)</li>
+</ul>
+
+<h3>Commands requiring <code>WRITE</code> access</h3>
+
+<ul>
+<li><code>add-conflicts-to-feature</code>:  Add conflicts to a feature in the store.</li>
+<li><code>add-conflicts-to-param</code>:  Add conflicts to a parameter in the store.</li>
+<li><code>add-dependencies-to-feature</code>:  Add dependencies to a feature in the store.</li>
+<li><code>add-dependencies-to-param</code>:  Add dependencies to a parameter in the store.</li>
+<li><code>add-feature</code>:  Adds a feature to the store.</li>
+<li><code>add-features-to-group</code>:  Add features to a group in the store.</li>
+<li><code>add-features-to-node</code>:  Add features to a node in the store.</li>
+<li><code>add-group</code>:  Adds a group to the store.</li>
+<li><code>add-includes-to-feature</code>:  Add includes to a feature in the store.</li>
+<li><code>add-node</code>:  Adds a node to the store.</li>
+<li><code>add-node-memberships</code>:  Add group memberships to a node in the store.</li>
+<li><code>add-nodes-to-group</code>:  Add nodes to a group in the store.</li>
+<li><code>add-param</code>:  Adds a parameter to the store.</li>
+<li><code>add-params-to-feature</code>:  Add parameters to a feature in the store.</li>
+<li><code>add-params-to-group</code>:  Add parameters to a group in the store.</li>
+<li><code>add-params-to-node</code>:  Add parameters to a node in the store.</li>
+<li><code>add-params-to-subsystem</code>:  Add parameters to a subsystem in the store.</li>
+<li><code>add-subsystem</code>:  Adds a subsystem to the store.</li>
+<li><code>feature-import</code>:  Imports a wallaby feature from a Condor configuration file.</li>
+<li><code>make-snapshot</code>:  Makes a snapshot with a given name.</li>
+<li><code>modify-feature</code>:  Alters metadata for a feature in the store.</li>
+<li><code>modify-group</code>:  Alters metadata for a group in the store.</li>
+<li><code>modify-param</code>:  Alters metadata for a parameter in the store.</li>
+<li><code>remove-conflicts-from-feature</code>:  Remove conflicts from a feature in the store.</li>
+<li><code>remove-conflicts-from-param</code>:  Remove conflicts from a parameter in the store.</li>
+<li><code>remove-dependencies-from-feature</code>:  Remove dependencies from a feature in the store.</li>
+<li><code>remove-dependencies-from-param</code>:  Remove dependencies from a parameter in the store.</li>
+<li><code>remove-feature</code>:  Deletes a feature from the store.</li>
+<li><code>remove-features-from-group</code>:  Remove features from a group in the store.</li>
+<li><code>remove-features-from-node</code>:  Remove features from a node in the store.</li>
+<li><code>remove-group</code>:  Deletes a group from the store.</li>
+<li><code>remove-includes-from-feature</code>:  Remove includes from a feature in the store.</li>
+<li><code>remove-node</code>:  Deletes a node from the store.</li>
+<li><code>remove-node-memberships</code>:  Remove group memberships from a node in the store.</li>
+<li><code>remove-nodes-from-group</code>:  Remove nodes from a group in the store.</li>
+<li><code>remove-param</code>:  Deletes a parameter from the store.</li>
+<li><code>remove-params-from-feature</code>:  Remove parameters from a feature in the store.</li>
+<li><code>remove-params-from-group</code>:  Remove parameters from a group in the store.</li>
+<li><code>remove-params-from-node</code>:  Remove parameters from a node in the store.</li>
+<li><code>remove-params-from-subsystem</code>:  Remove parameters from a subsystem in the store.</li>
+<li><code>remove-snapshot</code>:  Removes a snapshot with a given name.</li>
+<li><code>remove-subsystem</code>:  Deletes a subsystem from the store.</li>
+<li><code>replace-conflicts-on-feature</code>:  Replace the conflicts on a feature in the store with a new set of conflicts.</li>
+<li><code>replace-conflicts-on-param</code>:  Replace the conflicts on a parameter in the store with a new set of conflicts.</li>
+<li><code>replace-dependencies-on-feature</code>:  Replace the dependencies on a feature in the store with a new set of dependencies.</li>
+<li><code>replace-dependencies-on-param</code>:  Replace the dependencies on a parameter in the store with a new set of dependencies.</li>
+<li><code>replace-features-on-group</code>:  Replace the features on a group in the store with a new set of features.</li>
+<li><code>replace-features-on-node</code>:  Replace the features on a node in the store with a new set of features.</li>
+<li><code>replace-includes-on-feature</code>:  Replace the includes on a feature in the store with a new set of includes.</li>
+<li><code>replace-node-memberships</code>:  Replace group memberships on a node in the store with a new set of group memberships.</li>
+<li><code>replace-params-on-feature</code>:  Replace the parameters on a feature in the store with a new set of parameters.</li>
+<li><code>replace-params-on-group</code>:  Replace the parameters on a group in the store with a new set of parameters.</li>
+<li><code>replace-params-on-node</code>:  Replace the parameters on a node in the store with a new set of parameters.</li>
+<li><code>replace-params-on-subsystem</code>:  Replace the parameters on a subsystem in the store with a new set of parameters.</li>
+<li><code>upgrade-db</code>:  Upgrade the wallaby database.</li>
+</ul>
+
+<h3>Commands requiring <code>ADMIN</code> access</h3>
+
+<ul>
+<li><code>activate</code>:  Activates pending changes to the pool configuration.</li>
+<li><code>delete-user</code>:  Deletes Wallaby role information for a broker user. (<strong>N.B.</strong> Can also be authorized via shared secret)</li>
+<li><code>force-pull</code>:  Force a configuration pull</li>
+<li><code>force-restart</code>:  Force all daemons to restart</li>
+<li><code>load</code>:  Loads a wallaby snapshot from a file or from standard input (<strong>N.B.</strong> <code>ADMIN</code> access required if <code>--activate</code> option supplied)</li>
+<li><code>load-snapshot</code>:  Loads the snapshot with a given name.</li>
+<li><code>set-user-role</code>:  Defines or modifies Wallaby roles for broker users. (<strong>N.B.</strong> Can also be authorized via shared secret)</li>
+</ul>
+
+    </div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://timothysc.github.com/blog/2012/09/12/dust-off-nuke-it-from-orbit/">Dust off nuke it from orbit</a></h1>
+      <p class="meta">
+        <time datetime="2012-09-12T09:12:00Z" pubdate data-updated="true">Sep 12<span>th</span>, 2012  &nbsp; &mdash; &nbsp; Timothy St. Clair</time>
+      </p>
+    </header>
+    <div class="entry-content"><p>So in an effort to single source the numerous blogs, and other random bitz which have been smatter across the internet, I’ve decided to start putting all my professional efforts into one loc where other developers can easily find sources, blogs, etc.</p>
+</div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://chapeau.freevariable.com/2012/08/highly-available-configuration-data-with-wallaby.html">Highly-available configuration data with Wallaby</a></h1>
+      <p class="meta">
+        <time datetime="2012-08-29T21:03:00Z" pubdate data-updated="true">Aug 29<span>th</span>, 2012  &nbsp; &mdash; &nbsp; Will Benton</time>
+      </p>
+    </header>
+    <div class="entry-content">
+        <p>Many Condor users are interested in <em>high-availability</em> (HA) services:  they don't want their compute resources to become unavailable due to the failure of a single machine that is running an important Condor daemon.  (See <a href="http://research.cs.wisc.edu/condor/CondorWeek2012/presentations/rati-benton-condor-ha.pdf">this talk</a> that Rob Rati and I gave at Condor Week this year for a couple of solutions to HA with the Condor <code>schedd</code>.)  So it's only natural that Condor users who are interested in configuring their pools with <a href="http://getwallaby.com">Wallaby</a> might wonder how Wallaby responds in the face of failure.</p>
+
+<p>Some of the technologies that the current version of Wallaby is built upon do not lend themselves to traditional active-active high-availability solutions.  However, the good news is that due to Wallaby's architecture, almost all running Condor nodes <em>will not be affected</em> by a failure of the Wallaby service or the machine it is running on.  Nodes that have already checked in with Wallaby will have their latest activated configurations as of the last checking.  The only limitations in the event of service failure are:</p>
+
+<ol>
+<li>new nodes will not be able to check in and get the default configuration; </li>
+<li>it will not be possible to access older activated configurations; and</li>
+<li>it will not be possible to alter, activate, or deploy the configuration.</li>
+</ol>
+
+<p>These limitations, of course, disappear when the service is restored.  For most users, losing the ability to update or deploy configurations due to a service failure — but not losing their deployed configurations or otherwise affecting normal pool operation — represents an acceptable risk.  Some installations, especially those who aggressively exploit Wallaby's scripting interface or versioning capability, may want a more robust solution:  these users might want to be able to access older versions of their activated configurations even if Wallaby is down, or they might want a mechanism to speed recovery by starting a replica of their service on another machine.  In the remainder of this post, we'll discuss some approaches to provide more access to Wallaby data when Wallaby is down.</p>
+
+<h3>Accessing older versioned configurations</h3>
+
+<p>If you need to access historical versioned configurations, the easiest way to do it is to set up a <code>cron</code> job on the machine running Wallaby that periodically runs <code>wallaby vc-export</code> on your snapshot database and outputs versioned configurations to a shared filesystem.  <code>wallaby vc-export</code>, which is documented <a href="http://getwallaby.com/2011/11/exporting-versioned-configurations/">in this post</a>, exports all historical snapshots to plain-text files, so you can access the configuration for <code>foo.example.com</code> at version 1234 in a file called something like <code>1234/nodes/foo.example.com</code>.  This <code>cron</code> job needs to be able to access the filesystem path of the Wallaby snapshot database; furthermore, to run it efficiently, you'll probably want to limit the number of snapshots it processes each time; see <code>wallaby vc-export</code>'s online help for more details.</p>
+
+<h3>Exporting Wallaby state to a file</h3>
+
+<p>If you're just interested in the state of the Wallaby service (including possibly unactivated changes), you can periodically run <code>wallaby dump</code> over the network.  This will produce a YAML file consisting of the serialized state of the Wallaby; you can later load this file by using the <code>wallaby load</code> command, possibly against another Wallaby agent.</p>
+
+<h3>Backing up the raw database files</h3>
+
+<p>The easiest way to pick up and recover from a Wallaby node failure is to start a new Wallaby service with the same databases as the failed node.  In turn, the easiest way to do this is by periodically copying these database files from their locations on the Wallaby node (typically in <code>/var/lib/wallaby</code>) to some location on a shared filesystem.  The following Ruby script<noscript>, which you'll need to view this post in a browser and not a feed reader to see,</noscript> will safely copy the SQLite files that Wallaby uses even while Wallaby is running:</p>
+
+<script src="https://gist.github.com/3518892.js?file=backup-db.rb"></script>
+
+        
+
+    </div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://erikerlandson.github.com/blog/2012/07/27/driving-a-condor-job-renice-policy-with-accounting-groups/">Driving a Condor Job Renice Policy with Accounting Groups</a></h1>
+      <p class="meta">
+        <time datetime="2012-07-27T20:50:00Z" pubdate data-updated="true">Jul 27<span>th</span>, 2012  &nbsp; &mdash; &nbsp; Erik Erlandson</time>
+      </p>
+    </header>
+    <div class="entry-content"><p>Condor can run its jobs with a renice priority level specified by <code>JOB_RENICE_INCREMENT</code>, which defaults simply to 10, but can in fact be any ClassAd expression, and is evaluated in the context of the job ad corresponding to the job being run.</p>
+
+<p>This opens up an opportunity to create a renice <em>policy</em>, driven by accounting groups.  Consider a <a href="http://erikerlandson.github.com/blog/2012/07/10/configuring-minimum-and-maximum-resources-for-mission-critical-jobs-in-a-condor-pool/">scenario I discussed previously</a>, where a condor pool caters to mission critical (MC) jobs and regular (R) jobs.</p>
+
+<p>An additional configuration trick we could apply is to add a renice policy that gives a higher renice value (that is, a lower priority) to any jobs that aren't run under the mission-critical (MC) rubric, as in this example configuration:</p>
+
+<pre><code># A convenience expression that extracts group, e.g. "mc.user@domain.com" --&gt; "mc"
+SUBMIT_EXPRS = AcctGroupName
+AcctGroupName = ifThenElse(my.AccountingGroup =!= undefined, \
+                           regexps("^([^@]+)\.[^.]+", my.AccountingGroup, "\1"), "&lt;none&gt;")
+
+NUM_CPUS = 3
+
+# Groups representing mission critical and regular jobs:
+GROUP_NAMES = MC, R
+GROUP_QUOTA_MC = 2
+GROUP_QUOTA_R = 1
+
+# Any group not MC gets a renice increment of 10:
+JOB_RENICE_INCREMENT = 10 * (AcctGroupName =!= "MC")
+</code></pre>
+
+<p>To demonstrate this policy in action, I wrote a little shell script I called <code>burn</code>, whose only function is to burn cycles for a given number of seconds:</p>
+
+<pre><code>#!/bin/sh
+
+# usage: burn [n]
+# where n is number of seconds to burn cycles
+s="$1"
+if [ -z "$s" ]; then s=60; fi
+
+t0=`date +%s`
+while [ 1 ]; do
+    x=0
+    # burn some cycles:
+    while [ $x -lt 10000 ]; do let x=$x+1; done
+    t=`date +%s`
+    let e=$t-$t0
+    # halt when the requested time is up:
+    if [ $e -gt $s ]; then exit ; fi
+done
+</code></pre>
+
+<p>Begin by standing up a condor pool including the configuration above.   Make sure the <code>burn</code> script is readable.  Also, it is preferable to make sure your system is unloaded (load average should be as close to zero as reasonably possible).  Then submit the following, which instantiates two <code>burn</code> jobs running under accounting group <code>MC</code> and a third under group <code>R</code>:</p>
+
+<pre><code>universe = vanilla
+cmd = /path/to/burn
+args = 600
+should_transfer_files = if_needed
+when_to_transfer_output = on_exit
++AccountingGroup = "MC.user"
+queue 2
++AccountingGroup = "R.user"
+queue 1
+</code></pre>
+
+<p>Allow the jobs to negotiate and then run for a couple minutes.  You should then see something similar to the following load-average information from the slot ads:</p>
+
+<pre><code>$ condor_status -format "%s" SlotID -format " | %.2f" LoadAvg -format " | %.2f" CondorLoadAvg -format " | %.2f" TotalLoadAvg -format " | %.2f" TotalCondorLoadAvg -format " | %s\n" AccountingGroup | sort
+1 | 1.33 | 1.33 | 2.75 | 2.70 | MC.user@localdomain
+2 | 1.28 | 1.24 | 2.75 | 2.70 | MC.user@localdomain
+3 | 0.13 | 0.13 | 2.77 | 2.72 | R.user@localdomain
+</code></pre>
+
+<p>Note, which particular <code>SlotID</code> runs which job may vary.  However, we expect to see that the load averages for the slot running group <code>R</code> are much lower than the load averages for slots running jobs under group <code>MC</code>, as seen above.</p>
+
+<p>We can explicitly verify the renice numbers from our policy to see that our one <code>R</code> job has a nice value of 10 (and is using only a fraction of the cpu):</p>
+
+<pre><code># tell 'ps' to give us (pid, %cpu, nice, cmd+args):
+$ ps -eo "%p %C %n %a" | grep 'burn 600'
+22403 10.2  10 /bin/sh /home/eje/bin/burn 600
+22406 93.2   0 /bin/sh /home/eje/bin/burn 600
+22411 90.6   0 /bin/sh /home/eje/bin/burn 600
+</code></pre>
+</div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://erikerlandson.github.com/blog/2012/07/19/lifo-and-fifo-preemption-policies-for-a-condor-pool/">LIFO and FIFO Preemption Policies for a Condor Pool</a></h1>
+      <p class="meta">
+        <time datetime="2012-07-19T20:57:00Z" pubdate data-updated="true">Jul 19<span>th</span>, 2012  &nbsp; &mdash; &nbsp; Erik Erlandson</time>
+      </p>
+    </header>
+    <div class="entry-content"><p>On a Condor pool, a Last In First Out (LIFO) preemption policy favors choosing the longest-running job from the available preemption options.  Correspondingly, a First In First Out (FIFO) policy favors the most-recent job for preemption.</p>
+
+<p>Configuring a LIFO or FIFO policy is easy, using the <code>PREEMPTION_RANK</code> configuration variable.  <code>PREEMPTION_RANK</code> defines a ClassAd expression that is evaluated for all slots that are candidates for claim preemption, and causes those candidates to be sorted so that the candidates with the highest rank value are considered first.   Therefore, to implement a LIFO (or FIFO) preemption policy, one needs reference an expression that represents the claiming job's running time:</p>
+
+<pre><code># LIFO preemption: favor preempting jobs that have been running the longest
+PREEMPTION_RANK = TotalJobRunTime
+# turn this into FIFO by using (-TotalJobRunTime)
+</code></pre>
+
+<p>The attribute <code>TotalJobRunTime</code> represents the amount of time a job has been running on its claim (generally, this is effectively equivalent to total running time, unless your job supports some form of checkpointing), and so ranking preemption candidates by this attribute results in LIFO preemption, and ranking by its negative provides FIFO preemption.</p>
+
+<p>Note that <code>PREEMPTION_RANK</code> applies <em>only</em> to candidates that have already met the requirements defined on <code>PREEMPTION_REQUIREMENTS</code>, or the slot-centric preemption policy defined by <code>RANK</code>.  <code>PREEMPTION_RANK</code> does not itself determine what claimed slots are considered by a job for preemption.</p>
+
+<p>To demonstrate LIFO and FIFO preemption in action, consider the following configuration:</p>
+
+<pre><code># turn off scheduler optimizations, as they can sometimes obscure the
+# negotiator/matchmaker behavior
+CLAIM_WORKLIFE = 0
+CLAIM_PARTITIONABLE_LEFTOVERS = False
+
+# reduce update latencies for faster testing response
+UPDATE_INTERVAL = 15
+NEGOTIATOR_INTERVAL = 20
+SCHEDD_INTERVAL = 15
+
+# for demonstration purposes, make sure basic preemption knobs are 'on'
+MAXJOBRETIREMENTTIME = 0
+PREEMPTION_REQUIREMENTS = True
+NEGOTIATOR_CONSIDER_PREEMPTION = True
+RANK = 0.0
+
+# LIFO preemption: favor preempting jobs that have been running the longest
+PREEMPTION_RANK = TotalJobRunTime
+# turn this into FIFO by using (-TotalJobRunTime)
+
+# define 3 cpus to provide fodder for preemption
+NUM_CPUS = 3
+</code></pre>
+
+<p>Begin by spinning up a condor pool with the configuration above.  When the pool is operating, fill the three slots with jobs for 'user1', with a delay to ensure that jobs have easily distinguishable values for <code>TotalJobRunTime</code>:</p>
+
+<pre><code>$ cat /tmp/user1.jsub 
+universe = vanilla
+cmd = /bin/sleep
+args = 600
+should_transfer_files = if_needed
+when_to_transfer_output = on_exit
++AccountingGroup="user1"
+queue 1
+
+$ condor_submit /tmp/user1.jsub ; sleep 30 ; condor_submit /tmp/user1.jsub ; sleep 30 ; condor_submit /tmp/user1.jsub
+</code></pre>
+
+<p>Once these jobs have all started running, verify their run times using <a href="http://erikerlandson.github.com/blog/2012/06/29/easy-histograms-and-tables-from-condor-jobs-and-slots/">ccsort</a>:</p>
+
+<pre><code>$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
+1.0 | 78 | user1@localdomain
+2.0 | 36 | user1@localdomain
+3.0 | 16 | user1@localdomain
+</code></pre>
+
+<p>to make preemption easy, give user1 a low priority:</p>
+
+<pre><code>$ condor_userprio -setprio user1@localdomain 10
+</code></pre>
+
+<p>Now, we will submit some jobs for 'user2': which will be allowed to preempt jobs for 'user1'.  We should see that the longest-running job for user1 is chosen each time:</p>
+
+<pre><code>$ condor_submit /tmp/user2.jsub
+Submitting job(s).
+1 job(s) submitted to cluster 4.
+
+$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
+2.0 | 81 | user1@localdomain
+3.0 | 61 | user1@localdomain
+4.0 | 2 | user2@localdomain
+
+$ condor_submit /tmp/user2.jsub
+Submitting job(s).
+1 job(s) submitted to cluster 5.
+
+$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
+3.0 | 91 | user1@localdomain
+4.0 | 32 | user2@localdomain
+5.0 | 3 | user2@localdomain
+</code></pre>
+
+<p>Now we change LIFO to FIFO and demonstrate.  Switch the sign of <code>TotalJobRunTime</code>:</p>
+
+<pre><code># Now I am FIFO!
+PREEMPTION_RANK = -TotalJobRunTime
+</code></pre>
+
+<p>And restart the negotiator, and check on our currently running jobs:</p>
+
+<pre><code>$ condor_restart -negotiator
+
+$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
+3.0 | 151 | user1@localdomain
+4.0 | 92 | user2@localdomain
+5.0 | 49 | user2@localdomain
+</code></pre>
+
+<p>Now, set up 'user2' for easy preemption like user1:</p>
+
+<pre><code>$ condor_userprio -setprio user2@localdomain 10
+</code></pre>
+
+<p>And submit some jobs for user3.  Since we reconfigured for FIFO preemption, we should now see the <em>most recent</em> job preempted each time (in this case, these should both be the 'user2' jobs):</p>
+
+<pre><code>$ condor_submit /tmp/user3.jsub
+Submitting job(s).
+1 job(s) submitted to cluster 6.
+
+$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
+3.0 | 241 | user1@localdomain
+4.0 | 182 | user2@localdomain
+6.0 | 15 | user3@localdomain
+
+$ condor_submit /tmp/user3.jsub
+Submitting job(s).
+1 job(s) submitted to cluster 7.
+
+$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
+3.0 | 301 | user1@localdomain
+6.0 | 75 | user3@localdomain
+7.0 | 17 | user3@localdomain
+</code></pre>
+</div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://erikerlandson.github.com/blog/2012/07/10/configuring-minimum-and-maximum-resources-for-mission-critical-jobs-in-a-condor-pool/">Configuring Minimum and Maximum Resources for Mission Critical Jobs in a Condor Pool</a></h1>
+      <p class="meta">
+        <time datetime="2012-07-10T22:49:00Z" pubdate data-updated="true">Jul 10<span>th</span>, 2012  &nbsp; &mdash; &nbsp; Erik Erlandson</time>
+      </p>
+    </header>
+    <div class="entry-content"><p>Suppose you are administering a Condor pool for a company or organization where you want to support both "mission critical" (MC) jobs and "regular" (R) jobs.  Mission critical jobs might include IT functions such as backups, or payroll, or experiment submissions from high profile internal customers.  Regular jobs encompass any jobs that can be delayed, or preempted, with little or no consequence.</p>
+
+<p>As part of your Condor policy for supporting MC jobs, you may want to ensure that these jobs always have access to a minimum set of resources on the pool.  In order to maintain the peace, you may also wish to set a pool-wide maximum on MC jobs, to leave some number of resources available for R jobs as well.  The following configuration, which I will discuss and demonstrate below, configures a pool-wide minimum <em>and maximum</em> for resources allocated to MC jobs.  Additionally, it shows how to dedicate MC resources on specific nodes in the pool.</p>
+
+<pre><code># turn off scheduler optimizations, as they can sometimes obscure the
+# negotiator/matchmaker behavior
+CLAIM_WORKLIFE = 0
+
+# turn off adaptive loops in negotiation - these give a single
+# 'traditional' one-pass negotiation cycle
+GROUP_QUOTA_MAX_ALLOCATION_ROUNDS = 1
+GROUP_QUOTA_ROUND_ROBIN_RATE = 1e100
+
+# for demonstration purposes, make sure basic preemption knobs are 'on'
+MAXJOBRETIREMENTTIME = 0
+PREEMPTION_REQUIREMENTS = True
+NEGOTIATOR_CONSIDER_PREEMPTION = True
+RANK = 0.0
+
+# extracts the acct group name, e.g. "MC.user@localdomain" --&gt; "MC"
+SUBMIT_EXPRS = AcctGroupName CCLimits
+AcctGroupName = ifThenElse(my.AccountingGroup =!= undefined, \
+                           regexps("^([^@]+)\.[^.]+", my.AccountingGroup, "\1"), "&lt;none&gt;")
+CCLimits = ifThenElse(my.ConcurrencyLimits isnt undefined, \
+                      my.ConcurrencyLimits, "***")
+# note - the "my." scoping in the above is important - 
+# these attribute names may also occur in a machine ad
+
+# oversubscribe the machine to simulate 20 nodes on a single box
+NUM_CPUS = 20
+
+# accounting groups, each with equal quota
+# Mission Critical jobs are associated with group 'MC'
+# Regular jobs are associated with group 'R'
+GROUP_NAMES = MC, R
+GROUP_QUOTA_MC = 10
+GROUP_QUOTA_R = 10
+
+# enable 'autoregroup' for groups, which gives all grps
+# a chance to compete for resources above their quota
+GROUP_AUTOREGROUP = TRUE
+GROUP_ACCEPT_SURPLUS = FALSE
+
+# a pool-wide limit on MC job resources
+# note this is a "hard" limit - with this example config, MC jobs cannot exceed this
+# limit even if there are free resources
+MC_JOB_LIMIT = 15
+
+# special slot for MC jobs, effectively reserves
+# specific resources for MC jobs on a particular node.
+SLOT_TYPE_1 = cpus=1
+SLOT_TYPE_1_PARTITIONABLE = FALSE
+NUM_SLOTS_TYPE_1 = 5
+
+# Allocate any "non-MC" remainders here:
+SLOT_TYPE_2 = cpus=1
+SLOT_TYPE_2_PARTITIONABLE = FALSE
+NUM_SLOTS_TYPE_2 = 15
+
+# note - in the above, I declared static slots for the purposes of 
+# demonstration, because partitionable slots interfere with clarity of
+# APPEND_RANK expr behavior, due to being peeled off 1 slot at a time
+# in the negotiation cycle
+
+# A job counts against MC_JOB_LIMIT if and only if it is of the "MC" 
+# accounting group, otherwise it won't be run
+START = ($(START)) &amp;&amp; (((AcctGroupName =?= "MC") &amp;&amp; (stringListIMember("mc_job", CCLimits))) \
+              || ((AcctGroupName =!= "MC") &amp;&amp; !stringListIMember("mc_job", CCLimits)))
+
+# rank from the slot's POV:
+# "MC-reserved" slots (slot type 1) prefer MC jobs,
+# while other slots have no preference
+RANK = ($(RANK)) + 10.0*ifThenElse((SlotTypeID=?=1) || (SlotTypeID=?=-1), \
+                                   1.0 * (AcctGroupName =?= "MC"), 0.0)
+
+# rank from the job's POV:
+# "MC" jobs prefer any specially allocated per-node resources
+# any other jobs prefer other jobs
+APPEND_RANK = 10.0*ifThenElse(AcctGroupName =?= "MC", \
+              1.0*((SlotTypeID=?=1) || (SlotTypeID=?=-1)), \
+              1.0*((SlotTypeID=!=1) &amp;&amp; (SlotTypeID=!=-1)))
+
+# If a job negotiated under "MC", it may not be preempted by a job that did not.
+PREEMPTION_REQUIREMENTS = ($(PREEMPTION_REQUIREMENTS)) &amp;&amp; \
+                          ((SubmitterNegotiatingGroup =?= "MC") || \
+                           (RemoteNegotiatingGroup =!= "MC"))
+</code></pre>
+
+<p>Next I will discuss some of the components from this configuration and their purpose.  The first goal of a pool-wide resource minimum is accomplished by declaring accounting groups for MC and R jobs to run against:</p>
+
+<pre><code>GROUP_NAMES = MC, R
+GROUP_QUOTA_MC = 10
+GROUP_QUOTA_R = 10
+</code></pre>
+
+<p>We will enable the autoregroup feature, which allows jobs to also compete for any unused resources <em>without</em> regard for accounting groups, after all jobs have had an opportunity to match under their group.  This is a good way to allow opportunistic resource usage, and also will facilitate demonstration.</p>
+
+<pre><code>GROUP_AUTOREGROUP = TRUE
+</code></pre>
+
+<p>A pool-wide maximum on resource usage by MC jobs can be accomplished with a concurrency limit.  Note that this limit is larger than the group quota for MC jobs:</p>
+
+<pre><code>MC_JOB_LIMIT = 15
+</code></pre>
+
+<p>It is also desirable to enforce the semantic that MC jobs <em>must</em> 'charge' against the MC_JOB concurrency limit, and conversely that any non-MC jobs are not allowed to charge against that limit.   Adding the following clause to the START expression enforces this semantic by preventing any jobs not following this rule from running:</p>
+
+<pre><code>START = ($(START)) &amp;&amp; (((AcctGroupName =?= "MC") &amp;&amp; (stringListIMember("mc_job", CCLimits))) \
+                    || ((AcctGroupName =!= "MC") &amp;&amp; !stringListIMember("mc_job", CCLimits)))
+</code></pre>
+
+<p>The final resource related goal for MC jobs is to reserve a certain number of resources on specific machines in the pool.  In the configuration above that is accomplished by declaring a special slot type, as here where we declare 5 slots of slot type 1 (the remaining 15 slots are declared via slot type 2, above):</p>
+
+<pre><code>SLOT_TYPE_1 = cpus=1
+SLOT_TYPE_1_PARTITIONABLE = FALSE
+NUM_SLOTS_TYPE_1 = 5
+</code></pre>
+
+<p>Then we add a term to the slot rank expression that will cause any slot of type 1 to preempt a non-MC job in favor of an MC job (the factor of 10.0 is an optional tuning factor to allow this term to either take priority over other terms, or cede priority):</p>
+
+<pre><code>RANK = ($(RANK)) + 10.0*ifThenElse((SlotTypeID=?=1) || (SlotTypeID=?=-1), \
+                                   1.0 * (AcctGroupName =?= "MC"), 0.0)
+</code></pre>
+
+<p>(Note, slot type -1 would represent a dynamic slot derived from a partitionable slot of type 1.  In this example, all slots are static)</p>
+
+<p>An additional "job side" rank term can also be helpful, to allow MC jobs to try and match special MC reserved slots first, and to allow non-MC jobs to avoid reserved slots if possible:</p>
+
+<pre><code>APPEND_RANK = 10.0*ifThenElse(AcctGroupName =?= "MC", \
+              1.0*((SlotTypeID=?=1) || (SlotTypeID=?=-1)), \
+              1.0*((SlotTypeID=!=1) &amp;&amp; (SlotTypeID=!=-1)))
+</code></pre>
+
+<p>Lastly, preemption policy can be configured to help enforce resource allocations for MC jobs.  Here, a preemption clause is added to prevent any non-MC job from preempting a MC job, and specifically one that <em>negotiated</em> under its group quota (that is, it refers to RemoteNegotiatingGroup):</p>
+
+<pre><code>PREEMPTION_REQUIREMENTS = ($(PREEMPTION_REQUIREMENTS)) &amp;&amp; \
+                          ((SubmitterNegotiatingGroup =?= "MC") || \
+                           (RemoteNegotiatingGroup =!= "MC"))
+</code></pre>
+
+<p>With the example policy configuration unpacked, we can demonstrate its behavior.  Begin by spinning up a pool with the above configuration.  Verify that we have the expected slots (You can refer <a href="http://erikerlandson.github.com/blog/2012/06/29/easy-histograms-and-tables-from-condor-jobs-and-slots/">here to learn more about cchist</a>):</p>
+
+<pre><code>$ cchist condor_status RemoteGroup RemoteNegotiatingGroup SlotTypeID
+      5 undefined | undefined | 1
+     15 undefined | undefined | 2
+     20 total
+</code></pre>
+
+<p>Next, submit 20 Mission Critical jobs (getting enough sleep is critical):</p>
+
+<pre><code>universe = vanilla
+cmd = /bin/sleep
+args = 600
+should_transfer_files = if_needed
+when_to_transfer_output = on_exit
+concurrency_limits = mc_job
++AccountingGroup="MC.user"
+queue 20
+</code></pre>
+
+<p>Since we configured a pool-wide maximum of 15 cores, we want to verify that we did not exceed that limit.  Note that 5 slots were negotiated under "&lt;none>", via the autoregroup feature (denoted by the value in RemoteNegotiatingGroup), as the group quota for MC is 10, and the MC jobs were able to match their pool limit of 15:</p>
+
+<pre><code>$ cchist condor_status RemoteGroup RemoteNegotiatingGroup SlotTypeID
+      5 MC | MC | 1
+      5 MC | MC | 2
+      5 MC | &lt;none&gt; | 2
+      5 undefined | undefined | 2
+     20 total
+</code></pre>
+
+<p>Next we set the MC submitter to a lower priority (i.e. higher prio value):</p>
+
+<pre><code>$ condor_userprio -setprio MC.user@localdomain 10
+The priority of MC.user@localdomain was set to 10.000000
+</code></pre>
+
+<p>Now we submit 15 "regular" R jobs:</p>
+
+<pre><code>universe = vanilla
+cmd = /bin/sleep
+args = 600
+should_transfer_files = if_needed
+when_to_transfer_output = on_exit
++AccountingGroup="R.user"
+queue 15
+</code></pre>
+
+<p>The submitter "R.user" currently has higher priority than "MC.user", however our preemption policy will only allow preemption of MC jobs that negotiated under "&lt;none>", as those were matched outside the accounting group's quota.  So we see that jobs with RemoteNegotiatingGroup == "MC" remain un-preempted:</p>
+
+<pre><code>$ cchist condor_status RemoteGroup RemoteNegotiatingGroup SlotTypeID
+      5 MC | MC | 1
+      5 MC | MC | 2
+     10 R | R | 2
+     20 total
+</code></pre>
+
+<p>The above demonstrates the pool-wide quota and concurrentcy limits for MC jobs.  To demonstrate per-machine resources, we start by clearing all jobs:</p>
+
+<pre><code>$ condor_rm -all
+</code></pre>
+
+<p>Submit 20 "R" jobs (similar to above), and verify that they occupy all slots, including the slots with SlotTypeID == 1, which are reserved for MC jobs (but not currently being used):</p>
+
+<pre><code>$ cchist condor_status RemoteGroup RemoteNegotiatingGroup SlotTypeID
+      5 R | &lt;none&gt; | 1
+      5 R | &lt;none&gt; | 2
+     10 R | R | 2
+     20 total
+</code></pre>
+
+<p>Submit 10 MC jobs.  "MC.user" does not have sufficient priority to preempt "R.user", however the slot rank expression <em>will</em> preempt non-MC jobs for an MC job on slots of type 1, and so we see that MC jobs <em>do</em> acquire the 5 type-1 slots reserved on this node:</p>
+
+<pre><code>$ cchist condor_status RemoteGroup RemoteNegotiatingGroup SlotTypeID
+      5 MC | MC | 1
+      5 R | &lt;none&gt; | 2
+     10 R | R | 2
+     20 total
+</code></pre>
+
+<p>Finally, as an encore you can verify that jobs run against the MC accounting group must also charge against the MC_JOB concurrency limit, and non-MC jobs may not charge against it.  Again, start with an empty queue:</p>
+
+<pre><code>$ condor_rm -all
+</code></pre>
+
+<p>Now, submit 'bad' jobs that use accounting group "MC" but does not use the "mc_job" concurrency limits:</p>
+
+<pre><code>universe = vanilla
+cmd = /bin/sleep
+args = 600
+should_transfer_files = if_needed
+when_to_transfer_output = on_exit
++AccountingGroup="MC.user"
+queue 10
+</code></pre>
+
+<p>And likewise some 'bad' regular jobs that attempt to use the "mc_job" concurrency limits:</p>
+
+<pre><code>universe = vanilla
+cmd = /bin/sleep
+args = 600
+should_transfer_files = if_needed
+when_to_transfer_output = on_exit
+concurrency_limits = mc_job
++AccountingGroup="R.user"
+queue 10
+</code></pre>
+
+<p>You should see that <em>none</em> of these jobs are allowed to run:</p>
+
+<pre><code>$ cchist condor_status RemoteGroup RemoteNegotiatingGroup SlotTypeID
+      5 undefined | undefined | 1
+     15 undefined | undefined | 2
+     20 total
+$ cchist condor_q JobStatus
+     20 1
+     20 total
+</code></pre>
+</div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://chapeau.freevariable.com/2012/06/using-wallabys-skeleton-group.html">Using Wallaby's skeleton group</a></h1>
+      <p class="meta">
+        <time datetime="2012-06-15T21:04:21Z" pubdate data-updated="true">Jun 15<span>th</span>, 2012  &nbsp; &mdash; &nbsp; Will Benton</time>
+      </p>
+    </header>
+    <div class="entry-content">
+        <p><a href="http://getwallaby.com">Wallaby</a> 0.15.0 includes a new feature called the <em>skeleton group</em>.  (This feature was available in earlier versions of Wallaby, too, but it was experimental and had some rough edges.) Find out how the skeleton group makes configuration more flexible by <a href="http://getwallaby.com/2012/06/using-the-skeleton-group/">reading all about it.</a></p>
+
+        
+
+    </div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://getwallaby.com/2012/06/using-the-skeleton-group/">Using the skeleton group</a></h1>
+      <p class="meta">
+        <time datetime="2012-06-15T17:46:00Z" pubdate data-updated="true">Jun 15<span>th</span>, 2012  &nbsp; &mdash; &nbsp; William Benton</time>
+      </p>
+    </header>
+    <div class="entry-content"><p>In Wallaby, Condor nodes are configured by applying <em>features</em> and <em>parameter</em> settings to <em>groups</em>.  In order for the group abstraction to be fully general, <a href="http://getwallaby.com/2011/05/using-wallaby-groups-to-implement-node-tagging/">Wallaby provides two kinds of <em>special groups</em></a>:  the <em>default group</em>, which contains every node (but which is the lowest-priority membership for each node), and a set of <em>identity groups</em>, each of which only contains a single node (and which is always its highest-priority membership, so that special settings applied to a node&#8217;s identity group always take precedence over settings from that node&#8217;s other memberships).</p>
+
+<p>The default group provides a convenient mechanism to apply some configuration to every node in a pool, whether or not it has been explicitly configured; this enables us to provide some sensible basic configuration for nodes that are added to the pool opportunistically or from the cloud.  However, for some applications, using the default group may be inflexible because of Wallaby&#8217;s additive, compositional configuration model.  For example, what if you want to enable some functionality by default but disable it on some subset of nodes?  Or what if you want to use &#8220;defaults&#8221; to override some settings made in explicit groups?</p>
+
+<p>The <em>skeleton group</em> provides a solution to these problems.  (The &#8220;skeleton group&#8221; is so named by analogy with the <a href="http://www.linuxhowtos.org/Tips%20and%20Tricks/using_skel.htm"><code>/etc/skel</code></a> directory on Linux systems, which provides a template for the home directories of newly-created users.)  Like the default group, every new node is added to the skeleton group when it is created and receives the last-activated configuration for the skeleton group. Unlike the default group, individual nodes&#8217; skeleton group memberships can be at different priorities; furthermore, nodes can be removed from the skeleton group all together.  In this post, we&#8217;ll see how to set it up and use it.</p>
+
+<ol>
+<li>Ensure that you&#8217;re running Wallaby 0.15.0 or later.  (Some older versions also include experimental support for the skeleton group, but Wallaby 0.15.0 eliminates many rough edges and is the recommended minimum version for using the skeleton group.)</li>
+<li>Change the environment that your <code>wallaby-agent</code> runs in so that <code>WALLABY_ENABLE_SKELETON_GROUP</code> is set to <code>true</code>.  The easiest way to do this is to modify the <code>/etc/sysconfig/wallaby-agent</code> file (on RHEL 5 and 6) or the <code>/etc/sysconfig/wallaby-agent-env</code> file (on Fedora).</li>
+<li>Restart Wallaby by running <code>service wallaby restart</code> (on RHEL 5 and 6) or <code>systemctl  restart wallaby.service</code> (on Fedora).</li>
+<li>Create a new node, either explicitly (e.g. <code>wallaby add-node foo.local.</code>) or by having a new node check in; note that its memberships include <code>+++SKEL</code>.  This is the skeleton group.  (Preexisting nodes won&#8217;t be in the skeleton group by default, but it&#8217;s straightforward to add them all via the Wallaby shell.)</li>
+</ol>
+
+
+<p>Now that you have it set up, here are some things to try doing with it:</p>
+
+<ol>
+<li>Put some of your default-group configuration in the skeleton group.  Note that the skeleton group will be validated in isolation just as the default group is, but the validation procedure for the skeleton group assumes that the default group configuration has also been applied already &#8212; so your skeleton group configuration will need to be valid when applied atop the default group configuration.  (This is so that newly-created nodes will have a valid configuration.)</li>
+<li>Put configuration that you want to override on some nodes in the skeleton group.  Then remove these nodes from the skeleton group.</li>
+<li>Experiment with configurations that depend on the priority of the skeleton group; move it around in nodes&#8217; membership lists.</li>
+<li><a href="http://getwallaby.com/2010/10/extending-the-wallaby-shell/">Write a Wallaby shell command</a> to copy the configuration from the skeleton group over to a node&#8217;s identity group and then remove that node from the skeleton group (in order to allow further customization).</li>
+</ol>
+
+
+<p>Let us know how you wind up using this functionality!</p>
+</div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://chapeau.freevariable.com/2012/06/troubleshooting-condor-with-wallaby.html">Troubleshooting Condor with Wallaby</a></h1>
+      <p class="meta">
+        <time datetime="2012-06-01T20:49:36Z" pubdate data-updated="true">Jun 1<span>st</span>, 2012  &nbsp; &mdash; &nbsp; Will Benton</time>
+      </p>
+    </header>
+    <div class="entry-content">
+        <p>Often, if you're trying to reproduce a problem someone else is having with Condor, you'll need their configuration.  Likewise, if you're trying to help someone reproduce a problem you're having, you'll want to send along your configuration to aid them in replicating your setup.  For installations that use legacy flat-file configurations (optionally with a local configuration directory), this can be a pain, since you'll need to copy several files from site to site (ensuring that you've included all the files necessary to replicate your configuration, perhaps across multiple machines on the site experiencing the problem).</p>
+
+<p>If everyone involved uses <a href="http://getwallaby.com/">Wallaby</a> for configuration management, things can be a lot simpler:  the site experiencing the problem can use <code>wallaby dump</code> to save the state of their configuration for an entire pool to a flat file, which the troubleshooting site can then inspect or restore with <code>wallaby load</code>.  If the problem appears in some configuration snapshots but not in others, the reporting site can use <a href="http://getwallaby.com/2011/11/exporting-versioned-configurations/"><code>wallaby vc-export</code></a> to generate a directory of <em>all</em> of their configurations over time, so that the troubleshooting site can attempt to pinpoint the differences between what worked and what didn't.</p>
+
+<p>(Thanks to <a href="http://spinningmatt.wordpress.com">Matt</a> for pointing out the value of versioned semantic configuration management in reproducing problems!)</p>
+
+        
+
+    </div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://getwallaby.com/2012/06/troubleshooting/">Troubleshooting Condor with Wallaby</a></h1>
+      <p class="meta">
+        <time datetime="2012-06-01T17:27:00Z" pubdate data-updated="true">Jun 1<span>st</span>, 2012  &nbsp; &mdash; &nbsp; William Benton</time>
+      </p>
+    </header>
+    <div class="entry-content"><p>Often, if you&#8217;re trying to reproduce a problem someone else is having with Condor, you&#8217;ll need their configuration.  Likewise, if you&#8217;re trying to help someone reproduce a problem you&#8217;re having, you&#8217;ll want to send along your configuration to aid them in replicating your setup.  For installations that use legacy flat-file configurations (optionally with a local configuration directory), this can be a pain, since you&#8217;ll need to copy several files from site to site (ensuring that you&#8217;ve included all the files necessary to replicate your configuration, perhaps across multiple machines on the site experiencing the problem).</p>
+
+<p>If everyone involved uses <a href="http://getwallaby.com/">Wallaby</a> for configuration management, things can be a lot simpler:  the site experiencing the problem can use <code>wallaby dump</code> to save the state of their configuration for an entire pool to a flat file, which the troubleshooting site can then inspect or restore with <code>wallaby load</code>.  If the problem appears in some configuration snapshots but not in others, the reporting site can use <a href="http://getwallaby.com/2011/11/exporting-versioned-configurations/"><code>wallaby vc-export</code></a> to generate a directory of <em>all</em> of their configurations over time, so that the troubleshooting site can attempt to pinpoint the differences between what worked and what didn&#8217;t.</p>
+
+<p>(Thanks to <a href="http://spinningmatt.wordpress.com">Matt</a> for pointing out the value of versioned semantic configuration management in reproducing problems!)</p>
+</div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://chapeau.freevariable.com/2012/05/boldly-going-forward-to-ruby-19.html">Boldly going forward — to Ruby 1.9</a></h1>
+      <p class="meta">
+        <time datetime="2012-05-02T16:53:03Z" pubdate data-updated="true">May 2<span>nd</span>, 2012  &nbsp; &mdash; &nbsp; Will Benton</time>
+      </p>
+    </header>
+    <div class="entry-content">
+        <p>From the very beginning of the project, we've developed <a href="http://getwallaby.com">Wallaby</a> and its stack in Ruby 1.8 and not paid much attention to Ruby 1.9.  We had done so for a few reasons, but primary among these is that we had internal Ruby 1.8 experience and that we needed to support Wallaby on 1.8.6 for the foreseeable future (and thus wouldn't be writing code depending on 1.9 language or library features).  All of that changed, of course, once we began <a href="https://fedoraproject.org/wiki/Features/Wallaby">packaging Wallaby for Fedora</a>.  Because Fedora 17 <a href="https://fedoraproject.org/wiki/Features/Ruby_1.9.3">defaults to Ruby 1.9.3</a>, we needed to port the code to work with both Ruby 1.9.3 and Ruby 1.8.6.  Most major Ruby projects work with 1.9 these days, but I suspect a lot of code that is intended to be deployed on Ruby 1.8 is in the same boat we were.  In this post, we'll cover some of the pitfalls we ran into while boldly bringing our code base into 2009; we've kept an eye towards solutions that will work in 1.8 and 1.9, since we will be continuing to support Wallaby on Ruby 1.8.6.</p>
+
+<h3>Standard library interface changes</h3>
+
+<p>In Ruby 1.8, <code>Module#instance_methods</code> returned an <code>Array</code> of <code>String</code>s; in Ruby 1.9, it returns an <code>Array</code> of <code>Symbol</code>s.  The return type of <code>Module#constants</code> has also changed similarly.  <code>Module#method_defined?</code> and <code>Module#const_defined?</code> still accept <code>String</code> or <code>Symbol</code> parameters, though; when checking for the existence of a method or constant, prefer these.  If you need to iterate through or grep for a substring in an <code>Array</code> of method or constant names, map each value to the result of calling <code>to_s</code> on itself first.</p>
+
+<p>The sort of <code>String</code> returned by the <code>to_s</code> method on collection classes has changed in Ruby 1.9; it is now similar to the return value of the <code>inspect</code> method.  So, in Ruby 1.8:</p>
+
+<pre><code>&gt;&gt; ls = %w{foo bar blah}
+=&gt; ["foo", "bar", "blah"]
+&gt;&gt; ls &lt;&lt; %w{fred barney}
+=&gt; ["foo", "bar", "blah", ["fred", "barney"]]
+&gt;&gt; ls.to_s
+=&gt; "foobarblahfredbarney"
+&gt;&gt; ls.inspect
+=&gt; "["foo", "bar", "blah", ["fred", "barney"]]"
+</code></pre>
+
+<p>Whereas in Ruby 1.9, the result is this:</p>
+
+<pre><code>&gt;&gt; ls = %w{foo bar blah}
+=&gt; ["foo", "bar", "blah"] 
+&gt;&gt; ls &lt;&lt; %w{fred barney}
+=&gt; ["foo", "bar", "blah", ["fred", "barney"]] 
+&gt;&gt; ls.to_s
+=&gt; "[\"foo\", \"bar\", \"blah\", [\"fred\", \"barney\"]]" 
+&gt;&gt; ls.inspect
+=&gt; "[\"foo\", \"bar\", \"blah\", [\"fred\", \"barney\"]]"
+</code></pre>
+
+<p>If you have code that depends on the old <code>to_s</code> behavior (we did, but I intend to conceal the identity of the developer responsible in order to protect the guilty), you can approximate it in several backwards-compatible ways:  if you're only worried about <code>Array</code>s that contain <code>String</code> elements, the easiest thing to do is just to call <code>ls.join("")</code>.</p>
+
+<h3>Semantic changes in the Ruby language</h3>
+
+<p>The big change that affected us --- and will probably affect you, too, if you do a lot of metaprogramming or module trickery --- involves block scoping.  In some cases in our code, <code>define_method</code> blocks that referred to free variables exhibited different behavior on Ruby 1.8 and Ruby 1.9.  The solution in these cases is ugly but straightforward:  use a <code>Proc</code> object as you would use a <code>let</code> in Scheme, like this:</p>
+
+<pre><code>free_var = :something
+
+# ...
+
+Proc.new do |fv|
+  define_method "my_method" do
+    fv
+  end
+end.call(free_var)
+</code></pre>
+
+<h3>Text-encoding issues</h3>
+
+<p>A lot of people have written about <a href="http://yehudakatz.com/2010/05/05/ruby-1-9-encodings-a-primer-and-the-solution-for-rails/">Ruby 1.9's support for multiple text encodings</a>.  If you're using native extension libraries that create strings and haven't been explicitly vetted for 1.9 compatibility, you'll want to make sure that the Ruby <code>String</code> objects are created with the appropriate encoding metadata.  In our case, the <a href="http://cwiki.apache.org/qpid/qpid-management-framework.html">QMF</a> library was returning UTF-8 strings that had encoding type <code>BINARY</code> in Ruby (i.e. raw bytes).  Consider two <code>String</code> objects with identical sequences of bytes; one is tagged <code>BINARY</code> and the other is tagged <code>UTF-8</code>:  these will be indistinguishable if you print them to a terminal or write them to a file, but Ruby's comparison operators will not find them identical.  We submitted a <a href="https://github.com/apache/qpid/commit/2bab1a8f3ca3fd57d9bcb8543f08b914de2e0910">patch to QMF</a> to ensure that strings returned from QMF are either tagged as the default external encoding or as UTF-8 (if no external encoding is specified).</p>
+
+<h3>In conclusion</h3>
+
+<p>This isn't an exhaustive list of all of the changes between Ruby 1.8 and Ruby 1.9, of course (see <a href="http://slideshow.rubyforge.org/ruby19.html">here</a> for that), but it is a set of problems that folks developing networked services and infrastructure for these might need to worry about.  The standard-library interface changes were pretty minor; the other issues were listed roughly in order of increasing frustration.  The important news, of course, is that Wallaby and its dependencies now work with Ruby 1.9.3 and are thus readily available to Fedora 17 users.  Go forth, install, and configure!</p>
+
+        
+
+    </div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://getwallaby.com/2012/03/getwallaby-dot-com-is-now-powered-by-octopress/">Now powered by OctoPress</a></h1>
+      <p class="meta">
+        <time datetime="2012-03-16T17:27:00Z" pubdate data-updated="true">Mar 16<span>th</span>, 2012  &nbsp; &mdash; &nbsp; William Benton</time>
+      </p>
+    </header>
+    <div class="entry-content"><p>I noticed yesterday that this site had recently fallen victim to yet another WordPress security vulnerability; please accept my apologies if you&#8217;ve seen any unexpected behavior here.  In other news, I&#8217;m pleased to announce that getwallaby.com is now powered by <a href="http://octopress.org">OctoPress</a>.  Please <a href="https://github.com/willb/getwallaby.com/issues">let me know</a> if you find any quirks with the new site.</p>
+</div>
+  </article>
+
+  <article>
+    <header>
+      <h1 class="entry-title"><a href="http://getwallaby.com/2011/11/exporting-versioned-configurations/">Exporting versioned configurations</a></h1>
+      <p class="meta">
+        <time datetime="2011-11-02T22:24:33Z" pubdate data-updated="true">Nov 2<span>nd</span>, 2011  &nbsp; &mdash; &nbsp; William Benton</time>
+      </p>
+    </header>
+    <div class="entry-content"><p>Wallaby stores versioned configurations in a database.  <a href="http://getwallaby.com/the-wallaby-api/">Wallaby API</a> clients can access older versions of a node&#8217;s configuration by supplying the <code>version</code> option to the <code>Node#getConfig</code> method.  Sometimes, though, we&#8217;d like to inspect individual configurations in greater detail than the API currently allows.</p>
+
+<p>The <a href="http://git.fedorahosted.org/git/?p=grid/wallaby.git">Wallaby git repository</a> now contains a <a href="http://git.fedorahosted.org/git/?p=grid/wallaby.git;a=blob;f=lib/mrg/grid/config/shell/cmd_versioned_config_export.rb;hb=HEAD">command</a> to export versioned configurations from a database to flat text files.  Clone the repository or just download the file and then place <code>cmd_versioned_config_export.rb</code> somewhere in your <code>WALLABY_SHELL_COMMAND_PATH</code>, and you&#8217;ll be able to invoke it like this:</p>
+
+<pre><code>Usage:  wallaby vc-export DBFILE
+exports versioned configurations from DBFILE to plain text files
+    -h, --help                       displays this message
+        --verbose                    outputs information about command progress
+    -o, --output-dir DIR             set output directory to DIR
+        --earliest NUM               output only the earliest NUM configurations
+        --latest NUM                 output only the most recent NUM configurations
+        --since DATE                 output only configurations since the given date
+</code></pre>
+
+<p>It will create a directory (called <code>snapshots</code> by default) with subdirectories for each versioned configuration; each of these will be timestamped with the time of the configuration.  Within each version directory, there will be directories for node configurations and stored group configurations.  (If you&#8217;re using an older version of Wallaby, the only stored group configuration will be for the default group.  Versioned configurations generated with a fairly recent version of Wallaby, on the other hand, will have stored configurations for more groups and should also have useful information about node memberships in the configuration file.)</p>
+
+<p><code>wallaby vc-export</code> allows you both to back up versioned configurations and simply to inspect them.  Let us know if you find a new application for it, or if you find it useful in other ways!</p>
+</div>
+  </article>
+
+</div>
+<aside class="sidebar">
+  <section>
+    <h1>Planet Condor Members</h1>
+    
+      <a href="http://willbenton.com"> Will Benton</a><br>
+    
+      <a href="http://getwallaby.com/"> William Benton</a><br>
+    
+      <a href="http://erikerlandson.github.com/"> Erik Erlandson</a><br>
+    
+      <a href="http://tmckayus.github.com/"> Trevor McKay</a><br>
+    
+      <a href="http://rrati.github.com/"> Robert Rati</a><br>
+    
+      <a href="http://timothysc.github.com/"> Timothy St. Clair</a><br>
+    
+  </section>
+</aside>
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2012 - Erik Erlandson -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+
+
+
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>

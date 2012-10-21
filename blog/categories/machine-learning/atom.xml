@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: machine learning | tool monkey]]></title>
+  <link href="http://erikerlandson.github.com/blog/categories/machine-learning/atom.xml" rel="self"/>
+  <link href="http://erikerlandson.github.com/"/>
+  <updated>2012-10-21T13:29:30-07:00</updated>
+  <id>http://erikerlandson.github.com/</id>
+  <author>
+    <name><![CDATA[Erik Erlandson]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Deriving an Incremental Form of the Polynomial Regression Equations]]></title>
+    <link href="http://erikerlandson.github.com/blog/2012/07/05/deriving-an-incremental-form-of-the-polynomial-regression-equations/"/>
+    <updated>2012-07-05T19:46:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2012/07/05/deriving-an-incremental-form-of-the-polynomial-regression-equations</id>
+    <content type="html"><![CDATA[<p>Incremental, or on-line, algorithms are increasingly popular as data set sizes explode and web enabled applications create environments where new data arrive continuously (that is, incrementally) from clients out on the internet.</p>
+
+<p>Recently I have been doing some <a href="https://github.com/erikerlandson/ratorade">experiments</a> with applying one of the <em>oldest</em> incremental algorithms to the task of rating predictions: computing a linear regression with a coefficient of correlation.  The incremental formulae look like this:</p>
+
+<div markdown="0">
+To find coefficients \( a_0, a_1 \) of the linear predictor \( y = a_0 + a_1 x \):
+\\[
+a_1 = \\frac {n \\Sigma x y - \\Sigma x \\Sigma y} {n \\Sigma x^2 - \\left( \\Sigma x \\right) ^2 }
+\\hspace{1 cm}
+a_0 = \\frac { \\Sigma y - a_1 \\Sigma x } {n}
+\\]
+The correlation coefficient of this predictor is given by:
+\\[
+\\rho (x,y) = \\frac {n \\Sigma x y - \\Sigma x \\Sigma y} {\\sqrt {n \\Sigma x^2 - \\left( \\Sigma x \\right) ^ 2 } \\sqrt {n \\Sigma y^2 - \\left( \\Sigma y \\right) ^ 2 } }
+\\]
+</div>
+
+
+<p>As you can see from the formulae above, it is sufficient to maintain running sums</p>
+
+<div markdown="0"> \\[ n, \\Sigma x, \\Sigma y, \\Sigma x^2, \\Sigma y^2, \\Sigma x y \\] </div>
+
+
+<p>and so any new data can be included incrementally - that is, the model can be updated without revisiting any previous data.</p>
+
+<p>Working with these models caused me to wonder if there was a way to generalize them to obtain incremental formulae for a quadratic predictor, or generalized polynomials.  As it happens, there is.  To show how, I'll derive an incremental formula for the coefficients of the quadratic predictor:</p>
+
+<div markdown="0">
+\\[
+y = a_0 + a_1 x + a_2 x^2
+\\]
+</div>
+
+
+<p>Recall the <a href="http://en.wikipedia.org/wiki/Polynomial_regression#Matrix_form_and_calculation_of_estimates">matrix formula</a> for polynomial regression:</p>
+
+<div markdown="0">
+\\[ \\vec{a} = \\left( X^T X \\right) ^ {-1} X^T \\vec{y} \\]
+
+where, in the quadratic case:
+
+\\[
+\\vec{a} = \\left( \\begin{array} {c}
+a_0 \\\\
+a_1 \\\\
+a_2 \\\\
+\\end{array} \\right)
+\\hspace{1 cm}
+X = \\left( \\begin{array} {ccc}
+1 & x_1 & x_1^2 \\\\
+1 & x_2 & x_2^2 \\\\
+  &  \vdots  & \\\\
+1 & x_n & x_n^2 \\\\
+\\end{array} \\right)
+\\hspace{1 cm}
+\\vec{y} = \\left( \\begin{array} {c}
+y_1 \\\\
+y_2 \\\\
+\vdots \\\\
+y_n \\\\
+\\end{array} \\right)
+\\]
+
+Note that we can apply the definition of matrix multiplication and express the two products \\( X^T X \\) and \\( X^T \\vec{y} \\) from the above formula like so:
+\\[
+X^T X = 
+\\left( \\begin{array} {ccc}
+n & \\Sigma x & \\Sigma x^2 \\\\
+\\Sigma x & \\Sigma x^2 & \\Sigma x^3 \\\\
+\\Sigma x^2 & \\Sigma x^3 & \\Sigma x^4 \\\\
+\\end{array} \\right)
+\\hspace{1 cm}
+X^T \\vec{y} =
+\\left( \\begin{array} {c}
+\\Sigma y \\\\
+\\Sigma x y \\\\
+\\Sigma x^2 y \\\\
+\\end{array} \\right)
+\\]
+</div>
+
+
+<p>And so now we can express the formula for our quadratic coefficients in this way:</p>
+
+<div markdown="0">
+\\[
+\\left( \\begin{array} {c}
+a_0 \\\\
+a_1 \\\\
+a_2 \\\\
+\\end{array} \\right)
+=
+\\left( \\begin{array} {ccc}
+n & \\Sigma x & \\Sigma x^2 \\\\
+\\Sigma x & \\Sigma x^2 & \\Sigma x^3 \\\\
+\\Sigma x^2 & \\Sigma x^3 & \\Sigma x^4 \\\\
+\\end{array} \\right)
+^ {-1}
+\\left( \\begin{array} {c}
+\\Sigma y \\\\
+\\Sigma x y \\\\
+\\Sigma x^2 y \\\\
+\\end{array} \\right)
+\\]
+</div>
+
+
+<p>Note that we now have a matrix formula that is expressed entirely in sums of various terms in x and y, which means that it can be maintained incrementally, as we desired.  If you have access to a matrix math package, you might very well declare victory right here, as you can easily construct these matrices and do the matrix arithmetic at will to obtain the model coefficients.  However, as an additional step I applied <a href="http://www.sagemath.org/">sage</a> to do the symbolic matrix inversion and multiplication to give:</p>
+
+<div markdown="0">
+\\[
+\\small
+a_0 =
+\\frac {1} {Z}
+\\left( 
+- \\left( \\Sigma x^3 \\Sigma x - \\left( \\Sigma x^2 \\right)^2 \\right) \\Sigma x^2 y  +  \\left( \\Sigma x^4  \\Sigma x - \\Sigma x^3 \\Sigma x^2 \\right) \\Sigma x y  -  \\left( \\Sigma x^4 \\Sigma x^2 - \\left( \\Sigma x^3 \\right)^2 \\right) \\Sigma y 
+\\right)
+\\normalsize
+\\]
+\\[
+\\small
+a_1 =
+\\frac {1} {Z}
+\\left( 
+\\left( n \\Sigma x^3  - \\Sigma x^2 \\Sigma x \\right) \\Sigma x^2 y  -  \\left( n \\Sigma x^4 - \\left( \\Sigma x^2 \\right) ^2 \\right) \\Sigma x y  +  \\left( \\Sigma x^4 \\Sigma x - \\Sigma x^3 \\Sigma x^2 \\right) \\Sigma y
+\\right)
+\\normalsize
+\\]
+\\[
+\\small
+a_2 =
+\\frac {1} {Z}
+\\left( 
+- \\left( n \\Sigma x^2 - \\left( \\Sigma x \\right) ^2 \\right) \\Sigma x^2 y  +  \\left( n \\Sigma x^3 - \\Sigma x^2 \\Sigma x \\right) \\Sigma x y  -  \\left( \\Sigma x^3 \\Sigma x - \\left( \\Sigma x^2 \\right) ^2 \\right) \\Sigma y 
+\\right)
+\\normalsize
+\\]
+where:
+\\[
+Z = n \\left( \\Sigma x^3 \\right) ^ 2 - 2 \\Sigma x^3 \\Sigma x^2 \\Sigma x + \\left( \\Sigma x^2 \\right) ^3 - \\left( n \\Sigma x^2 - \\left( \\Sigma x \\right) ^2  \\right) \\Sigma x^4
+\\]
+</div>
+
+
+<p>Inspecting the quadratic derivation above, it is now fairly easy to see that the general form of the incremental matrix formula for the coefficients of a degree-m polynomial looks like this:</p>
+
+<div markdown="0">
+\\[
+\\left( \\begin{array} {c}
+a_0 \\\\
+a_1 \\\\
+\vdots \\\\
+a_m \\\\
+\\end{array} \\right)
+=
+\\left( \\begin{array} {cccc}
+n & \\Sigma x & \\cdots & \\Sigma x^m \\\\
+\\Sigma x & \\Sigma x^2 & \\cdots & \\Sigma x^{m+1} \\\\
+\\vdots & & \\ddots & \\vdots \\\\
+\\Sigma x^m & \\Sigma x^{m+1} & \\cdots & \\Sigma x^{2 m} \\\\
+\\end{array} \\right)
+^ {-1}
+\\left( \\begin{array} {c}
+\\Sigma y \\\\
+\\Sigma x y \\\\
+\\vdots \\\\
+\\Sigma x^m y \\\\
+\\end{array} \\right)
+\\]
+</div>
+
+
+<p>Having an incremental formula for generalized polynomial regression leaves open the question of how one might generalize the correlation coefficient.  There is such a generalization, called the <a href="http://en.wikipedia.org/wiki/Multiple_correlation">coefficient of multiple determination</a>, which is defined:</p>
+
+<div markdown="0">
+\\[
+r = \\sqrt { \\vec{c} ^ T  R^{-1}  \\vec{c} }
+\\]
+Where
+\\[
+\\vec{c} = 
+\\left ( \\begin{array} {c}
+\\rho (x,y) \\\\
+\\rho (x^2,y) \\\\
+\\vdots \\\\
+\\rho (x^m,y) \\\\
+\\end{array} \\right)
+\\hspace{1 cm}
+R =
+\\left( \\begin{array} {cccc}
+1 & \\rho (x,x^2) & \\cdots & \\rho(x,x^m) \\\\
+\\rho (x^2,x) & 1 & \\cdots & \\rho(x^2,x^m) \\\\
+\\vdots & & \\ddots & \\vdots \\\\
+\\rho (x^m,x) & \\rho (x^m,x^2) & \\cdots & 1 \\\\
+\\end{array} \\right)
+\\]
+and \\( \\rho (x,y) \\) is the traditional pairwise correlation coefficient.
+</div>
+
+
+<p>But we already have an incremental formula for any pairwise correlation coefficient, which is defined above.  And so we can maintain the running sums needed to fill the matrix entries, and compute the coefficient of multiple determination for our polynomial model at any time.</p>
+
+<p>So we now have incremental formulae to maintain any polynomial model in an on-line environment where we either can't or prefer not to store the data history, and also incrementally evaluate the 'generalized correlation coefficient' for that model.</p>
+
+<p>Readers familiar with linear regression may notice that there is also nothing special about polynomial regression, in the sense that powers of x may also be replaced with arbitrary functions of x, and the same regression equations hold.  And so we might generalize the incremental matrix formulae further to replace products of powers of x with products of functions of x:</p>
+
+<div markdown="0">
+for a linear regression model \\( y = a_1 f_1 (x) + a_2 f_2 (x) + \\cdots + a_m f_m(x) \\) :
+\\[
+\\left( \\begin{array} {c}
+a_1 \\\\
+a_2 \\\\
+\vdots \\\\
+a_m \\\\
+\\end{array} \\right)
+=
+\\left( \\begin{array} {cccc}
+\\Sigma f_1 (x) f_1 (x) & \\Sigma f_1 (x) f_2 (x) & \\cdots & \\Sigma f_1 (x) f_m (x) \\\\
+\\Sigma f_2 (x) f_1 (x) & \\Sigma f_2 (x) f_2 (x) & \\cdots & \\Sigma f_2 (x) f_m (x) \\\\
+\\vdots & & \\ddots & \\vdots \\\\
+\\Sigma f_m (x) f_1 (x) & \\Sigma f_m (x) f_2 (x) & \\cdots & \\Sigma f_m (x) f_m (x) \\\\
+\\end{array} \\right)
+^ {-1}
+\\left( \\begin{array} {c}
+\\Sigma y f_1 (x) \\\\
+\\Sigma y f_2 (x) \\\\
+\\vdots \\\\
+\\Sigma y f_m (x) \\\\
+\\end{array} \\right)
+\\]
+</div>
+
+
+<p>The coefficient of multiple determination generalizes in the analogous way.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[The Joy of Anonymized Data]]></title>
+    <link href="http://erikerlandson.github.com/blog/2012/05/20/the-joy-of-anonymized-data/"/>
+    <updated>2012-05-20T11:31:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2012/05/20/the-joy-of-anonymized-data</id>
+    <content type="html"><![CDATA[<p>I've been fooling around with an <a href="https://github.com/erikerlandson/ratorade/tree/master/data">anonymized data set</a> on the side.  Although this can be frustrating in its own way, it occurred to me that it <em>does</em> have the advantage of forcing me to see the data in the same way my algorithms see it: that is, the data is just some anonymous strings, values and identifiers.  To the code, strings like "120 minute IPA" or "Dogfish Head Brewery" have no more significance than "Beer-12" or "Brewer-5317", and the anonymous identifiers remove any subconscious or conscious tendencies of mine to impart more meaning to an identifier string than is present to the algorithms.</p>
+
+<p>On the other hand, having anonymous identifiers prevents me from drawing any actual inspirations for utilizing semantics that <em>might</em> genuinely be leveragable by an algorithm.  However, my current goal is to produce tools that are generically useful across data domains.  In that respect, I think developing on anonymized data could actually be helping.  Time will tell.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Pretty Good Random Sampling from Database Queries]]></title>
+    <link href="http://erikerlandson.github.com/blog/2012/05/16/pretty-good-random-sampling-from-database-queries/"/>
+    <updated>2012-05-16T07:05:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2012/05/16/pretty-good-random-sampling-from-database-queries</id>
+    <content type="html"><![CDATA[<p>Suppose you want to add random sampling to a database query, but your database does not support it.  One known technique is to add a field, say "rk", that contains a random key value in [0,1), index on that field, and add a clause to the query:  <code>("rk" &gt;= x  &amp;&amp;  "rk" &lt; x+p)</code>, where p is your desired random sampling probability and x is randomly chosen from [0,1-p).</p>
+
+<p>This is not bad, but we can see it is not <em>truly</em> randomized, as the sliding window [x,x+p) over the "rk" random key field generates overlap in the samplings.  The larger the value of p, the more significant the overlapping effect will be.</p>
+
+<p>Eliminating this effect absolutely (and maintaining query efficiency) is difficult without direct database support, however we can take steps to significantly reduce it.  Suppose we generated <em>two</em> independently randomized keys "rk0" and "rk1".  We could sample using a slightly more complex clause: <code>(("rk0" &gt;= x0  &amp;&amp; "rk0" &lt; x0+d) || ("rk1" &gt;= x1  &amp;&amp;  "rk1" &lt; x1+d))</code>, where x0 and x1 are randomly selected from [0,1-d).</p>
+
+<p>What value do we use for d to maintain a random sampling factor of p?  As "rk0" and "rk1" are independent random variables, the effective sampling factor p is given by p = d + d - d<sup>2,</sup> where the d<sup>2</sup> accounts for query results present in both the "rk0" and "rk1" subqueries.  Applying the quadratic formula to solve for d gives us: d = 1-sqrt(1-p).</p>
+
+<p>This approach should be useable with any database.  Here is example code I wrote for generating the random sampling portion of a mongodb query in pymongo:</p>
+
+<pre><code>def random_sampling_query(p, rk0="rk0", rk1="rk1", pad = 0):
+    d = (1.0 - sqrt(1.0-p)) * (1.0 + pad)
+    if d &gt; 1.0: d = 1.0
+    if d &lt; 0.0: d = 0.0
+    s0 = random.random()*(1.0 - d)
+    s1 = random.random()*(1.0 - d)
+    return {"$or":[{rk0:{"$gte":s0, "$lt":s0+d}}, {rk1:{"$gte":s1, "$lt":s1+d}}]}
+</code></pre>
+
+<p>I included an optional 'pad' parameter to support a case where one might want a particular (integer) sample size s, and so set p = s/(db-table-size), and use padding to mitigate the probability of getting less than s records due to random sampling jitter.  In mongodb one could then append <code>limit(s)</code> to the query return, and get exactly s returns in most cases, with the correct padding.</p>
+
+<p>Here is a pymongo example of using the <code>random_sampling_query()</code> above:</p>
+
+<pre><code># get a query that does random sampling of 1% of the results:
+query = random_sampling_query(0.01)
+# other query clauses can be added if desired:
+query[user] = "eje"
+# issue the final query to get results with random sampling:
+qres = data.find(query)
+</code></pre>
+
+<p>One could extend the logic above by using 3 independent random fields rk0,rk1,rk2 and applying the cubic formula, or four fields and the quartic formula, but I suspect that is passing the point of diminishing returns on storage cost, query cost and algebra.</p>
+]]></content>
+  </entry>
+  
+</feed>
