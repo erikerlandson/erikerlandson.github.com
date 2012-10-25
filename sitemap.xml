@@ -2,86 +2,82 @@
 <urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'>
     <url>
         <loc>http://erikerlandson.github.com/blog/2012/03/19/dont-try-to-stop-me/</loc>
-        <lastmod>2012-10-21T13:01:39-07:00</lastmod>
+        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/03/19/interaction-between-mktime-and-tm-isdst-a-compute-cycle-landmine/
         </loc>
-        <lastmod>2012-10-21T13:01:39-07:00</lastmod>
+        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/05/16/pretty-good-random-sampling-from-database-queries/
         </loc>
-        <lastmod>2012-10-21T13:01:39-07:00</lastmod>
+        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
     </url>
     <url>
         <loc>http://erikerlandson.github.com/blog/2012/05/20/the-joy-of-anonymized-data/</loc>
-        <lastmod>2012-10-21T13:01:39-07:00</lastmod>
+        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/06/27/maintaining-accounting-group-quotas-with-preemption-policy/
         </loc>
-        <lastmod>2012-10-21T13:01:39-07:00</lastmod>
+        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/06/29/easy-histograms-and-tables-from-condor-jobs-and-slots/
         </loc>
-        <lastmod>2012-10-21T13:01:39-07:00</lastmod>
+        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/07/05/deriving-an-incremental-form-of-the-polynomial-regression-equations/
         </loc>
-        <lastmod>2012-10-21T13:01:39-07:00</lastmod>
+        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/07/10/configuring-minimum-and-maximum-resources-for-mission-critical-jobs-in-a-condor-pool/
         </loc>
-        <lastmod>2012-10-21T13:01:39-07:00</lastmod>
+        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/07/19/lifo-and-fifo-preemption-policies-for-a-condor-pool/
         </loc>
-        <lastmod>2012-10-21T13:01:39-07:00</lastmod>
+        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/07/27/driving-a-condor-job-renice-policy-with-accounting-groups/
         </loc>
-        <lastmod>2012-10-21T13:01:39-07:00</lastmod>
+        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/09/26/improved-parse-checking-for-classad-log-files-in-condor/
         </loc>
-        <lastmod>2012-10-21T13:18:20-07:00</lastmod>
+        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/10/05/hosting-a-blog-feed-aggregator-with-octopress/
         </loc>
-        <lastmod>2012-10-21T13:18:20-07:00</lastmod>
-    </url>
-    <url>
-        <loc>http://erikerlandson.github.com/planet/</loc>
-        <lastmod>2012-10-21T13:18:20-07:00</lastmod>
+        <lastmod>2012-10-25T16:44:20-07:00</lastmod>
     </url>
     <url>
         <loc>http://erikerlandson.github.com/</loc>
-        <lastmod>2012-10-21T13:18:20-07:00</lastmod>
+        <lastmod>2012-10-25T16:44:20-07:00</lastmod>
     </url>
     <url>
         <loc>http://erikerlandson.github.com/metafeed/</loc>
-        <lastmod>2012-10-21T13:18:20-07:00</lastmod>
+        <lastmod>2012-10-25T16:44:20-07:00</lastmod>
     </url>
     <url>
         <loc>http://erikerlandson.github.com/blog/archives/</loc>
-        <lastmod>2012-10-21T13:18:20-07:00</lastmod>
+        <lastmod>2012-10-25T16:44:20-07:00</lastmod>
     </url>
 </urlset>

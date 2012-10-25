@@ -4,7 +4,7 @@
   <title><![CDATA[Category: blog feed | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/blog-feed/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2012-10-21T13:33:48-07:00</updated>
+  <updated>2012-10-25T16:45:43-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -26,6 +26,8 @@
 <li>Optional generation of a 'meta-feed' in atom.xml format, from aggregated feed entries</li>
 <li>Automatic removal of duplicate feed list urls, and automatic removal of duplicate posts (e.g. if multiple category feeds from the same author are listed)</li>
 <li>Automatic generation of feed author list as an Octopress 'aside'</li>
+<li>Inclusion/exclusion of posts based on number of posts and/or post age</li>
+<li>Display of full or summary content based on number of posts and/or post age</li>
 </ul>
 
 
@@ -33,7 +35,7 @@
 
 <p>Currently, you can obtain a copy of "feed_aggregator.rb" here:</p>
 
-<p><a href="https://github.com/erikerlandson/erikerlandson.github.com/blob/source/plugins/feed_aggregator.rb">https://github.com/erikerlandson/erikerlandson.github.com/blob/source/plugins/feed_aggregator.rb</a></p>
+<p><a href="https://github.com/erikerlandson/octopress/blob/feed_aggregator/plugins/feed_aggregator.rb">feed_aggregator.rb</a></p>
 
 <p>Simply copy this file into the plugins directory for your octopress repo:</p>
 
@@ -45,9 +47,9 @@
 <p>You can obtain a copy of the layout files here:</p>
 
 <ul>
-<li><a href="https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator.html">https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator.html</a></li>
-<li><a href="https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator_page.html">https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator_page.html</a></li>
-<li><a href="https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator_meta.xml">https://github.com/erikerlandson/erikerlandson.github.com/blob/source/source/_layouts/feed_aggregator_meta.xml</a></li>
+<li><a href="https://github.com/erikerlandson/octopress/blob/feed_aggregator/.themes/classic/source/_layouts/feed_aggregator.html">feed_aggregator.html</a></li>
+<li><a href="https://github.com/erikerlandson/octopress/blob/feed_aggregator/.themes/classic/source/_layouts/feed_aggregator_page.html">feed_aggregator_page.html</a></li>
+<li><a href="https://github.com/erikerlandson/octopress/blob/feed_aggregator/.themes/classic/source/_layouts/feed_aggregator_meta.xml">feed_aggregator_meta.xml</a></li>
 </ul>
 
 
@@ -82,21 +84,47 @@ layout: feed_aggregator
 title: My Blog Feed Aggregator
 
 # maximum number of entries from each feed url to display (defaults to 5)
+# use '0' for 'no limit'
 post_limit: 5
+
+# limit on total posts for feed (defaults to 100)
+# use 0 for 'no limit'
+post_total_limit: 50
+
+# maximum post age to include: &lt;N&gt; { seconds | minutes | hours | days | weeks | months | years }
+# abbreviations and plurals are supported, e.g.  w, week, weeks
+# defaults to '1 year'
+# use '0 &lt;any-unit&gt;' for 'no limit'
+post_age_limit: 6 months
+
+# only render full content for the first &lt;N&gt; posts 
+# (default is 'full content for all posts')
+# use a limit of 0 to use all summaries
+full_post_limit: 10
+
+# use summaries for all posts older than this 
+# (default is 'no maximum age')
+# works like post_age_limit
+full_post_age_limit: 1 month
 
 # generate a 'meta-feed' atom file, with the given name 'atom.xml' (meta feeds are optional)
 # (with no directory, generates in same directory as the feed aggregator page)
 meta_feed: atom.xml
 
 # list all urls to aggregate here
+# You can either specify a single feed url, or explicitly specify 'url', 'author' 
+# and/or 'author_url' params for the feed aggregator to use.
+# feed_aggregator does its best to supply these values automatically otherwise.
 feed_list:
   - http://blog_site_1.com/atom.xml
   - http://blog_site_2.com/atom.xml
-  - http://blog_site_3.com/atom.xml
+  - url: http://www.john_doe.com/feed/feed.rss
+    author: John Doe
+    author_url: http://www.john_doe.com
 ---
 </code></pre>
 
-<p>As you can see, you only need to supply some yaml front-matter.  Page formatting/rendering is performed automatically from the information in the header.  You must use <code>layout: feed_aggregator</code>, and include the standard <code>title</code> to use for the aggregator title.  <code>post_limit: 5</code> Indicates that at most 5 posts from each feed will be included.  Finally, the <code>feed_list</code> parameter allows you to list each feed url you wish to aggregate.</p>
+<p>As you can see, you only need to supply some yaml front-matter.  Page formatting/rendering is performed automatically from the information in the header.  You must use <code>layout: feed_aggregator</code>, and include the standard <code>title</code> to use for the aggregator title, and the <code>feed_list</code> to supply the individual feeds to aggregate.  Other parameters have default values and behaviors, which are described above.  Various <code>meta_feed</code> path behaviors are described in their own section below.</p>
 
 <p>Once you've created the page, you can publish as usual:</p>
 
@@ -141,7 +169,6 @@ meta_feed:
 
 <ul>
 <li>It might be nice to support the display of an avatar/icon for authors</li>
-<li>Issue a pull request, so the feed aggregator can be included as a standard octopress feature</li>
 </ul>
 
 ]]></content>
