@@ -3,7 +3,7 @@ layout: post
 title: "Randomized Sleep Jobs in HTCondor Using Delayed Evaluation"
 date: 2012-10-31 14:17
 comments: true
-categories: [ htcondor, condor, condor_submit, delayed evaluation, job classad ]
+categories: [ computing, htcondor, condor, condor_submit, delayed evaluation, job classad ]
 ---
 In some cases, when testing or demonstrating the performance of an HTCondor pool, it is useful to submit a plug of jobs with randomized running times.  The standard technique for controlling run times is to submit a classic 'sleep' job.  However, randomizing the argument to sleep is another matter.  Luckily there is an easy way to do this with a single submit file, using delayed evaluation syntax.
 
