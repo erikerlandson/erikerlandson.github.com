@@ -4,7 +4,7 @@
   <title><![CDATA[Category: wallaby | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/wallaby/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2012-11-01T10:28:51-07:00</updated>
+  <updated>2012-11-01T10:36:32-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -62,8 +62,7 @@ GROUP_QUOTA_DYNAMIC_Demo.A \
 GROUP_QUOTA_DYNAMIC_Demo.B \
 GROUP_QUOTA_DYNAMIC_Demo.C \
 NEGOTIATOR_ALLOW_QUOTA_OVERSUBSCRIPTION \
-NEGOTIATOR_CONSIDER_PREEMPTION \
-CLAIM_WORKLIFE
+NEGOTIATOR_CONSIDER_PREEMPTION
 </code></pre>
 
 <p>Activate the configuration so far to tell subsystems about new parameters for reconfig</p>
