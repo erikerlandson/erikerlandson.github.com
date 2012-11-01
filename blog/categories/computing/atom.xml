@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2012-10-31T15:08:39-07:00</updated>
+  <updated>2012-11-01T08:35:06-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,104 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Using Accounting Groups With Wallaby]]></title>
+    <link href="http://erikerlandson.github.com/blog/2012/11/01/using-accounting-groups-with-wallaby/"/>
+    <updated>2012-11-01T07:41:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2012/11/01/using-accounting-groups-with-wallaby</id>
+    <content type="html"><![CDATA[<p>Here is an introduction to using HTCondor accounting groups with Wallaby.</p>
+
+<p>I will begin by walking through an accounting group configuration on a pool managed by wallaby.  Following, I will demonstrate the configuration in action.</p>
+
+<p>First, it is good practice to snapshot current wallaby configuration for reference:</p>
+
+<pre><code>$ wallaby make-snapshot "pre demo state"
+</code></pre>
+
+<p>When demonstrating basic accounting group behavior, it is often cleanest to work with static slots.  Removing any dynamic/partitionable slot configuration is recommended:</p>
+
+<pre><code># e.g. if slot configuration resides on the default group:
+$ wallaby remove-features-from-group +++DEFAULT DynamicSlots
+$ wallaby add-features-to-group +++DEFAULT ExecuteNode
+$ wallaby activate
+</code></pre>
+
+<p>We will be constructing a wallaby feature called <code>AcctGroupDemo</code> to hold our accounting group configurations.  This clears out the feature:</p>
+
+<pre><code>$ wallaby remove-feature AcctGroupDemo
+$ wallaby add-feature AcctGroupDemo
+</code></pre>
+
+<p>Wallaby wants to know about features that are used in configurations, so begin by declaring them to the wallaby store:</p>
+
+<pre><code>$ wallaby add-param GROUP_QUOTA_Demo
+$ wallaby add-param GROUP_QUOTA_DYNAMIC_Demo.A
+$ wallaby add-param GROUP_QUOTA_DYNAMIC_Demo.B
+$ wallaby add-param GROUP_QUOTA_DYNAMIC_Demo.C
+$ wallaby add-param GROUP_ACCEPT_SURPLUS_Demo
+$ wallaby add-param NEGOTIATOR_ALLOW_QUOTA_OVERSUBSCRIPTION
+</code></pre>
+
+<p>If you alter the configuration parameters, you will want the negotiator to reconfigure itself when you activate.  Here we declare the accounting group features as part of the negotiator subsystem:</p>
+
+<pre><code>$ wallaby add-params-to-subsystem negotiator \
+GROUP_QUOTA_Demo \
+GROUP_QUOTA_DYNAMIC_Demo.A \
+GROUP_QUOTA_DYNAMIC_Demo.B \
+GROUP_QUOTA_DYNAMIC_Demo.C \
+NEGOTIATOR_ALLOW_QUOTA_OVERSUBSCRIPTION
+</code></pre>
+
+<p>Now we construct the actual configuration as the <code>AcctGroupDemo</code> wallaby feature.  Here we are constructing a group <code>Demo</code> with three subgroups <code>Demo.{A|B|C}</code>.  In a multi-node pool with several cores, it is often easiest to play with group behavior by creating a sub-hierarchy such as this <code>Demo</code> sub-hierarchy, and configuring <code>GROUP_ACCEPT_SURPLUS_Demo=False</code>, so that the sub-hierarchy behaves with a well-defined total slot quota (in this case 15).  The sub-groups A,B and C each take 1/3 of the parent's quota, so in this example each will receive 5 slots.  It is worth noting the use of the 'append' operator <code>&gt;=</code> at the beginning of the value for <code>GROUP_NAMES</code>.  This is good practice for all list-valued config variables, as it allows other features to add onto the list if they are applied:</p>
+
+<pre><code>$ wallaby add-params-to-feature AcctGroupDemo \
+NEGOTIATOR_ALLOW_QUOTA_OVERSUBSCRIPTION=False \
+GROUP_NAMES='&gt;= Demo, Demo.A, Demo.B, Demo.C' \
+GROUP_ACCEPT_SURPLUS=True \
+GROUP_QUOTA_Demo=15 \
+GROUP_ACCEPT_SURPLUS_Demo=False \
+GROUP_QUOTA_DYNAMIC_Demo.A=0.333 \
+GROUP_QUOTA_DYNAMIC_Demo.B=0.333 \
+GROUP_QUOTA_DYNAMIC_Demo.C=0.333
+</code></pre>
+
+<p>With our accounting group feature created, we can apply it to the machine our negotiator daemon is running on.  Then snapshot our configuration modifications for reference, and activate the new configuration:</p>
+
+<pre><code>$ wallaby add-features-to-node negotiator.node.com AcctGroupDemo
+$ wallaby make-snapshot 'new acct group config'
+$ wallaby activate
+</code></pre>
+
+<p>Now we will demonstrate the new feature in action.  Submit the following file to your pool, which submits 100 jobs each to groups Demo.A, Demo.B and Demo.C, with durations randomly chosen between 25 and 35 seconds:</p>
+
+<pre><code>universe = vanilla
+cmd = /bin/sleep
+args = $$([25 + random(11)])
+transfer_executable = false
+should_transfer_files = if_needed
+when_to_transfer_output = on_exit
++AccountingGroup="Demo.A.user1"
+queue 100
++AccountingGroup="Demo.B.user1"
+queue 100
++AccountingGroup="Demo.C.user1"
+queue 100
+</code></pre>
+
+<p>Once you make this submission, allow the jobs to negotiate, and you can check to see what accounting groups are running on slots by inspecting the value of RemoteNegotiatingGroup on slot ads.   You should see that subgroups Demo.A, Demo.B and Demo.C are each running 5 jobs.  Note, due to jobs completing between negotiation cycles, these numbers can be &lt;= 5 at certain times (if you have any other slots in the pool, they will show up in the output below as having either 'undefined' negotiating group or possibly some other value if other accounting groups are being used on the pool).</p>
+
+<pre><code>$ condor_status -format "%s\n" 'ifThenElse(RemoteNegotiatingGroup isnt undefined, string(RemoteNegotiatingGroup), "undefined")' -constraint 'True' | sort | uniq -c | awk '{ print $0; t += $1 } END { printf("%7d total\n",t) }'
+  5 Demo.A
+  5 Demo.B
+  5 Demo.C
+100 undefined
+115 total
+</code></pre>
+
+<p>With this accounting group configuration in place, you can play with changing quotas for the accounting groups and observe the numbers of running jobs change in response.</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Randomized Sleep Jobs in HTCondor Using Delayed Evaluation]]></title>
@@ -425,142 +523,6 @@ $ ps -eo "%p %C %n %a" | grep 'burn 600'
 22403 10.2  10 /bin/sh /home/eje/bin/burn 600
 22406 93.2   0 /bin/sh /home/eje/bin/burn 600
 22411 90.6   0 /bin/sh /home/eje/bin/burn 600
-</code></pre>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[LIFO and FIFO Preemption Policies for a Condor Pool]]></title>
-    <link href="http://erikerlandson.github.com/blog/2012/07/19/lifo-and-fifo-preemption-policies-for-a-condor-pool/"/>
-    <updated>2012-07-19T13:57:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2012/07/19/lifo-and-fifo-preemption-policies-for-a-condor-pool</id>
-    <content type="html"><![CDATA[<p>On a Condor pool, a Last In First Out (LIFO) preemption policy favors choosing the longest-running job from the available preemption options.  Correspondingly, a First In First Out (FIFO) policy favors the most-recent job for preemption.</p>
-
-<p>Configuring a LIFO or FIFO policy is easy, using the <code>PREEMPTION_RANK</code> configuration variable.  <code>PREEMPTION_RANK</code> defines a ClassAd expression that is evaluated for all slots that are candidates for claim preemption, and causes those candidates to be sorted so that the candidates with the highest rank value are considered first.   Therefore, to implement a LIFO (or FIFO) preemption policy, one needs reference an expression that represents the claiming job's running time:</p>
-
-<pre><code># LIFO preemption: favor preempting jobs that have been running the longest
-PREEMPTION_RANK = TotalJobRunTime
-# turn this into FIFO by using (-TotalJobRunTime)
-</code></pre>
-
-<p>The attribute <code>TotalJobRunTime</code> represents the amount of time a job has been running on its claim (generally, this is effectively equivalent to total running time, unless your job supports some form of checkpointing), and so ranking preemption candidates by this attribute results in LIFO preemption, and ranking by its negative provides FIFO preemption.</p>
-
-<p>Note that <code>PREEMPTION_RANK</code> applies <em>only</em> to candidates that have already met the requirements defined on <code>PREEMPTION_REQUIREMENTS</code>, or the slot-centric preemption policy defined by <code>RANK</code>.  <code>PREEMPTION_RANK</code> does not itself determine what claimed slots are considered by a job for preemption.</p>
-
-<p>To demonstrate LIFO and FIFO preemption in action, consider the following configuration:</p>
-
-<pre><code># turn off scheduler optimizations, as they can sometimes obscure the
-# negotiator/matchmaker behavior
-CLAIM_WORKLIFE = 0
-CLAIM_PARTITIONABLE_LEFTOVERS = False
-
-# reduce update latencies for faster testing response
-UPDATE_INTERVAL = 15
-NEGOTIATOR_INTERVAL = 20
-SCHEDD_INTERVAL = 15
-
-# for demonstration purposes, make sure basic preemption knobs are 'on'
-MAXJOBRETIREMENTTIME = 0
-PREEMPTION_REQUIREMENTS = True
-NEGOTIATOR_CONSIDER_PREEMPTION = True
-RANK = 0.0
-
-# LIFO preemption: favor preempting jobs that have been running the longest
-PREEMPTION_RANK = TotalJobRunTime
-# turn this into FIFO by using (-TotalJobRunTime)
-
-# define 3 cpus to provide fodder for preemption
-NUM_CPUS = 3
-</code></pre>
-
-<p>Begin by spinning up a condor pool with the configuration above.  When the pool is operating, fill the three slots with jobs for 'user1', with a delay to ensure that jobs have easily distinguishable values for <code>TotalJobRunTime</code>:</p>
-
-<pre><code>$ cat /tmp/user1.jsub 
-universe = vanilla
-cmd = /bin/sleep
-args = 600
-should_transfer_files = if_needed
-when_to_transfer_output = on_exit
-+AccountingGroup="user1"
-queue 1
-
-$ condor_submit /tmp/user1.jsub ; sleep 30 ; condor_submit /tmp/user1.jsub ; sleep 30 ; condor_submit /tmp/user1.jsub
-</code></pre>
-
-<p>Once these jobs have all started running, verify their run times using <a href="http://erikerlandson.github.com/blog/2012/06/29/easy-histograms-and-tables-from-condor-jobs-and-slots/">ccsort</a>:</p>
-
-<pre><code>$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
-1.0 | 78 | user1@localdomain
-2.0 | 36 | user1@localdomain
-3.0 | 16 | user1@localdomain
-</code></pre>
-
-<p>to make preemption easy, give user1 a low priority:</p>
-
-<pre><code>$ condor_userprio -setprio user1@localdomain 10
-</code></pre>
-
-<p>Now, we will submit some jobs for 'user2': which will be allowed to preempt jobs for 'user1'.  We should see that the longest-running job for user1 is chosen each time:</p>
-
-<pre><code>$ condor_submit /tmp/user2.jsub
-Submitting job(s).
-1 job(s) submitted to cluster 4.
-
-$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
-2.0 | 81 | user1@localdomain
-3.0 | 61 | user1@localdomain
-4.0 | 2 | user2@localdomain
-
-$ condor_submit /tmp/user2.jsub
-Submitting job(s).
-1 job(s) submitted to cluster 5.
-
-$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
-3.0 | 91 | user1@localdomain
-4.0 | 32 | user2@localdomain
-5.0 | 3 | user2@localdomain
-</code></pre>
-
-<p>Now we change LIFO to FIFO and demonstrate.  Switch the sign of <code>TotalJobRunTime</code>:</p>
-
-<pre><code># Now I am FIFO!
-PREEMPTION_RANK = -TotalJobRunTime
-</code></pre>
-
-<p>And restart the negotiator, and check on our currently running jobs:</p>
-
-<pre><code>$ condor_restart -negotiator
-
-$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
-3.0 | 151 | user1@localdomain
-4.0 | 92 | user2@localdomain
-5.0 | 49 | user2@localdomain
-</code></pre>
-
-<p>Now, set up 'user2' for easy preemption like user1:</p>
-
-<pre><code>$ condor_userprio -setprio user2@localdomain 10
-</code></pre>
-
-<p>And submit some jobs for user3.  Since we reconfigured for FIFO preemption, we should now see the <em>most recent</em> job preempted each time (in this case, these should both be the 'user2' jobs):</p>
-
-<pre><code>$ condor_submit /tmp/user3.jsub
-Submitting job(s).
-1 job(s) submitted to cluster 6.
-
-$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
-3.0 | 241 | user1@localdomain
-4.0 | 182 | user2@localdomain
-6.0 | 15 | user3@localdomain
-
-$ condor_submit /tmp/user3.jsub
-Submitting job(s).
-1 job(s) submitted to cluster 7.
-
-$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
-3.0 | 301 | user1@localdomain
-6.0 | 75 | user3@localdomain
-7.0 | 17 | user3@localdomain
 </code></pre>
 ]]></content>
   </entry>

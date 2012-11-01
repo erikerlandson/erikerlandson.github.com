@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="In some cases, when testing or demonstrating the performance of an HTCondor pool, it is useful to submit a plug of jobs with randomized running times &hellip;">
+  <meta name="description" content="Here is an introduction to using HTCondor accounting groups with Wallaby. I will begin by walking through an accounting group configuration on a pool &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,131 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2012/11/01/using-accounting-groups-with-wallaby/">Using Accounting Groups With Wallaby</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-11-01T07:41:00-07:00" pubdate data-updated="true">Nov 1<span>st</span>, 2012</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Here is an introduction to using HTCondor accounting groups with Wallaby.</p>
+
+<p>I will begin by walking through an accounting group configuration on a pool managed by wallaby.  Following, I will demonstrate the configuration in action.</p>
+
+<p>First, it is good practice to snapshot current wallaby configuration for reference:</p>
+
+<pre><code>$ wallaby make-snapshot "pre demo state"
+</code></pre>
+
+<p>When demonstrating basic accounting group behavior, it is often cleanest to work with static slots.  Removing any dynamic/partitionable slot configuration is recommended:</p>
+
+<pre><code># e.g. if slot configuration resides on the default group:
+$ wallaby remove-features-from-group +++DEFAULT DynamicSlots
+$ wallaby add-features-to-group +++DEFAULT ExecuteNode
+$ wallaby activate
+</code></pre>
+
+<p>We will be constructing a wallaby feature called <code>AcctGroupDemo</code> to hold our accounting group configurations.  This clears out the feature:</p>
+
+<pre><code>$ wallaby remove-feature AcctGroupDemo
+$ wallaby add-feature AcctGroupDemo
+</code></pre>
+
+<p>Wallaby wants to know about features that are used in configurations, so begin by declaring them to the wallaby store:</p>
+
+<pre><code>$ wallaby add-param GROUP_QUOTA_Demo
+$ wallaby add-param GROUP_QUOTA_DYNAMIC_Demo.A
+$ wallaby add-param GROUP_QUOTA_DYNAMIC_Demo.B
+$ wallaby add-param GROUP_QUOTA_DYNAMIC_Demo.C
+$ wallaby add-param GROUP_ACCEPT_SURPLUS_Demo
+$ wallaby add-param NEGOTIATOR_ALLOW_QUOTA_OVERSUBSCRIPTION
+</code></pre>
+
+<p>If you alter the configuration parameters, you will want the negotiator to reconfigure itself when you activate.  Here we declare the accounting group features as part of the negotiator subsystem:</p>
+
+<pre><code>$ wallaby add-params-to-subsystem negotiator \
+GROUP_QUOTA_Demo \
+GROUP_QUOTA_DYNAMIC_Demo.A \
+GROUP_QUOTA_DYNAMIC_Demo.B \
+GROUP_QUOTA_DYNAMIC_Demo.C \
+NEGOTIATOR_ALLOW_QUOTA_OVERSUBSCRIPTION
+</code></pre>
+
+<p>Now we construct the actual configuration as the <code>AcctGroupDemo</code> wallaby feature.  Here we are constructing a group <code>Demo</code> with three subgroups <code>Demo.{A|B|C}</code>.  In a multi-node pool with several cores, it is often easiest to play with group behavior by creating a sub-hierarchy such as this <code>Demo</code> sub-hierarchy, and configuring <code>GROUP_ACCEPT_SURPLUS_Demo=False</code>, so that the sub-hierarchy behaves with a well-defined total slot quota (in this case 15).  The sub-groups A,B and C each take 1/3 of the parent&#8217;s quota, so in this example each will receive 5 slots.  It is worth noting the use of the &#8216;append&#8217; operator <code>&gt;=</code> at the beginning of the value for <code>GROUP_NAMES</code>.  This is good practice for all list-valued config variables, as it allows other features to add onto the list if they are applied:</p>
+
+<pre><code>$ wallaby add-params-to-feature AcctGroupDemo \
+NEGOTIATOR_ALLOW_QUOTA_OVERSUBSCRIPTION=False \
+GROUP_NAMES='&gt;= Demo, Demo.A, Demo.B, Demo.C' \
+GROUP_ACCEPT_SURPLUS=True \
+GROUP_QUOTA_Demo=15 \
+GROUP_ACCEPT_SURPLUS_Demo=False \
+GROUP_QUOTA_DYNAMIC_Demo.A=0.333 \
+GROUP_QUOTA_DYNAMIC_Demo.B=0.333 \
+GROUP_QUOTA_DYNAMIC_Demo.C=0.333
+</code></pre>
+
+<p>With our accounting group feature created, we can apply it to the machine our negotiator daemon is running on.  Then snapshot our configuration modifications for reference, and activate the new configuration:</p>
+
+<pre><code>$ wallaby add-features-to-node negotiator.node.com AcctGroupDemo
+$ wallaby make-snapshot 'new acct group config'
+$ wallaby activate
+</code></pre>
+
+<p>Now we will demonstrate the new feature in action.  Submit the following file to your pool, which submits 100 jobs each to groups Demo.A, Demo.B and Demo.C, with durations randomly chosen between 25 and 35 seconds:</p>
+
+<pre><code>universe = vanilla
+cmd = /bin/sleep
+args = $$([25 + random(11)])
+transfer_executable = false
+should_transfer_files = if_needed
+when_to_transfer_output = on_exit
++AccountingGroup="Demo.A.user1"
+queue 100
++AccountingGroup="Demo.B.user1"
+queue 100
++AccountingGroup="Demo.C.user1"
+queue 100
+</code></pre>
+
+<p>Once you make this submission, allow the jobs to negotiate, and you can check to see what accounting groups are running on slots by inspecting the value of RemoteNegotiatingGroup on slot ads.   You should see that subgroups Demo.A, Demo.B and Demo.C are each running 5 jobs.  Note, due to jobs completing between negotiation cycles, these numbers can be &lt;= 5 at certain times (if you have any other slots in the pool, they will show up in the output below as having either &#8216;undefined&#8217; negotiating group or possibly some other value if other accounting groups are being used on the pool).</p>
+
+<pre><code>$ condor_status -format "%s\n" 'ifThenElse(RemoteNegotiatingGroup isnt undefined, string(RemoteNegotiatingGroup), "undefined")' -constraint 'True' | sort | uniq -c | awk '{ print $0; t += $1 } END { printf("%7d total\n",t) }'
+  5 Demo.A
+  5 Demo.B
+  5 Demo.C
+100 undefined
+115 total
+</code></pre>
+
+<p>With this accounting group configuration in place, you can play with changing quotas for the accounting groups and observe the numbers of running jobs change in response.</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1560,44 +1685,6 @@ queue 10
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/05/20/the-joy-of-anonymized-data/">The Joy of Anonymized Data</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-05-20T11:31:00-07:00" pubdate data-updated="true">May 20<span>th</span>, 2012</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>I&#8217;ve been fooling around with an <a href="https://github.com/erikerlandson/ratorade/tree/master/data">anonymized data set</a> on the side.  Although this can be frustrating in its own way, it occurred to me that it <em>does</em> have the advantage of forcing me to see the data in the same way my algorithms see it: that is, the data is just some anonymous strings, values and identifiers.  To the code, strings like &#8220;120 minute IPA&#8221; or &#8220;Dogfish Head Brewery&#8221; have no more significance than &#8220;Beer-12&#8221; or &#8220;Brewer-5317&#8221;, and the anonymous identifiers remove any subconscious or conscious tendencies of mine to impart more meaning to an identifier string than is present to the algorithms.</p>
-
-<p>On the other hand, having anonymous identifiers prevents me from drawing any actual inspirations for utilizing semantics that <em>might</em> genuinely be leveragable by an algorithm.  However, my current goal is to produce tools that are generically useful across data domains.  In that respect, I think developing on anonymized data could actually be helping.  Time will tell.</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/2/">&larr; Older</a>
@@ -1617,6 +1704,10 @@ queue 10
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2012/11/01/using-accounting-groups-with-wallaby/">Using Accounting Groups With Wallaby</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2012/10/31/randomized-sleep-jobs-in-htcondor-using-delayed-evaluation/">Randomized Sleep Jobs in HTCondor Using Delayed Evaluation</a>
       </li>
     
@@ -1630,10 +1721,6 @@ queue 10
     
       <li class="post">
         <a href="/blog/2012/07/27/driving-a-condor-job-renice-policy-with-accounting-groups/">Driving a Condor Job Renice Policy with Accounting Groups</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2012/07/19/lifo-and-fifo-preemption-policies-for-a-condor-pool/">LIFO and FIFO Preemption Policies for a Condor Pool</a>
       </li>
     
   </ul>
