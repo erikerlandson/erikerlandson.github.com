@@ -4,7 +4,7 @@
   <title><![CDATA[Category: condor | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/condor/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2012-11-01T10:52:11-07:00</updated>
+  <updated>2012-11-01T11:13:25-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -18,7 +18,7 @@
     <link href="http://erikerlandson.github.com/blog/2012/11/01/using-accounting-groups-with-wallaby/"/>
     <updated>2012-11-01T07:41:00-07:00</updated>
     <id>http://erikerlandson.github.com/blog/2012/11/01/using-accounting-groups-with-wallaby</id>
-    <content type="html"><![CDATA[<p>In this post I will describe how to use HTCondor accounting groups with Wallaby.  I will begin by walking through an accounting group configuration on a pool managed by wallaby.  Following, I will demonstrate the configuration in action.</p>
+    <content type="html"><![CDATA[<p>In this post I will describe how to use HTCondor accounting groups with <a href="http://getwallaby.com">Wallaby</a>.  I will begin by walking through an accounting group configuration on a pool managed by wallaby.  Following, I will demonstrate the configuration in action.</p>
 
 <p>The gist of this demo will be to create a simple accounting group hierarchy:  A top-level group called <code>Demo</code>, and three child groups <code>Demo.A, Demo.B, Demo.C</code>.  <code>Demo</code> will be given a <em>static</em> quota to simulate the behavior of a pool with a particular number of slots available.  The child groups will use <em>dynamic</em> quotas to express their quota shares from the parent as ratios.</p>
 
