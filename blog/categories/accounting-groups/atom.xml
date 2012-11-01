@@ -4,7 +4,7 @@
   <title><![CDATA[Category: accounting groups | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/accounting-groups/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2012-11-01T10:24:58-07:00</updated>
+  <updated>2012-11-01T10:27:56-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -104,7 +104,7 @@ when_to_transfer_output = on_exit
 queue 100
 </code></pre>
 
-<p>Once you make this submission, allow the jobs to negotiate, and you can check to see what accounting groups are running on slots by inspecting the value of RemoteNegotiatingGroup on slot ads.   You should see that subgroup Demo.A has acquired surplus and is running 15 jobs, as there are no jobs under groups Demo.B or Demo.C that need slots.  Note, due to jobs completing between negotiation cycles, these numbers can be &lt;= 5 at certain times.  If you have any other slots in the pool, they will show up in the output below as having either 'undefined' negotiating group or possibly '<none>' if any other jobs are running).</p>
+<p>Once you make this submission, allow the jobs to negotiate, and you can check to see what accounting groups are running on slots by inspecting the value of RemoteNegotiatingGroup on slot ads.   You should see that subgroup Demo.A has acquired surplus and is running 15 jobs, as there are no jobs under groups Demo.B or Demo.C that need slots.  Note, due to jobs completing between negotiation cycles, these numbers can be less than the maximum possible at certain times.  If you have any other slots in the pool, they will show up in the output below as having either 'undefined' negotiating group or possibly '<none>' if any other jobs are running).</p>
 
 <pre><code>$ condor_status -format "%s\n" 'ifThenElse(RemoteNegotiatingGroup isnt undefined, string(RemoteNegotiatingGroup), "undefined")' -constraint 'True' | sort | uniq -c | awk '{ print $0; t += $1 } END { printf("%7d total\n",t) }'
  15 Demo.A
