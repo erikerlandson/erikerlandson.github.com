@@ -4,7 +4,7 @@
   <title><![CDATA[tool monkey]]></title>
   <link href="http://erikerlandson.github.com/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2012-11-01T11:13:25-07:00</updated>
+  <updated>2012-11-13T16:38:45-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,35 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Rethinking the Semantics of Group Quotas and Slot Weights for Heterogeneous and Multidimensional Compute Resources]]></title>
+    <link href="http://erikerlandson.github.com/blog/2012/11/13/rethinking-the-semantics-of-group-quotas-and-slot-weights-for-heterogeneous-and-multidimensional-compute-resources/"/>
+    <updated>2012-11-13T15:31:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2012/11/13/rethinking-the-semantics-of-group-quotas-and-slot-weights-for-heterogeneous-and-multidimensional-compute-resources</id>
+    <content type="html"><![CDATA[<p>The HTCondor semantic for accounting group quotas and slot weights is currently cpu-centric.  This is an artifact of the historic primacy of cpu as the most commonly-considered limiting resource in computations.  For example the <code>SlotWeight</code> attribute is currently defaulted to <code>Cpus</code>, and when slot weights are disabled, there is logic activated in matchmaking to sum the available cpus on slots to avoid &#8216;undercounting&#8217; total pool quotas.</p>
+
+<p>However, HTCondor slots &#8211; the core model of computational resources in an HTCondor pool &#8211; manage four resources by default: cpu, memory, disk and swap.  Furthermore, slots may now be configured with arbitrary custom resources.  As recently mentioned by <a href="http://spinningmatt.wordpress.com/2012/11/13/no-longer-thinking-in-slots-thinking-in-aggregate-resources-and-consumption-policies">Matthew Farrellee</a>, there is a growing pressure to provide robust support not just for traditional cpu-centric resource presentation, usage and allocation, but also seamlessly mediated with memory-centric, gpu-centric or &#8216;*&#8217;-centric resource allocation policies and more generally allocation policies that are simultaneously aware of all resource dimensions.</p>
+
+<p>This goal immediately raises some questions for the semantics of accounting groups and slot weights when matching jobs against slots during matchmaking.</p>
+
+<p>Consider a pool where 50% of the slots are &#8216;weighted&#8217; in a traditional cpu-centric way, but the other 50% are intended to be allocated in a memory-centric way.  This is currently possible, as the <code>SlotWeight</code> attribute can be configured appropriately to be a function of either <code>Cpus</code> or <code>Memory</code>.</p>
+
+<p>But in a scenario where slots are weighted as functions of heterogeneous resource dimensions, it raises a semantic question:  when we sum these weights to obtain the pool-wide available quota, what &#8216;real world&#8217; quantity does this total represent &#8211; if any?   Is it a purely heuristic numeric value with no well defined unit attached?</p>
+
+<p>This question has import.  Understanding what the answer is, or should be, impacts what story we tell to users about what their accounting group configuration actually means.  When I assign a quota to an accounting group in such a heterogeneous environment, what is that quota regulating?   When a job matches a cpu-centric slot, does the cost of that match have a different meaning than when matching against a memory-centric slot?   When the slots are partitionable, a match implies a certain multi-dimensional slice of resources allocated from that slot.  What is the cost of that slice?  Does the sum of costs add up to the original weight on the partitionable slot?  If not, how does that affect our understanding of quota semantics?</p>
+
+<p>It may be possible unify all of these ideas by adopting the perspective that a slot&#8217;s weight is a measure of the maximum number of jobs that can be matched against it.  The cost of a match is W(S)-W(S&#8217;), where W(S) is the weight function evaluated on the slot prior to match, and W(S&#8217;) is the corresponding weight after the match has extracted its requested resources.  The pool&#8217;s total quota is just the sum of W(S), over all slots S in the pool.  Note, this implies that the &#8216;unit&#8217; attached to both slot weights and accounting group quotas is &#8216;jobs&#8217;.</p>
+
+<p>Consider a simple example from the traditional cpu-centric configuration:   A partitionable slot is configured with 8 cpus, and <code>SlotWeight</code> is just its default <code>Cpus</code>.  Using this model, the allocation policy is: &#8216;each match must use >= 1 cpu&#8221;, and that other resource requests are assumed to be not limiting.  The maximum number of matches is 8 jobs, each requesting 1 cpu.   However, a job might also request 2 cpus.  In this case, note that the cost of the match is 2, since the remaining slot has 6 slots, and so W(S&#8217;) now evaluates to 6.   So, the cost of the match is how many fewer possible jobs the original slot can support after the match takes its requested resources.</p>
+
+<p>This approach can be applied equally well to a memory-centric strategy, or a disk centric strategy, or a gpu-based strategy, or any combination simultaneously.  All weights evaluate to a value with unit &#8216;jobs&#8217;.   All match costs are differences between weights (before and after match), and so their values are also in units of &#8216;jobs&#8217;.  Therefore, the semantics of the sum of weights over a pool is always well defined: it is a number of jobs, and spefically a measure of the maximum number of jobs that might match against all the slots in the pool.  When a match acquires resources that reduce this maximum by more than 1 job, that is not in any way inconsistent.  It means the job used resources that might have supported two or more &#8216;smaller&#8217; jobs.   This means that accounting group quotas (and submitter shares) also have a well defined unit and semantic, which is &#8216;how many (or what fraction of) the maximum possible jobs is this group guaranteed by my accounting policy&#8217;</p>
+
+<p>One implication of this proposed semantic for quotas and weights is that the measure for the maximum number of jobs that may match against any given slot must be some finite number.   It implies that all resource dimensions are quantized in some way by the allocation policy.   This scheme would not support a real-valued resource dimension that had no minimum quantization.  I do not think that this is a very heavy-weight requirement, and in fact we have already been moving in that direction with features such as MODIFY_REQUEST_EXPRS_xxx.</p>
+
+<p>When a slot&#8217;s resource allocation policy is defined over all its resources, what bounds this measure of maximum possible matches?  In a case where each job match <em>must</em> use at least one non-zero quantum of each resource dimension, then the limit is the resource with the mimimum quantized levels.   In a case where jobs may request a zero amount of resources, then the limit is the resource with the maximum quantized levels.  (note, it is required that each match use at least one quantum of at least one resource, otherwise the maximum is not properly bounded).</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Using Accounting Groups With Wallaby]]></title>
