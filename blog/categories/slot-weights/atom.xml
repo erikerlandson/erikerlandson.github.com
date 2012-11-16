@@ -4,7 +4,7 @@
   <title><![CDATA[Category: slot weights | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/slot-weights/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2012-11-15T17:39:56-07:00</updated>
+  <updated>2012-11-15T17:44:54-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -24,7 +24,7 @@
 
 <p>In the HTCondor vocabulary, a job acquires a <em>claim</em> on resources to actually run after it has been matched.  It has been proposed that it may be beneficial for HTCondor to evolve toward a model where there are (aggregate) resource ads, and claims against those ads, as a simplification of the current model which involves static, partitionable and dynamic slots, with claims.  With this in mind, a preferable terminology for group quota and weight semantics might be that a resource ad (or slot) has a measure of the maximum number of claims it could dispense: a <em>claim capacity</em> measure.  The cost of a claim (or match) is the corresponding reduction of the resource's claim capacity.</p>
 
-<p>So, this semantic model could be referred to as the Claim Capacity Model of group quotas and slot weights.</p>
+<p>So, this semantic model could be referred to as the Claim Capacity Model of group quotas and slot weights.  With this terminology, the shared 'unit' for group quotas and slot weights would be <em>claims</em> instead of <em>jobs</em>.</p>
 ]]></content>
   </entry>
   
