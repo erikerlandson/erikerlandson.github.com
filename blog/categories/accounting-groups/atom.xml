@@ -4,7 +4,7 @@
   <title><![CDATA[Category: accounting groups | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/accounting-groups/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2012-11-13T16:38:45-07:00</updated>
+  <updated>2012-11-15T17:39:56-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,21 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Rethinking the Semantics of Group Quotas and Slot Weights: Claim Capacity Model]]></title>
+    <link href="http://erikerlandson.github.com/blog/2012/11/15/rethinking-the-semantics-of-group-quotas-and-slot-weights-claim-capacity-model/"/>
+    <updated>2012-11-15T17:22:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2012/11/15/rethinking-the-semantics-of-group-quotas-and-slot-weights-claim-capacity-model</id>
+    <content type="html"><![CDATA[<p>In my previous post about <a href="http://erikerlandson.github.com/blog/2012/11/13/rethinking-the-semantics-of-group-quotas-and-slot-weights-for-heterogeneous-and-multidimensional-compute-resources">Rethinking the Semantics of Group Quotas and Slot Weights</a>, I proposed a concept for unifying the semantics of accounting group quotas and slot weights across arbitrary resource allocation strategies.</p>
+
+<p>My initial terminology was that the weight of a slot (i.e. resource ad) is a measure of the <em>maximum</em> number of jobs that might match against that ad, given the currently available resource quantities and the allocation policy.  The cost of a match becomes the amount by which that measure is reduced, after the match's resources are removed from the ad.</p>
+
+<p>In the HTCondor vocabulary, a job acquires a <em>claim</em> on resources to actually run after it has been matched.  It has been proposed that it may be beneficial for HTCondor to evolve toward a model where there are (aggregate) resource ads, and claims against those ads, as a simplification of the current model which involves static, partitionable and dynamic slots, with claims.  With this in mind, a preferable terminology for group quota and weight semantics might be that a resource ad (or slot) has a measure of the maximum number of claims it could dispense: a <em>claim capacity</em> measure.  The cost of a claim (or match) is the corresponding reduction of the resource's claim capacity.</p>
+
+<p>So, this semantic model could be referred to as the Claim Capacity Model of group quotas and slot weights.</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Rethinking the Semantics of Group Quotas and Slot Weights for Heterogeneous and Multidimensional Compute Resources]]></title>
@@ -528,105 +543,6 @@ queue 10
 $ cchist condor_q JobStatus
      20 1
      20 total
-</code></pre>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Maintaining Accounting Group Quotas With Preemption Policy]]></title>
-    <link href="http://erikerlandson.github.com/blog/2012/06/27/maintaining-accounting-group-quotas-with-preemption-policy/"/>
-    <updated>2012-06-27T20:33:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2012/06/27/maintaining-accounting-group-quotas-with-preemption-policy</id>
-    <content type="html"><![CDATA[<p>There is a straightforward technique to leverage a Condor <a href="http://research.cs.wisc.edu/condor/manual/v7.8/3_3Configuration.html#20480">preemption policy</a> to direct preemptions in a way that helps maintain resource usages as close as possible to the defined <a href="http://research.cs.wisc.edu/condor/manual/v7.8/3_4User_Priorities.html#SECTION00447000000000000000">accounting group quotas</a>.</p>
-
-<p>I will begin by simply giving the configuration and then describe how it works, with a short demonstration.  The actual configuration is simply a clause that can be added to the preemption policy defined by <code>PREEMPTION_REQUIREMENTS</code>:</p>
-
-<pre><code>PREEMPTION_REQUIREMENTS = $(PREEMPTION_REQUIREMENTS) &amp;&amp; (((SubmitterGroupResourcesInUse &lt; SubmitterGroupQuota) &amp;&amp; (RemoteGroupResourcesInUse &gt; RemoteGroupQuota)) || (SubmitterGroup =?= RemoteGroup))
-</code></pre>
-
-<p>Unpacking the above logic: the term <code>(SubmitterGroupResourcesInUse &lt; SubmitterGroupQuota)</code> captures the idea that to best maintain quota-driven resource usage, we only want to allow preemption if the submitting accounting group has not yet reached its quota, as acquiring more resources moves the usage closer to the group's quota.  Conversely, if the accounting group's resource usage is <em>already</em> at or above its quota, acquiring more resources via preemption will only drive the usage <em>farther</em> from the configured quota.</p>
-
-<p>The term <code>(RemoteGroupResourcesInUse &gt; RemoteGroupQuota)</code> captures a similar idea from the 'remote' side (the candidate for preemption).  Provided the remote's resource usage is greater than its quota, allowing preemption will move its usage closer to the configured quota.</p>
-
-<p>The last term <code>(SubmitterGroup =?= RemoteGroup)</code> (a disjunction) ensures that with an accounting group preemption may always occur, deferring to any other clauses in the expression.</p>
-
-<p>A brief aside: in the following example, I use the 'svhist' bash function for ease and clarity.  For example, the command <code>svhist AccountingGroup State Activity</code> is shorthand for: <code>condor_status -format "%s" 'AccountingGroup' -format " | %s" 'State' -format " | %s\n" 'Activity' -constraint 'True' | sort | uniq -c | awk '{ print $0; t += $1 } END { printf("%7d total\n",t) }'</code>  The svhist command is available <a href="https://github.com/erikerlandson/bash_condor_tools">here</a>.</p>
-
-<p>To demonstrate this preemption policy, consider the following example configuration:</p>
-
-<pre><code># turn off scheduler optimizations, as they can sometimes obscure the
-# negotiator/matchmaker behavior
-CLAIM_WORKLIFE = 0
-
-# for demonstration purposes, make sure basic preemption knobs are 'on'
-MAXJOBRETIREMENTTIME = 0
-PREEMPTION_REQUIREMENTS = True
-NEGOTIATOR_CONSIDER_PREEMPTION = True
-
-NUM_CPUS = 15
-
-# 3 accounting groups, each with equal quota
-GROUP_NAMES = A, B, C
-GROUP_QUOTA_A = 5
-GROUP_QUOTA_B = 5
-GROUP_QUOTA_C = 5
-
-# groups may use each others' surplus
-GROUP_ACCEPT_SURPLUS = TRUE
-# (an alternative way for groups to acquire surplus is to enable GROUP_AUTOREGROUP)
-# GROUP_AUTOREGROUP = TRUE
-
-# A preepmption policy clause that only allows preemptions that move usages closer to configured quotas
-PREEMPTION_REQUIREMENTS = $(PREEMPTION_REQUIREMENTS) &amp;&amp; (((SubmitterGroupResourcesInUse &lt; SubmitterGroupQuota) &amp;&amp; (RemoteGroupResourcesInUse &gt; RemoteGroupQuota)) || (SubmitterGroup =?= RemoteGroup))
-</code></pre>
-
-<p>Begin by submitting 5 jobs to accounting group A, and 10 jobs to group B:</p>
-
-<pre><code>universe = vanilla
-cmd = /bin/sleep
-args = 3600
-should_transfer_files = if_needed
-when_to_transfer_output = on_exit
-+AccountingGroup="A.user"
-queue 5
-+AccountingGroup="B.user"
-queue 10
-</code></pre>
-
-<p>Confirm that group B's resource usage is 10 (note, this is over its quota of 5):</p>
-
-<pre><code>$ svhist AccountingGroup State Activity
-      5 A.user@localdomain | Claimed | Busy
-     10 B.user@localdomain | Claimed | Busy
-     15 total
-</code></pre>
-
-<p>Now set submitter priorities to allow preemption, provided preemption policy supports it</p>
-
-<pre><code>$ condor_userprio -setprio A.user@localdomain 10
-The priority of A.user@localdomain was set to 10.000000
-$ condor_userprio -setprio B.user@localdomain 10
-The priority of B.user@localdomain was set to 10.000000
-</code></pre>
-
-<p>Now submit 10 jobs to group C.</p>
-
-<pre><code>universe = vanilla
-cmd = /bin/sleep
-args = 3600
-should_transfer_files = if_needed
-when_to_transfer_output = on_exit
-+AccountingGroup="C.user"
-queue 10
-</code></pre>
-
-<p>Finally, we verify that our preemption policy drove the resource usages to quota:</p>
-
-<pre><code>$ svhist AccountingGroup State Activity
-      5 A.user@localdomain | Claimed | Busy
-      5 B.user@localdomain | Claimed | Busy
-      5 C.user@localdomain | Claimed | Busy
-     15 total
 </code></pre>
 ]]></content>
   </entry>

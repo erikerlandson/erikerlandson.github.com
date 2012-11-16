@@ -4,7 +4,7 @@
   <title><![CDATA[Category: group quotas | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/group-quotas/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2012-11-13T16:38:45-07:00</updated>
+  <updated>2012-11-15T17:39:56-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,21 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Rethinking the Semantics of Group Quotas and Slot Weights: Claim Capacity Model]]></title>
+    <link href="http://erikerlandson.github.com/blog/2012/11/15/rethinking-the-semantics-of-group-quotas-and-slot-weights-claim-capacity-model/"/>
+    <updated>2012-11-15T17:22:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2012/11/15/rethinking-the-semantics-of-group-quotas-and-slot-weights-claim-capacity-model</id>
+    <content type="html"><![CDATA[<p>In my previous post about <a href="http://erikerlandson.github.com/blog/2012/11/13/rethinking-the-semantics-of-group-quotas-and-slot-weights-for-heterogeneous-and-multidimensional-compute-resources">Rethinking the Semantics of Group Quotas and Slot Weights</a>, I proposed a concept for unifying the semantics of accounting group quotas and slot weights across arbitrary resource allocation strategies.</p>
+
+<p>My initial terminology was that the weight of a slot (i.e. resource ad) is a measure of the <em>maximum</em> number of jobs that might match against that ad, given the currently available resource quantities and the allocation policy.  The cost of a match becomes the amount by which that measure is reduced, after the match's resources are removed from the ad.</p>
+
+<p>In the HTCondor vocabulary, a job acquires a <em>claim</em> on resources to actually run after it has been matched.  It has been proposed that it may be beneficial for HTCondor to evolve toward a model where there are (aggregate) resource ads, and claims against those ads, as a simplification of the current model which involves static, partitionable and dynamic slots, with claims.  With this in mind, a preferable terminology for group quota and weight semantics might be that a resource ad (or slot) has a measure of the maximum number of claims it could dispense: a <em>claim capacity</em> measure.  The cost of a claim (or match) is the corresponding reduction of the resource's claim capacity.</p>
+
+<p>So, this semantic model could be referred to as the Claim Capacity Model of group quotas and slot weights.</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Rethinking the Semantics of Group Quotas and Slot Weights for Heterogeneous and Multidimensional Compute Resources]]></title>
