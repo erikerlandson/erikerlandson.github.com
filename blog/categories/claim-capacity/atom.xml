@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: claim capacity | tool monkey]]></title>
+  <link href="http://erikerlandson.github.com/blog/categories/claim-capacity/atom.xml" rel="self"/>
+  <link href="http://erikerlandson.github.com/"/>
+  <updated>2012-11-26T16:11:50-07:00</updated>
+  <id>http://erikerlandson.github.com/</id>
+  <author>
+    <name><![CDATA[Erik Erlandson]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Rethinking the Semantics of Group Quotas and Slot Weights: Computing Claim Capacity from Consumption Policy]]></title>
+    <link href="http://erikerlandson.github.com/blog/2012/11/26/rethinking-the-semantics-of-group-quotas-and-slot-weights-computing-claim-capacity-from-consumption-policy/"/>
+    <updated>2012-11-26T13:52:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2012/11/26/rethinking-the-semantics-of-group-quotas-and-slot-weights-computing-claim-capacity-from-consumption-policy</id>
+    <content type="html"><![CDATA[<p>In two previous posts, I made a case to motivate the need for a better definition of slot weights and group quotas that could accommodate use cases involving aggregate resources (partitionable slots) with heterogeneous consumption policies and also provide a principled unit analysis for weights and quotas.  These previous posts can be viewed here:</p>
+
+<ul>
+<li><a href="http://erikerlandson.github.com/blog/2012/11/13/rethinking-the-semantics-of-group-quotas-and-slot-weights-for-heterogeneous-and-multidimensional-compute-resources/">Rethinking the Semantics of Group Quotas and Slot Weights for Heterogeneous and Multidimensional Compute Resources</a></li>
+<li><a href="http://erikerlandson.github.com/blog/2012/11/15/rethinking-the-semantics-of-group-quotas-and-slot-weights-claim-capacity-model/">Rethinking the Semantics of Group Quotas and Slot Weights: Claim Capacity Model</a></li>
+</ul>
+
+
+<p>As previously mentioned, a Claim Capacity Model of accounting group quotas and slot weights (or "resource consumption costs") requires a resource claiming model that assigns a well defined finite value for the maximum number of claims that each resource and its consumption policy can support.  It must also be re-evaluatable on a resource as its assets are consumed, so that the cost of a proposed claim (or match, in negotiation-speak) can be defined as W(R) - W(R'), were R' embodies the amounts of all assets remaining after the claim has taken its share.  (Here, I will be using the term 'assets' to refer to quantities such as cpus, memory, disk, swap or any <a href="http://spinningmatt.wordpress.com/2012/11/19/extensible-machine-resources/">extensible resources</a> defined, to clarify the difference between an aggregate resource (i.e. a partitionable slot) versus a single resource dimension such as cpus, memory, etc).</p>
+
+<p>This almost immediately raises the question of how best to define such a resource claiming model.  In this post I will briefly describe a few possible approaches, focusing on models which are easy reason about, easy to configure and additionally allow claim capacity for a resource - W(R) - to be computed automatically for the user, thus making a sane relationship between consumption policies and consumption costs possible to enforce.</p>
+
+<h3>Approach 1: fixed claim consumption model</h3>
+
+<p>The simplest-possible approach is arguably to just directly configure a fixed number, M, of claims attached to a resource.  In this model, each match of a job against a resource consumes one of the M claims.   Here, match cost W(R) - W(R') = 1 in all cases, and is independent of the 'size' of assets consumed from a resource.</p>
+
+<p>A possible use case for such a model is that one might wish to declare that a resource can run up to a certain number of jobs, without assigning any particular cost to consuming individual assets.  If the pool users' workload consists of large numbers of resource-cheap jobs that can effectively share cpu, memory, etc, then such a model might be a good fit.</p>
+
+<h3>Approach 2: configure asset quantization levels</h3>
+
+<p>Another approach that makes the relation between consumption policy and claim capacity easy to think about is to configure a quantization level for each resource asset.  For example, here we might quantize memory into 20 levels, i.e. Q(memory) = 20.  Similarly we might define Q(cpus) = 10 (note that HTCondor does not currently handle fractional cpus on resources, but this kind of model would benefit if floating point asset fractions were supported).  At any time, a resource R has some number q(a) left of the original Q(a).  A job requests an amount r(a) for asset (a).   Here, a claim gets a quantized approximation of any requested asset = V(a)(n(a)/Q(a)), where V(a) is the total original value available for asset (a), and n(a) = ceiling(r(a)Q(a)/V(a)).   Here there are two possible sub-policies.  If we demand that each claim consume >= 1 quantum of every asset (i.e. n(a) >= 1), then the claim capacity W(R) is the minimum of q(a), for (a) over all assets.  However, if a claim is allowed to consume a zero quantity of some individual assets (n(a)=0), then the claim capacity is the <em>maximum</em> of the q(a).   In this case, one must address the corner case of a claim attempting to consume (n(a)=0) over all assets.  The resulting resource R' has q'(a) = q(a)-n(a), and W(R') is the minium (or maximum) over the new q'(a).</p>
+
+<h3>Approach 3: configure minimum asset charges</h3>
+
+<p>A third approach is to configure a <em>minimum</em> amount of each asset that any claim must be charged.   For example, we might define a minimum amount of memory C(memory) to charge any claim.   If a job requests an amount r(a), it will always receive max(r(a), C(a)).  As above, q(a) is the number of quanta currently available for asset (a).  Let v(a) be the amount of (a) currently available.  Here we define q(a) for an asset (a) to be floor(v(a)/C(a)).   If we adhere to a reasonable restriction that C(a) must be strictly > 0 for all (a), we are guaranteed a well defined W(R) = min over the q(a).</p>
+
+<p>It is an open question which of these models (or some other completely different options) should be supported.  Conceivably all of them could be provided as options.</p>
+
+<p>Currently my personal preference leans toward Approach 3.  It is easy to reason about and configure.  It yields a well defined W(R) in all circumstances, with no corner cases, that is straightforward to compute and enforce automatically.  It is easy to configure heterogeneous consumption policies that cost different resource assets in different ways, simply by tuning minimum charge C(a) appropriately for each asset.  This includes claim capacity models where jobs are assumed to use very small amounts of any resource, including fractional shares of cpu assets.</p>
+]]></content>
+  </entry>
+  
+</feed>
