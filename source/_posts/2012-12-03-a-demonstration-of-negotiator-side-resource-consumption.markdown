@@ -110,7 +110,7 @@ Next we consider altering the resource consumption policy.  As a simple example,
 
 Perhaps we then also want to express match cost in a memory-centric way, instead of the usual cpu-centric way:
 
-    SlotWeight = floor(TotalSlotMemory / 512)
+    SlotWeight = floor(Memory / 512)
 
 Here it is worth noting that in this implementation of negotiator-side consumption, the cost of a match is defined as W(S) - W(S'), where W(S) is the weight of the slot _prior_ to consuming resources from the match and consumption policy, and W(S`) is the weight evaluated for the slot _after_ those resources are subtracted.  This modification enables multiple matches to be made against a single p-slot, and furthermore it paves the way to possible avenues for a [better unit analysis of slot weights and accounting groups](http://erikerlandson.github.com/blog/2012/11/26/rethinking-the-semantics-of-group-quotas-and-slot-weights-computing-claim-capacity-from-consumption-policy/).
 
