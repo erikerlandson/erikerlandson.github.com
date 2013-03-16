@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="I&#8217;ve been considering models for the effects of HTCondor negotiation cycle cadence on pool loading and accounting group starvation, which led &hellip;">
+  <meta name="description" content="Motivation The original motivation for these experiments was consideration of the impact of negotiator cycle cadence (i.e. the time between the start &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,223 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2013/03/15/examining-the-modulus-of-random-variables/">Examining the Modulus of Random Variables</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2013-03-15T12:03:00-07:00" pubdate data-updated="true">Mar 15<span>th</span>, 2013</time>
+        
+         | <a href="/blog/2013/03/15/examining-the-modulus-of-random-variables/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><h3>Motivation</h3>
+
+<p>The original motivation for these experiments was consideration of the impact of negotiator cycle cadence (i.e. the time between the start of one cycle and the start of the next) on HTCondor pool loading.  Specifically, any HTCondor job that completes and vacates its resource may leave that resource unloaded until it can be re-matched on the next cycle.  Therefore, the duration of resource vacancies (and hence, pool loading) can be thought of as a function of job durations <em>modulo</em> the cadence of the negotiator cycle.  In general, the aggregate behavior of job durations on a pool is useful to model as a random variable.  And so, it seemed worthwhile to build up a little intuition about the behavior of a random variable when you take its modulus.</p>
+
+<h3>Methodology</h3>
+
+<p>I took a Monte Carlo approach to this study because a tractable theoretical framework eluded me, and you do not have to dive very deep to show that <a href="http://erikerlandson.github.com/blog/2013/01/02/the-mean-of-the-modulus-does-not-equal-the-modulus-of-the-mean/">even trivial random variable behavior under a modulus is dependent on the distribution</a>.   A Monte Carlo framework for the study also allows for other underlying distributions to be easily studied, by altering the random variable being sampled.   In the interest of getting right into results, I&#8217;ll briefly discuss the tools I used at the end of this post.</p>
+
+<h3>Modulus and Variance</h3>
+
+<p>Consider what happens to a random variable&#8217;s modulus as its variance increases.  This sequence of plots shows that the modulus of a normal distribution tends toward a uniform distribution over the modulus interval, as the underlying variance increases:</p>
+
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="center">  </th>
+<th align="center">  </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.20.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.30.png" width="375" height="375">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.40.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.50.png" width="375" height="375">  |</td>
+</tr>
+</tbody>
+</table>
+
+
+<br>
+
+
+<p>From the above plots, we can see that in the case of a normal distribution, its modulus tends toward uniform rather quickly - by the time the underlying variance is half of the modulus interval.</p>
+
+<p>The following plots demonstrate the same effect with a one-tailed distribution (the exponential) &#8211; it requires a larger variance for the effect to manifest.</p>
+
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="center">  </th>
+<th align="center">  </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/exponential_01.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/exponential_04.png" width="375" height="375">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/exponential_10.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/exponential_20.png" width="375" height="375">  |</td>
+</tr>
+</tbody>
+</table>
+
+
+<br>
+
+
+<p>A third example, using a log-normal distribution.   The variance of the log-normal increases as a function of both \( \mu \) and \( \sigma \).  In this example \( \mu \) is increased systematically, holding \( \sigma \) constant at 1:</p>
+
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="center">  </th>
+<th align="center">  </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_1.0.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.5_1.0.png" width="375" height="375">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_1.0_1.0.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_2.0_1.0.png" width="375" height="375">  |</td>
+</tr>
+</tbody>
+</table>
+
+
+<br>
+
+
+<p>For a final examination of variance, I will again use log-normals and this time vary \( \sigma \), while holding \( \mu \) constant at 0.  Here we see that the effect of increasing the log-normal variance via \( \sigma \) does <em>not</em> follow the pattern in previous examples &#8211; the distribution does not &#8216;spread&#8217; and its modulus does not evolve toward a uniform distribution!</p>
+
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="center">  </th>
+<th align="center">  </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_0.5.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_1.0.png" width="375" height="375">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_1.5.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_2.0.png" width="375" height="375">  |</td>
+</tr>
+</tbody>
+</table>
+
+
+<br>
+
+
+<h3>Modulus and Mean</h3>
+
+<p>The following table of plots demonstrates the decreasing effect that a distribution&#8217;s location (mean) has, as its spread increases and its modulus approaches uniformity.   In fact, we see that <em>any</em> distribution in the &#8216;uniform modulus&#8217; parameter region is indistinguishable from any other, with respect to its modulus &#8211; all changes to mean or variance <em>within</em> this region have no affect on the distribution&#8217;s modulus!</p>
+
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="center">  </th>
+<th align="center">  </th>
+<th align="center">  </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.0_0.3.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.5_0.3.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_1.0_0.3.png" width="260" height="260">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.0_0.4.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.5_0.4.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_1.0_0.4.png" width="260" height="260">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.0_0.5.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.5_0.5.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_1.0_0.5.png" width="260" height="260">  |</td>
+</tr>
+</tbody>
+</table>
+
+
+<br>
+
+
+<h3>Conclusions</h3>
+
+<p>Generally, as the spread of a distribution increases, its modulus tends toward a uniform distribution on the modulus interval.   Although it was tempting to state this in terms of increasing variance, we see from the 2nd log-normal experiment that variance can increase without increasing &#8216;spread&#8217; in a way that causes the trend toward uniform modulus.   Currently, I&#8217;m not sure what the true invariant is, that properly distinguishes the 2nd log-normal scenario from the others.</p>
+
+<p>For any distribution that <em>does</em> reside in the &#8216;uniform-modulus&#8217; parameter space, we see that neither changes to location nor spread (nor even category of distribution) can be distinguished by the distribution modulus.</p>
+
+<h3>Tools</h3>
+
+<p>I used the following software widgets:</p>
+
+<ul>
+<li><a href="https://github.com/erikerlandson/condor_tools/blob/cad8773da36fa7f3c60c93895a428d6f1fae6752/bin/rv_modulus_study">rv_modulus_study</a> &#8211; the jig for Monte Carlo sampling of underlying distributions and their corresponding modulus</li>
+<li><a href="https://github.com/erikerlandson/dtools/wiki/dplot">dplot</a> &#8211; a simple cli wrapper around <code>matplotlib.pyplot</code> functionality</li>
+<li><a href="https://github.com/willb/capricious/">Capricious</a> &#8211; a library for random sampling of various distribution types</li>
+<li><a href="https://github.com/erikerlandson/capricious/blob/c8ec13f1f49880bb3573034de59971f84d15f7c1/lib/capricious/spline_distribution.rb">Capricious::SplineDistribution</a> &#8211; a ruby class for estimating PDF and CDF of a distribution from sampled data, using cubic Hermite splines (note, at the time of this writing, I&#8217;m using an experimental variation on my personal repo fork, at the link)</li>
+</ul>
+
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1077,117 +1294,6 @@ NEGOTIATOR.CLASSAD_LOG_STRICT_PARSING = False
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/07/27/driving-a-condor-job-renice-policy-with-accounting-groups/">Driving a Condor Job Renice Policy with Accounting Groups</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-07-27T13:50:00-07:00" pubdate data-updated="true">Jul 27<span>th</span>, 2012</time>
-        
-         | <a href="/blog/2012/07/27/driving-a-condor-job-renice-policy-with-accounting-groups/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Condor can run its jobs with a renice priority level specified by <code>JOB_RENICE_INCREMENT</code>, which defaults simply to 10, but can in fact be any ClassAd expression, and is evaluated in the context of the job ad corresponding to the job being run.</p>
-
-<p>This opens up an opportunity to create a renice <em>policy</em>, driven by accounting groups.  Consider a <a href="http://erikerlandson.github.com/blog/2012/07/10/configuring-minimum-and-maximum-resources-for-mission-critical-jobs-in-a-condor-pool/">scenario I discussed previously</a>, where a condor pool caters to mission critical (MC) jobs and regular (R) jobs.</p>
-
-<p>An additional configuration trick we could apply is to add a renice policy that gives a higher renice value (that is, a lower priority) to any jobs that aren&#8217;t run under the mission-critical (MC) rubric, as in this example configuration:</p>
-
-<pre><code># A convenience expression that extracts group, e.g. "mc.user@domain.com" --&gt; "mc"
-SUBMIT_EXPRS = AcctGroupName
-AcctGroupName = ifThenElse(my.AccountingGroup =!= undefined, \
-                           regexps("^([^@]+)\.[^.]+", my.AccountingGroup, "\1"), "&lt;none&gt;")
-
-NUM_CPUS = 3
-
-# Groups representing mission critical and regular jobs:
-GROUP_NAMES = MC, R
-GROUP_QUOTA_MC = 2
-GROUP_QUOTA_R = 1
-
-# Any group not MC gets a renice increment of 10:
-JOB_RENICE_INCREMENT = 10 * (AcctGroupName =!= "MC")
-</code></pre>
-
-<p>To demonstrate this policy in action, I wrote a little shell script I called <code>burn</code>, whose only function is to burn cycles for a given number of seconds:</p>
-
-<pre><code>#!/bin/sh
-
-# usage: burn [n]
-# where n is number of seconds to burn cycles
-s="$1"
-if [ -z "$s" ]; then s=60; fi
-
-t0=`date +%s`
-while [ 1 ]; do
-    x=0
-    # burn some cycles:
-    while [ $x -lt 10000 ]; do let x=$x+1; done
-    t=`date +%s`
-    let e=$t-$t0
-    # halt when the requested time is up:
-    if [ $e -gt $s ]; then exit ; fi
-done
-</code></pre>
-
-<p>Begin by standing up a condor pool including the configuration above.   Make sure the <code>burn</code> script is readable.  Also, it is preferable to make sure your system is unloaded (load average should be as close to zero as reasonably possible).  Then submit the following, which instantiates two <code>burn</code> jobs running under accounting group <code>MC</code> and a third under group <code>R</code>:</p>
-
-<pre><code>universe = vanilla
-cmd = /path/to/burn
-args = 600
-should_transfer_files = if_needed
-when_to_transfer_output = on_exit
-+AccountingGroup = "MC.user"
-queue 2
-+AccountingGroup = "R.user"
-queue 1
-</code></pre>
-
-<p>Allow the jobs to negotiate and then run for a couple minutes.  You should then see something similar to the following load-average information from the slot ads:</p>
-
-<pre><code>$ condor_status -format "%s" SlotID -format " | %.2f" LoadAvg -format " | %.2f" CondorLoadAvg -format " | %.2f" TotalLoadAvg -format " | %.2f" TotalCondorLoadAvg -format " | %s\n" AccountingGroup | sort
-1 | 1.33 | 1.33 | 2.75 | 2.70 | MC.user@localdomain
-2 | 1.28 | 1.24 | 2.75 | 2.70 | MC.user@localdomain
-3 | 0.13 | 0.13 | 2.77 | 2.72 | R.user@localdomain
-</code></pre>
-
-<p>Note, which particular <code>SlotID</code> runs which job may vary.  However, we expect to see that the load averages for the slot running group <code>R</code> are much lower than the load averages for slots running jobs under group <code>MC</code>, as seen above.</p>
-
-<p>We can explicitly verify the renice numbers from our policy to see that our one <code>R</code> job has a nice value of 10 (and is using only a fraction of the cpu):</p>
-
-<pre><code># tell 'ps' to give us (pid, %cpu, nice, cmd+args):
-$ ps -eo "%p %C %n %a" | grep 'burn 600'
-22403 10.2  10 /bin/sh /home/eje/bin/burn 600
-22406 93.2   0 /bin/sh /home/eje/bin/burn 600
-22411 90.6   0 /bin/sh /home/eje/bin/burn 600
-</code></pre>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/2/">&larr; Older</a>
@@ -1207,6 +1313,10 @@ $ ps -eo "%p %C %n %a" | grep 'burn 600'
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2013/03/15/examining-the-modulus-of-random-variables/">Examining the Modulus of Random Variables</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2013/01/02/the-mean-of-the-modulus-does-not-equal-the-modulus-of-the-mean/">The Mean of the Modulus Does Not Equal the Modulus of the Mean</a>
       </li>
     
@@ -1220,10 +1330,6 @@ $ ps -eo "%p %C %n %a" | grep 'burn 600'
     
       <li class="post">
         <a href="/blog/2012/11/15/rethinking-the-semantics-of-group-quotas-and-slot-weights-claim-capacity-model/">Rethinking the Semantics of Group Quotas and Slot Weights: Claim Capacity Model</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2012/11/13/rethinking-the-semantics-of-group-quotas-and-slot-weights-for-heterogeneous-and-multidimensional-compute-resources/">Rethinking the Semantics of Group Quotas and Slot Weights for Heterogeneous and Multidimensional Compute Resources</a>
       </li>
     
   </ul>

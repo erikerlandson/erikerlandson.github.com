@@ -4,7 +4,7 @@
   <title><![CDATA[Category: htcondor | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/htcondor/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2013-02-06T16:29:59-07:00</updated>
+  <updated>2013-03-15T17:44:23-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,194 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Examining the Modulus of Random Variables]]></title>
+    <link href="http://erikerlandson.github.com/blog/2013/03/15/examining-the-modulus-of-random-variables/"/>
+    <updated>2013-03-15T12:03:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2013/03/15/examining-the-modulus-of-random-variables</id>
+    <content type="html"><![CDATA[<h3>Motivation</h3>
+
+<p>The original motivation for these experiments was consideration of the impact of negotiator cycle cadence (i.e. the time between the start of one cycle and the start of the next) on HTCondor pool loading.  Specifically, any HTCondor job that completes and vacates its resource may leave that resource unloaded until it can be re-matched on the next cycle.  Therefore, the duration of resource vacancies (and hence, pool loading) can be thought of as a function of job durations <em>modulo</em> the cadence of the negotiator cycle.  In general, the aggregate behavior of job durations on a pool is useful to model as a random variable.  And so, it seemed worthwhile to build up a little intuition about the behavior of a random variable when you take its modulus.</p>
+
+<h3>Methodology</h3>
+
+<p>I took a Monte Carlo approach to this study because a tractable theoretical framework eluded me, and you do not have to dive very deep to show that <a href="http://erikerlandson.github.com/blog/2013/01/02/the-mean-of-the-modulus-does-not-equal-the-modulus-of-the-mean/">even trivial random variable behavior under a modulus is dependent on the distribution</a>.   A Monte Carlo framework for the study also allows for other underlying distributions to be easily studied, by altering the random variable being sampled.   In the interest of getting right into results, I'll briefly discuss the tools I used at the end of this post.</p>
+
+<h3>Modulus and Variance</h3>
+
+<p>Consider what happens to a random variable's modulus as its variance increases.  This sequence of plots shows that the modulus of a normal distribution tends toward a uniform distribution over the modulus interval, as the underlying variance increases:</p>
+
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="center">  </th>
+<th align="center">  </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.20.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.30.png" width="375" height="375">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.40.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.50.png" width="375" height="375">  |</td>
+</tr>
+</tbody>
+</table>
+
+
+<br>
+
+
+<p>From the above plots, we can see that in the case of a normal distribution, its modulus tends toward uniform rather quickly - by the time the underlying variance is half of the modulus interval.</p>
+
+<p>The following plots demonstrate the same effect with a one-tailed distribution (the exponential) -- it requires a larger variance for the effect to manifest.</p>
+
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="center">  </th>
+<th align="center">  </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/exponential_01.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/exponential_04.png" width="375" height="375">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/exponential_10.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/exponential_20.png" width="375" height="375">  |</td>
+</tr>
+</tbody>
+</table>
+
+
+<br>
+
+
+<p>A third example, using a log-normal distribution.   The variance of the log-normal increases as a function of both \( \mu \) and \( \sigma \).  In this example \( \mu \) is increased systematically, holding \( \sigma \) constant at 1:</p>
+
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="center">  </th>
+<th align="center">  </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_1.0.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.5_1.0.png" width="375" height="375">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_1.0_1.0.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_2.0_1.0.png" width="375" height="375">  |</td>
+</tr>
+</tbody>
+</table>
+
+
+<br>
+
+
+<p>For a final examination of variance, I will again use log-normals and this time vary \( \sigma \), while holding \( \mu \) constant at 0.  Here we see that the effect of increasing the log-normal variance via \( \sigma \) does <em>not</em> follow the pattern in previous examples -- the distribution does not 'spread' and its modulus does not evolve toward a uniform distribution!</p>
+
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="center">  </th>
+<th align="center">  </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_0.5.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_1.0.png" width="375" height="375">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_1.5.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_2.0.png" width="375" height="375">  |</td>
+</tr>
+</tbody>
+</table>
+
+
+<br>
+
+
+<h3>Modulus and Mean</h3>
+
+<p>The following table of plots demonstrates the decreasing effect that a distribution's location (mean) has, as its spread increases and its modulus approaches uniformity.   In fact, we see that <em>any</em> distribution in the 'uniform modulus' parameter region is indistinguishable from any other, with respect to its modulus -- all changes to mean or variance <em>within</em> this region have no affect on the distribution's modulus!</p>
+
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="center">  </th>
+<th align="center">  </th>
+<th align="center">  </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.0_0.3.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.5_0.3.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_1.0_0.3.png" width="260" height="260">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.0_0.4.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.5_0.4.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_1.0_0.4.png" width="260" height="260">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.0_0.5.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.5_0.5.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_1.0_0.5.png" width="260" height="260">  |</td>
+</tr>
+</tbody>
+</table>
+
+
+<br>
+
+
+<h3>Conclusions</h3>
+
+<p>Generally, as the spread of a distribution increases, its modulus tends toward a uniform distribution on the modulus interval.   Although it was tempting to state this in terms of increasing variance, we see from the 2nd log-normal experiment that variance can increase without increasing 'spread' in a way that causes the trend toward uniform modulus.   Currently, I'm not sure what the true invariant is, that properly distinguishes the 2nd log-normal scenario from the others.</p>
+
+<p>For any distribution that <em>does</em> reside in the 'uniform-modulus' parameter space, we see that neither changes to location nor spread (nor even category of distribution) can be distinguished by the distribution modulus.</p>
+
+<h3>Tools</h3>
+
+<p>I used the following software widgets:</p>
+
+<ul>
+<li><a href="https://github.com/erikerlandson/condor_tools/blob/cad8773da36fa7f3c60c93895a428d6f1fae6752/bin/rv_modulus_study">rv_modulus_study</a> -- the jig for Monte Carlo sampling of underlying distributions and their corresponding modulus</li>
+<li><a href="https://github.com/erikerlandson/dtools/wiki/dplot">dplot</a> -- a simple cli wrapper around <code>matplotlib.pyplot</code> functionality</li>
+<li><a href="https://github.com/willb/capricious/">Capricious</a> -- a library for random sampling of various distribution types</li>
+<li><a href="https://github.com/erikerlandson/capricious/blob/c8ec13f1f49880bb3573034de59971f84d15f7c1/lib/capricious/spline_distribution.rb">Capricious::SplineDistribution</a> -- a ruby class for estimating PDF and CDF of a distribution from sampled data, using cubic Hermite splines (note, at the time of this writing, I'm using an experimental variation on my personal repo fork, at the link)</li>
+</ul>
+
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[A Demonstration of Negotiator-Side Resource Consumption]]></title>
@@ -265,149 +453,6 @@ slot1_1@rorschach | 1
 <p>One implication of this proposed semantic for quotas and weights is that the measure for the maximum number of jobs that may match against any given slot must be some finite number.   It implies that all resource dimensions are quantized in some way by the allocation policy.   This scheme would not support a real-valued resource dimension that had no minimum quantization.  I do not think that this is a very heavy-weight requirement, and in fact we have already been moving in that direction with features such as MODIFY_REQUEST_EXPRS_xxx.</p>
 
 <p>When a slot's resource allocation policy is defined over all its resources, what bounds this measure of maximum possible matches?  In a case where each job match <em>must</em> use at least one non-zero quantum of each resource dimension, then the limit is the resource with the mimimum quantized levels.   In a case where jobs may request a zero amount of resources, then the limit is the resource with the maximum quantized levels.  (note, it is required that each match use at least one quantum of at least one resource, otherwise the maximum is not properly bounded).</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Using Accounting Groups With Wallaby]]></title>
-    <link href="http://erikerlandson.github.com/blog/2012/11/01/using-accounting-groups-with-wallaby/"/>
-    <updated>2012-11-01T07:41:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2012/11/01/using-accounting-groups-with-wallaby</id>
-    <content type="html"><![CDATA[<p>In this post I will describe how to use HTCondor accounting groups with <a href="http://getwallaby.com">Wallaby</a>.  I will begin by walking through an accounting group configuration on a pool managed by wallaby.  Following, I will demonstrate the configuration in action.</p>
-
-<p>The gist of this demo will be to create a simple accounting group hierarchy:  A top-level group called <code>Demo</code>, and three child groups <code>Demo.A, Demo.B, Demo.C</code>.  <code>Demo</code> will be given a <em>static</em> quota to simulate the behavior of a pool with a particular number of slots available.  The child groups will use <em>dynamic</em> quotas to express their quota shares from the parent as ratios.</p>
-
-<p>First, it is good practice to snapshot current wallaby configuration for reference:</p>
-
-<pre><code>$ wallaby make-snapshot "pre demo state"
-</code></pre>
-
-<p>We will be constructing a wallaby feature called <code>AccountingGroups</code> to hold our accounting group configurations.  This creates the feature:</p>
-
-<pre><code>$ wallaby add-feature AccountingGroups
-</code></pre>
-
-<p>Wallaby wants to know about features that are used in configurations, so begin by declaring them to the wallaby store:</p>
-
-<pre><code>$ wallaby add-param GROUP_NAMES
-$ wallaby add-param GROUP_QUOTA_Demo
-$ wallaby add-param GROUP_QUOTA_DYNAMIC_Demo.A
-$ wallaby add-param GROUP_QUOTA_DYNAMIC_Demo.B
-$ wallaby add-param GROUP_QUOTA_DYNAMIC_Demo.C
-$ wallaby add-param GROUP_ACCEPT_SURPLUS_Demo
-$ wallaby add-param NEGOTIATOR_ALLOW_QUOTA_OVERSUBSCRIPTION
-$ wallaby add-param NEGOTIATOR_CONSIDER_PREEMPTION
-$ wallaby add-param CLAIM_WORKLIFE
-</code></pre>
-
-<p>Here we disable the "claim worklife" feature by setting claims to expire immediately.   This prevents jobs under one accounting group from acquiring surplus quota and holding on to it when new jobs arrive under a different group:</p>
-
-<pre><code>$ wallaby add-params-to-feature ExecuteNode CLAIM_WORKLIFE=0
-$ wallaby add-params-to-subsystem startd CLAIM_WORKLIFE
-$ wallaby add-params-to-feature Scheduler CLAIM_WORKLIFE=0
-$ wallaby add-params-to-subsystem scheduler CLAIM_WORKLIFE
-</code></pre>
-
-<p>If you alter the configuration parameters, you will want the negotiator to reconfigure itself when you activate.  Here we declare the accounting group features as part of the negotiator subsystem:</p>
-
-<pre><code>$ wallaby add-params-to-subsystem negotiator \
-GROUP_NAMES \
-GROUP_QUOTA_Demo \
-GROUP_QUOTA_DYNAMIC_Demo.A \
-GROUP_QUOTA_DYNAMIC_Demo.B \
-GROUP_QUOTA_DYNAMIC_Demo.C \
-NEGOTIATOR_ALLOW_QUOTA_OVERSUBSCRIPTION \
-NEGOTIATOR_CONSIDER_PREEMPTION
-</code></pre>
-
-<p>Activate the configuration so far to tell subsystems about new parameters for reconfig</p>
-
-<pre><code>$ wallaby activate
-</code></pre>
-
-<p>Now we construct the actual configuration as the <code>AccountingGroups</code> wallaby feature.  Here we are constructing a group <code>Demo</code> with three subgroups <code>Demo.{A|B|C}</code>.  In a multi-node pool with several cores, it is often easiest to play with group behavior by creating a sub-hierarchy such as this <code>Demo</code> sub-hierarchy, and configuring <code>GROUP_ACCEPT_SURPLUS_Demo=False</code>, so that the sub-hierarchy behaves with a well-defined total slot quota (in this case 15).  The sub-groups A,B and C each take 1/3 of the parent's quota, so in this example each will receive 5 slots.</p>
-
-<pre><code>$ wallaby add-params-to-feature AccountingGroups \
-NEGOTIATOR_ALLOW_QUOTA_OVERSUBSCRIPTION=False \
-NEGOTIATOR_CONSIDER_PREEMPTION=False \
-GROUP_NAMES='Demo, Demo.A, Demo.B, Demo.C' \
-GROUP_ACCEPT_SURPLUS=True \
-GROUP_QUOTA_Demo=15 \
-GROUP_ACCEPT_SURPLUS_Demo=False \
-GROUP_QUOTA_DYNAMIC_Demo.A=0.333 \
-GROUP_QUOTA_DYNAMIC_Demo.B=0.333 \
-GROUP_QUOTA_DYNAMIC_Demo.C=0.333
-</code></pre>
-
-<p>With our accounting group feature created, we can apply it to the machine our negotiator daemon is running on.  Then snapshot our configuration modifications for reference, and activate the new configuration:</p>
-
-<pre><code>$ wallaby add-features-to-node negotiator.node.com AccountingGroups
-$ wallaby make-snapshot 'new acct group config'
-$ wallaby activate
-</code></pre>
-
-<p>Now we will demonstrate the new feature in action.  Submit the following file to your pool, which submits 100 jobs each to groups <code>Demo.A</code> with durations randomly chosen between 25 and 35 seconds:</p>
-
-<pre><code>universe = vanilla
-cmd = /bin/sleep
-args = $$([25 + random(11)])
-transfer_executable = false
-should_transfer_files = if_needed
-when_to_transfer_output = on_exit
-+AccountingGroup="Demo.A.user1"
-queue 100
-</code></pre>
-
-<p>Once you make this submission, allow the jobs to negotiate, and you can check to see what accounting groups are running on slots by inspecting the value of <code>RemoteNegotiatingGroup</code> on slot ads.   You should see that subgroup <code>Demo.A</code> has acquired surplus and is running 15 jobs, as there are no jobs under groups <code>Demo.B</code> or <code>Demo.C</code> that need slots.  Note, due to jobs completing between negotiation cycles, these numbers can be less than the maximum possible at certain times.  If you have any other slots in the pool, they will show up in the output below as having either <code>undefined</code> negotiating group or possibly <code>&lt;none&gt;</code> if any other jobs are running.</p>
-
-<pre><code>$ condor_status -format "%s\n" 'ifThenElse(RemoteNegotiatingGroup isnt undefined, string(RemoteNegotiatingGroup), "undefined")' -constraint 'True' | sort | uniq -c | awk '{ print $0; t += $1 } END { printf("%7d total\n",t) }'
- 15 Demo.A
- 50 &lt;none&gt;
- 50 undefined
-115 total
-</code></pre>
-
-<p>Now submit some jobs against <code>Demo.B</code> and <code>Demo.C</code>, like so:</p>
-
-<pre><code>universe = vanilla
-cmd = /bin/sleep
-args = $$([25 + random(11)])
-transfer_executable = false
-should_transfer_files = if_needed
-when_to_transfer_output = on_exit
-+AccountingGroup="Demo.B.user1"
-queue 100
-+AccountingGroup="Demo.C.user1"
-queue 100
-</code></pre>
-
-<p>Once these jobs begin to negotiate, we expect to see the jobs balanced between the three groups evenly, as we gave each group 1/3 of the quota:</p>
-
-<pre><code>$ condor_status -format "%s\n" 'ifThenElse(RemoteNegotiatingGroup isnt undefined, string(RemoteNegotiatingGroup), "undefined")' -constraint 'True' | sort | uniq -c | awk '{ print $0; t += $1 } END { printf("%7d total\n",t) }'
-  5 Demo.A
-  5 Demo.B
-  5 Demo.C
- 50 &lt;none&gt;
- 50 undefined
-115 total
-</code></pre>
-
-<p>Finally, we see what happens if we remove jobs under <code>Demo.B</code>:</p>
-
-<pre><code>$ condor_rm -constraint 'AccountingGroup =?= "Demo.B.user1"'
-</code></pre>
-
-<p>Now we should see quota start to share between <code>Demo.A</code> and <code>Demo.C</code>:</p>
-
-<pre><code>$ condor_status -format "%s\n" 'ifThenElse(RemoteNegotiatingGroup isnt undefined, string(RemoteNegotiatingGroup), "undefined")' -constraint 'True' | sort | uniq -c | awk '{ print $0; t += $1 } END { printf("%7d total\n",t) }'
-  7 Demo.A
-  8 Demo.C
- 50 &lt;none&gt;
- 50 undefined
-115 total
-</code></pre>
-
-<p>With this accounting group configuration in place, you can play with changing quotas for the accounting groups and observe the numbers of running jobs change in response.</p>
 ]]></content>
   </entry>
   

@@ -1,0 +1,457 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Examining the Modulus of Random Variables - tool monkey</title>
+  <meta name="author" content="Erik Erlandson">
+
+  
+  <meta name="description" content="Motivation The original motivation for these experiments was consideration of the impact of negotiator cycle cadence (i.e. the time between the start &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://erikerlandson.github.com/blog/2013/03/15/examining-the-modulus-of-random-variables/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="tool monkey" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+
+  <!-- enables inclusion of MathJax LaTeX: http://greglus.com/blog/2011/11/29/integrate-MathJax-LaTeX-and-MathML-Markup-in-Octopress/ -->
+  <script type="text/javascript"
+    src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">tool monkey</a></h1>
+  
+    <h2>a many-angled blog</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:erikerlandson.github.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Examining the Modulus of Random Variables</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2013-03-15T12:03:00-07:00" pubdate data-updated="true">Mar 15<span>th</span>, 2013</time>
+        
+         | <a href="#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><h3>Motivation</h3>
+
+<p>The original motivation for these experiments was consideration of the impact of negotiator cycle cadence (i.e. the time between the start of one cycle and the start of the next) on HTCondor pool loading.  Specifically, any HTCondor job that completes and vacates its resource may leave that resource unloaded until it can be re-matched on the next cycle.  Therefore, the duration of resource vacancies (and hence, pool loading) can be thought of as a function of job durations <em>modulo</em> the cadence of the negotiator cycle.  In general, the aggregate behavior of job durations on a pool is useful to model as a random variable.  And so, it seemed worthwhile to build up a little intuition about the behavior of a random variable when you take its modulus.</p>
+
+<h3>Methodology</h3>
+
+<p>I took a Monte Carlo approach to this study because a tractable theoretical framework eluded me, and you do not have to dive very deep to show that <a href="http://erikerlandson.github.com/blog/2013/01/02/the-mean-of-the-modulus-does-not-equal-the-modulus-of-the-mean/">even trivial random variable behavior under a modulus is dependent on the distribution</a>.   A Monte Carlo framework for the study also allows for other underlying distributions to be easily studied, by altering the random variable being sampled.   In the interest of getting right into results, I&#8217;ll briefly discuss the tools I used at the end of this post.</p>
+
+<h3>Modulus and Variance</h3>
+
+<p>Consider what happens to a random variable&#8217;s modulus as its variance increases.  This sequence of plots shows that the modulus of a normal distribution tends toward a uniform distribution over the modulus interval, as the underlying variance increases:</p>
+
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="center">  </th>
+<th align="center">  </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.20.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.30.png" width="375" height="375">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.40.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.50.png" width="375" height="375">  |</td>
+</tr>
+</tbody>
+</table>
+
+
+<br>
+
+
+<p>From the above plots, we can see that in the case of a normal distribution, its modulus tends toward uniform rather quickly - by the time the underlying variance is half of the modulus interval.</p>
+
+<p>The following plots demonstrate the same effect with a one-tailed distribution (the exponential) &#8211; it requires a larger variance for the effect to manifest.</p>
+
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="center">  </th>
+<th align="center">  </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/exponential_01.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/exponential_04.png" width="375" height="375">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/exponential_10.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/exponential_20.png" width="375" height="375">  |</td>
+</tr>
+</tbody>
+</table>
+
+
+<br>
+
+
+<p>A third example, using a log-normal distribution.   The variance of the log-normal increases as a function of both \( \mu \) and \( \sigma \).  In this example \( \mu \) is increased systematically, holding \( \sigma \) constant at 1:</p>
+
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="center">  </th>
+<th align="center">  </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_1.0.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.5_1.0.png" width="375" height="375">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_1.0_1.0.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_2.0_1.0.png" width="375" height="375">  |</td>
+</tr>
+</tbody>
+</table>
+
+
+<br>
+
+
+<p>For a final examination of variance, I will again use log-normals and this time vary \( \sigma \), while holding \( \mu \) constant at 0.  Here we see that the effect of increasing the log-normal variance via \( \sigma \) does <em>not</em> follow the pattern in previous examples &#8211; the distribution does not &#8216;spread&#8217; and its modulus does not evolve toward a uniform distribution!</p>
+
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="center">  </th>
+<th align="center">  </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_0.5.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_1.0.png" width="375" height="375">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_1.5.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_2.0.png" width="375" height="375">  |</td>
+</tr>
+</tbody>
+</table>
+
+
+<br>
+
+
+<h3>Modulus and Mean</h3>
+
+<p>The following table of plots demonstrates the decreasing effect that a distribution&#8217;s location (mean) has, as its spread increases and its modulus approaches uniformity.   In fact, we see that <em>any</em> distribution in the &#8216;uniform modulus&#8217; parameter region is indistinguishable from any other, with respect to its modulus &#8211; all changes to mean or variance <em>within</em> this region have no affect on the distribution&#8217;s modulus!</p>
+
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="center">  </th>
+<th align="center">  </th>
+<th align="center">  </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.0_0.3.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.5_0.3.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_1.0_0.3.png" width="260" height="260">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.0_0.4.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.5_0.4.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_1.0_0.4.png" width="260" height="260">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.0_0.5.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.5_0.5.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_1.0_0.5.png" width="260" height="260">  |</td>
+</tr>
+</tbody>
+</table>
+
+
+<br>
+
+
+<h3>Conclusions</h3>
+
+<p>Generally, as the spread of a distribution increases, its modulus tends toward a uniform distribution on the modulus interval.   Although it was tempting to state this in terms of increasing variance, we see from the 2nd log-normal experiment that variance can increase without increasing &#8216;spread&#8217; in a way that causes the trend toward uniform modulus.   Currently, I&#8217;m not sure what the true invariant is, that properly distinguishes the 2nd log-normal scenario from the others.</p>
+
+<p>For any distribution that <em>does</em> reside in the &#8216;uniform-modulus&#8217; parameter space, we see that neither changes to location nor spread (nor even category of distribution) can be distinguished by the distribution modulus.</p>
+
+<h3>Tools</h3>
+
+<p>I used the following software widgets:</p>
+
+<ul>
+<li><a href="https://github.com/erikerlandson/condor_tools/blob/cad8773da36fa7f3c60c93895a428d6f1fae6752/bin/rv_modulus_study">rv_modulus_study</a> &#8211; the jig for Monte Carlo sampling of underlying distributions and their corresponding modulus</li>
+<li><a href="https://github.com/erikerlandson/dtools/wiki/dplot">dplot</a> &#8211; a simple cli wrapper around <code>matplotlib.pyplot</code> functionality</li>
+<li><a href="https://github.com/willb/capricious/">Capricious</a> &#8211; a library for random sampling of various distribution types</li>
+<li><a href="https://github.com/erikerlandson/capricious/blob/c8ec13f1f49880bb3573034de59971f84d15f7c1/lib/capricious/spline_distribution.rb">Capricious::SplineDistribution</a> &#8211; a ruby class for estimating PDF and CDF of a distribution from sampled data, using cubic Hermite splines (note, at the time of this writing, I&#8217;m using an experimental variation on my personal repo fork, at the link)</li>
+</ul>
+
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Erik Erlandson</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2013-03-15T12:03:00-07:00" pubdate data-updated="true">Mar 15<span>th</span>, 2013</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/computing/'>computing</a>, <a class='category' href='/blog/categories/distribution/'>distribution</a>, <a class='category' href='/blog/categories/exponential-distribution/'>exponential distribution</a>, <a class='category' href='/blog/categories/htcondor/'>htcondor</a>, <a class='category' href='/blog/categories/log-normal-distribution/'>log-normal distribution</a>, <a class='category' href='/blog/categories/math/'>math</a>, <a class='category' href='/blog/categories/mean/'>mean</a>, <a class='category' href='/blog/categories/modulus/'>modulus</a>, <a class='category' href='/blog/categories/normal-distribution/'>normal distribution</a>, <a class='category' href='/blog/categories/random-variable/'>random variable</a>, <a class='category' href='/blog/categories/standard-deviation/'>standard deviation</a>, <a class='category' href='/blog/categories/uniform-distribution/'>uniform distribution</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://erikerlandson.github.com/blog/2013/03/15/examining-the-modulus-of-random-variables/" data-via="" data-counturl="http://erikerlandson.github.com/blog/2013/03/15/examining-the-modulus-of-random-variables/" >Tweet</a>
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2013/01/02/the-mean-of-the-modulus-does-not-equal-the-modulus-of-the-mean/" title="Previous Post: The Mean of the Modulus Does Not Equal the Modulus of the Mean">&laquo; The Mean of the Modulus Does Not Equal the Modulus of the Mean</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>About The Author</h1>
+  <p>Erik is a senior software engineer at <a href="http://www.redhat.com">Red Hat</a> who works as a developer on the <a href="http://www.redhat.com/products/mrg/grid/">Red Hat Enterprise MRG Grid</a> suite.</p>
+</section>
+<section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2013/03/15/examining-the-modulus-of-random-variables/">Examining the Modulus of Random Variables</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2013/01/02/the-mean-of-the-modulus-does-not-equal-the-modulus-of-the-mean/">The Mean of the Modulus Does Not Equal the Modulus of the Mean</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2012/12/03/a-demonstration-of-negotiator-side-resource-consumption/">A Demonstration of Negotiator-Side Resource Consumption</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2012/11/26/rethinking-the-semantics-of-group-quotas-and-slot-weights-computing-claim-capacity-from-consumption-policy/">Rethinking the Semantics of Group Quotas and Slot Weights: Computing Claim Capacity from Consumption Policy</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2012/11/15/rethinking-the-semantics-of-group-quotas-and-slot-weights-claim-capacity-model/">Rethinking the Semantics of Group Quotas and Slot Weights: Claim Capacity Model</a>
+      </li>
+    
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/erikerlandson">@erikerlandson</a> on GitHub
+  
+  <script type="text/javascript">
+    $.domReady(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'erikerlandson',
+            count: 0,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2013 - Erik Erlandson -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'toolmonkey';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://erikerlandson.github.com/blog/2013/03/15/examining-the-modulus-of-random-variables/';
+        var disqus_url = 'http://erikerlandson.github.com/blog/2013/03/15/examining-the-modulus-of-random-variables/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>

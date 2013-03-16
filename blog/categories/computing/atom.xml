@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2013-02-06T16:29:59-07:00</updated>
+  <updated>2013-03-15T17:44:23-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,194 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Examining the Modulus of Random Variables]]></title>
+    <link href="http://erikerlandson.github.com/blog/2013/03/15/examining-the-modulus-of-random-variables/"/>
+    <updated>2013-03-15T12:03:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2013/03/15/examining-the-modulus-of-random-variables</id>
+    <content type="html"><![CDATA[<h3>Motivation</h3>
+
+<p>The original motivation for these experiments was consideration of the impact of negotiator cycle cadence (i.e. the time between the start of one cycle and the start of the next) on HTCondor pool loading.  Specifically, any HTCondor job that completes and vacates its resource may leave that resource unloaded until it can be re-matched on the next cycle.  Therefore, the duration of resource vacancies (and hence, pool loading) can be thought of as a function of job durations <em>modulo</em> the cadence of the negotiator cycle.  In general, the aggregate behavior of job durations on a pool is useful to model as a random variable.  And so, it seemed worthwhile to build up a little intuition about the behavior of a random variable when you take its modulus.</p>
+
+<h3>Methodology</h3>
+
+<p>I took a Monte Carlo approach to this study because a tractable theoretical framework eluded me, and you do not have to dive very deep to show that <a href="http://erikerlandson.github.com/blog/2013/01/02/the-mean-of-the-modulus-does-not-equal-the-modulus-of-the-mean/">even trivial random variable behavior under a modulus is dependent on the distribution</a>.   A Monte Carlo framework for the study also allows for other underlying distributions to be easily studied, by altering the random variable being sampled.   In the interest of getting right into results, I'll briefly discuss the tools I used at the end of this post.</p>
+
+<h3>Modulus and Variance</h3>
+
+<p>Consider what happens to a random variable's modulus as its variance increases.  This sequence of plots shows that the modulus of a normal distribution tends toward a uniform distribution over the modulus interval, as the underlying variance increases:</p>
+
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="center">  </th>
+<th align="center">  </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.20.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.30.png" width="375" height="375">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.40.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.50.png" width="375" height="375">  |</td>
+</tr>
+</tbody>
+</table>
+
+
+<br>
+
+
+<p>From the above plots, we can see that in the case of a normal distribution, its modulus tends toward uniform rather quickly - by the time the underlying variance is half of the modulus interval.</p>
+
+<p>The following plots demonstrate the same effect with a one-tailed distribution (the exponential) -- it requires a larger variance for the effect to manifest.</p>
+
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="center">  </th>
+<th align="center">  </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/exponential_01.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/exponential_04.png" width="375" height="375">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/exponential_10.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/exponential_20.png" width="375" height="375">  |</td>
+</tr>
+</tbody>
+</table>
+
+
+<br>
+
+
+<p>A third example, using a log-normal distribution.   The variance of the log-normal increases as a function of both \( \mu \) and \( \sigma \).  In this example \( \mu \) is increased systematically, holding \( \sigma \) constant at 1:</p>
+
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="center">  </th>
+<th align="center">  </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_1.0.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.5_1.0.png" width="375" height="375">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_1.0_1.0.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_2.0_1.0.png" width="375" height="375">  |</td>
+</tr>
+</tbody>
+</table>
+
+
+<br>
+
+
+<p>For a final examination of variance, I will again use log-normals and this time vary \( \sigma \), while holding \( \mu \) constant at 0.  Here we see that the effect of increasing the log-normal variance via \( \sigma \) does <em>not</em> follow the pattern in previous examples -- the distribution does not 'spread' and its modulus does not evolve toward a uniform distribution!</p>
+
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="center">  </th>
+<th align="center">  </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_0.5.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_1.0.png" width="375" height="375">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_1.5.png" width="375" height="375">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_2.0.png" width="375" height="375">  |</td>
+</tr>
+</tbody>
+</table>
+
+
+<br>
+
+
+<h3>Modulus and Mean</h3>
+
+<p>The following table of plots demonstrates the decreasing effect that a distribution's location (mean) has, as its spread increases and its modulus approaches uniformity.   In fact, we see that <em>any</em> distribution in the 'uniform modulus' parameter region is indistinguishable from any other, with respect to its modulus -- all changes to mean or variance <em>within</em> this region have no affect on the distribution's modulus!</p>
+
+<table>
+<thead>
+<tr>
+<th></th>
+<th align="center">  </th>
+<th align="center">  </th>
+<th align="center">  </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.0_0.3.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.5_0.3.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_1.0_0.3.png" width="260" height="260">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.0_0.4.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.5_0.4.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_1.0_0.4.png" width="260" height="260">  |</td>
+</tr>
+<tr>
+<td></td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.0_0.5.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.5_0.5.png" width="260" height="260">  </td>
+<td align="center">  <img src="/assets/images/rv_mod_study/normal_1.0_0.5.png" width="260" height="260">  |</td>
+</tr>
+</tbody>
+</table>
+
+
+<br>
+
+
+<h3>Conclusions</h3>
+
+<p>Generally, as the spread of a distribution increases, its modulus tends toward a uniform distribution on the modulus interval.   Although it was tempting to state this in terms of increasing variance, we see from the 2nd log-normal experiment that variance can increase without increasing 'spread' in a way that causes the trend toward uniform modulus.   Currently, I'm not sure what the true invariant is, that properly distinguishes the 2nd log-normal scenario from the others.</p>
+
+<p>For any distribution that <em>does</em> reside in the 'uniform-modulus' parameter space, we see that neither changes to location nor spread (nor even category of distribution) can be distinguished by the distribution modulus.</p>
+
+<h3>Tools</h3>
+
+<p>I used the following software widgets:</p>
+
+<ul>
+<li><a href="https://github.com/erikerlandson/condor_tools/blob/cad8773da36fa7f3c60c93895a428d6f1fae6752/bin/rv_modulus_study">rv_modulus_study</a> -- the jig for Monte Carlo sampling of underlying distributions and their corresponding modulus</li>
+<li><a href="https://github.com/erikerlandson/dtools/wiki/dplot">dplot</a> -- a simple cli wrapper around <code>matplotlib.pyplot</code> functionality</li>
+<li><a href="https://github.com/willb/capricious/">Capricious</a> -- a library for random sampling of various distribution types</li>
+<li><a href="https://github.com/erikerlandson/capricious/blob/c8ec13f1f49880bb3573034de59971f84d15f7c1/lib/capricious/spline_distribution.rb">Capricious::SplineDistribution</a> -- a ruby class for estimating PDF and CDF of a distribution from sampled data, using cubic Hermite splines (note, at the time of this writing, I'm using an experimental variation on my personal repo fork, at the link)</li>
+</ul>
+
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[The Mean of the Modulus Does Not Equal the Modulus of the Mean]]></title>
@@ -251,35 +439,6 @@ slot1_1@rorschach | 1
 <p>In the HTCondor vocabulary, a job acquires a <em>claim</em> on resources to actually run after it has been matched.  It has been proposed that it may be beneficial for HTCondor to evolve toward a model where there are (aggregate) resource ads, and claims against those ads, as a simplification of the current model which involves static, partitionable and dynamic slots, with claims.  With this in mind, a preferable terminology for group quota and weight semantics might be that a resource ad (or slot) has a measure of the maximum number of claims it could dispense: a <em>claim capacity</em> measure.  The cost of a claim (or match) is the corresponding reduction of the resource's claim capacity.</p>
 
 <p>So, this semantic model could be referred to as the Claim Capacity Model of group quotas and slot weights.  With this terminology, the shared 'unit' for group quotas and slot weights would be <em>claims</em> instead of <em>jobs</em>.</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Rethinking the Semantics of Group Quotas and Slot Weights for Heterogeneous and Multidimensional Compute Resources]]></title>
-    <link href="http://erikerlandson.github.com/blog/2012/11/13/rethinking-the-semantics-of-group-quotas-and-slot-weights-for-heterogeneous-and-multidimensional-compute-resources/"/>
-    <updated>2012-11-13T15:31:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2012/11/13/rethinking-the-semantics-of-group-quotas-and-slot-weights-for-heterogeneous-and-multidimensional-compute-resources</id>
-    <content type="html"><![CDATA[<p>The HTCondor semantic for accounting group quotas and slot weights is currently cpu-centric.  This is an artifact of the historic primacy of cpu as the most commonly-considered limiting resource in computations.  For example the <code>SlotWeight</code> attribute is currently defaulted to <code>Cpus</code>, and when slot weights are disabled, there is logic activated in matchmaking to sum the available cpus on slots to avoid 'undercounting' total pool quotas.</p>
-
-<p>However, HTCondor slots -- the core model of computational resources in an HTCondor pool -- manage four resources by default: cpu, memory, disk and swap.  Furthermore, slots may now be configured with arbitrary custom resources.  As recently mentioned by <a href="http://spinningmatt.wordpress.com/2012/11/13/no-longer-thinking-in-slots-thinking-in-aggregate-resources-and-consumption-policies">Matthew Farrellee</a>, there is a growing pressure to provide robust support not just for traditional cpu-centric resource presentation, usage and allocation, but also seamlessly mediated with memory-centric, gpu-centric or '*'-centric resource allocation policies and more generally allocation policies that are simultaneously aware of all resource dimensions.</p>
-
-<p>This goal immediately raises some questions for the semantics of accounting groups and slot weights when matching jobs against slots during matchmaking.</p>
-
-<p>Consider a pool where 50% of the slots are 'weighted' in a traditional cpu-centric way, but the other 50% are intended to be allocated in a memory-centric way.  This is currently possible, as the <code>SlotWeight</code> attribute can be configured appropriately to be a function of either <code>Cpus</code> or <code>Memory</code>.</p>
-
-<p>But in a scenario where slots are weighted as functions of heterogeneous resource dimensions, it raises a semantic question:  when we sum these weights to obtain the pool-wide available quota, what 'real world' quantity does this total represent -- if any?   Is it a purely heuristic numeric value with no well defined unit attached?</p>
-
-<p>This question has import.  Understanding what the answer is, or should be, impacts what story we tell to users about what their accounting group configuration actually means.  When I assign a quota to an accounting group in such a heterogeneous environment, what is that quota regulating?   When a job matches a cpu-centric slot, does the cost of that match have a different meaning than when matching against a memory-centric slot?   When the slots are partitionable, a match implies a certain multi-dimensional slice of resources allocated from that slot.  What is the cost of that slice?  Does the sum of costs add up to the original weight on the partitionable slot?  If not, how does that affect our understanding of quota semantics?</p>
-
-<p>It may be possible unify all of these ideas by adopting the perspective that a slot's weight is a measure of the maximum number of jobs that can be matched against it.  The cost of a match is W(S)-W(S'), where W(S) is the weight function evaluated on the slot prior to match, and W(S') is the corresponding weight after the match has extracted its requested resources.  The pool's total quota is just the sum of W(S), over all slots S in the pool.  Note, this implies that the 'unit' attached to both slot weights and accounting group quotas is 'jobs'.</p>
-
-<p>Consider a simple example from the traditional cpu-centric configuration:   A partitionable slot is configured with 8 cpus, and <code>SlotWeight</code> is just its default <code>Cpus</code>.  Using this model, the allocation policy is: 'each match must use >= 1 cpu", and that other resource requests are assumed to be not limiting.  The maximum number of matches is 8 jobs, each requesting 1 cpu.   However, a job might also request 2 cpus.  In this case, note that the cost of the match is 2, since the remaining slot has 6 slots, and so W(S') now evaluates to 6.   So, the cost of the match is how many fewer possible jobs the original slot can support after the match takes its requested resources.</p>
-
-<p>This approach can be applied equally well to a memory-centric strategy, or a disk centric strategy, or a gpu-based strategy, or any combination simultaneously.  All weights evaluate to a value with unit 'jobs'.   All match costs are differences between weights (before and after match), and so their values are also in units of 'jobs'.  Therefore, the semantics of the sum of weights over a pool is always well defined: it is a number of jobs, and spefically a measure of the maximum number of jobs that might match against all the slots in the pool.  When a match acquires resources that reduce this maximum by more than 1 job, that is not in any way inconsistent.  It means the job used resources that might have supported two or more 'smaller' jobs.   This means that accounting group quotas (and submitter shares) also have a well defined unit and semantic, which is 'how many (or what fraction of) the maximum possible jobs is this group guaranteed by my accounting policy'</p>
-
-<p>One implication of this proposed semantic for quotas and weights is that the measure for the maximum number of jobs that may match against any given slot must be some finite number.   It implies that all resource dimensions are quantized in some way by the allocation policy.   This scheme would not support a real-valued resource dimension that had no minimum quantization.  I do not think that this is a very heavy-weight requirement, and in fact we have already been moving in that direction with features such as MODIFY_REQUEST_EXPRS_xxx.</p>
-
-<p>When a slot's resource allocation policy is defined over all its resources, what bounds this measure of maximum possible matches?  In a case where each job match <em>must</em> use at least one non-zero quantum of each resource dimension, then the limit is the resource with the mimimum quantized levels.   In a case where jobs may request a zero amount of resources, then the limit is the resource with the maximum quantized levels.  (note, it is required that each match use at least one quantum of at least one resource, otherwise the maximum is not properly bounded).</p>
 ]]></content>
   </entry>
   
