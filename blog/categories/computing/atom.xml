@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2013-03-15T17:44:23-07:00</updated>
+  <updated>2013-03-17T21:26:01-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,288 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Smooth Gradients for Cubic Hermite Splines]]></title>
+    <link href="http://erikerlandson.github.com/blog/2013/03/16/smooth-gradients-for-cubic-hermite-splines/"/>
+    <updated>2013-03-16T07:39:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2013/03/16/smooth-gradients-for-cubic-hermite-splines</id>
+    <content type="html"><![CDATA[<p>One of the advantages of cubic Hermite splines is that their interval interpolation formula is an explicit function of gradients \( m_0, m_1, ... m_{n-1} \) at knot-points:</p>
+
+<div markdown="0">
+\\[
+y(t) = h_{00}(t) y_j + h_{10}(t) m_j + h_{01}(t) y_{j+1} + h_{11}(t) m_{j+1} \\\\
+\\]
+</div>
+
+
+<p>where the Hermite bases are:</p>
+
+<div markdown="0">
+\\[
+h_{00} = 2t^3 - 3t^2 + 1 \\\\
+h_{10} = t^3 - 2t^2 + t \\\\
+h_{01} = -2t^3 + 3t^2 \\\\
+h_{11} = t^3 - t^2 \\\\
+\\]
+</div>
+
+
+<p>(For now, I will be using the unit-interval form of the interpolation, where t runs from 0 to 1 on each interval.  I will also discuss the non-uniform interval equations below)</p>
+
+<p>This formulation allows one to explicitly specify the interpolation gradient at each knot point, and to choose from various gradient assignment policies, for example <a href="http://en.wikipedia.org/wiki/Cubic_Hermite_spline#Interpolating_a_data_set">those listed here</a>, even supporting policies for <a href="http://en.wikipedia.org/wiki/Monotone_cubic_interpolation">enforcing monotonic interpolations</a>.</p>
+
+<p>One important caveat with cubic Hermite splines is that although the gradient \( y'(t) \) is guaranteed to be continuous, it is <em>not</em> guaranteed to be smooth (that is, differentiable) <em>across</em> the knots (it is of course smooth <em>inside</em> each interval). Therefore, another useful category of gradient policy is to obtain gradients \( m_0, m_1, ... m_{n-1} \) such that \( y'(t) \) is also smooth across knots.</p>
+
+<p>(I feel sure that what follows was long since derived elsewhere, but my attempts to dig the formulation up on the internet failed, and so I decided the derivation might make a useful blog post)</p>
+
+<p>To ensure smooth gradient across knot points, we want the 2nd derivative \( y"(t) \) to be equal at the boundaries of adjacent intervals:</p>
+
+<div markdown="0">
+\\[
+h_{00}^"(t) y_{j-1} + h_{10}^"(t) m_{j-1} + h_{01}^"(t) y_j + h_{11}^"(t) m_j \\\\
+= \\\\
+h_{00}^"(t) y_j + h_{10}^"(t) m_j + h_{01}^"(t) y_{j+1} + h_{11}^"(t) m_{j+1}
+\\]
+</div>
+
+
+<p>or substituting the 2nd derivative of the basis definitions above:</p>
+
+<div markdown="0">
+\\[
+\\left( 12 t - 6 \\right) y_{j-1} + \\left( 6 t - 4 \\right) m_{j-1}  + \\left( 6 - 12 t \\right) y_j + \\left( 6 t - 2 \\right) m_j \\\\
+= \\\\
+\\left( 12 t - 6 \\right) y_{j} + \\left( 6 t - 4 \\right) m_{j}  + \\left( 6 - 12 t \\right) y_{j+1} + \\left( 6 t - 2 \\right) m_{j+1}
+\\]
+</div>
+
+
+<p>Observe that t = 1 on the left hand side of this equation, and t = 0 on the right side, and so we have:</p>
+
+<div markdown="0">
+\\[
+6 y_{j-1} + 2 m_{j-1} - 6 y_j + 4 m_j
+=
+-6 y_j - 4 m_j + 6 y_{j+1} - 2 m_{j+1}
+\\]
+</div>
+
+
+<p>which we can rearrange as:</p>
+
+<div markdown="0">
+\\[
+2 m_{j-1} + 8 m_j + 2 m_{j+1}
+=
+6 \\left( y_{j+1} - y_{j-1} \\right)
+\\]
+</div>
+
+
+<p>Given n knot points, the above equation holds for j = 1 to n-2 (using zero-based indexing, as nature intended).  Once we define equations for j = 0 and j = n-1, we will have a system of equations to solve.  There are two likely choices.  The first is to simply specify the endpoint gradients \( m_0 = G \) and \( m_{n-1} = H \) directly, which yields the following <a href="http://en.wikipedia.org/wiki/Tridiagonal_matrix_algorithm">tri-diagonal matrix equation:</a></p>
+
+<div markdown="0">
+\\[
+\\left( \\begin{array} {ccccc}
+1 &   &   &   &   \\\\
+2 & 8 & 2 &   &   \\\\
+  & 2 & 8 & 2 &   \\\\
+  &   & \\vdots &   &   \\\\
+  &   & 2 & 8 & 2 \\\\ 
+  &   &   &   & 1 \\\\
+\\end{array} \\right)
+
+\\left( \\begin{array} {c}
+m_0 \\\\
+m_1 \\\\
+ \\\\
+\\vdots \\\\
+ \\\\
+m_{n-1}
+\\end{array} \\right)
+=
+\\left( \\begin{array} {c}
+G \\\\
+6 \\left( y_2 - y_0 \\right) \\\\
+6 \\left( y_3 - y_1 \\right) \\\\
+\\vdots \\\\
+6 \\left( y_{n-1} - y_{n-3} \\right) \\\\
+H \\\\
+\\end{array} \\right)
+\\]
+</div>
+
+
+<p>The second common endpoint policy is to set the 2nd derivative equal to zero -- the "natural spline."   Setting the 2nd derivative to zero at the left-end knot (and t = 0) gives us:</p>
+
+<div markdown="0">
+\\[
+4 m_0 + 2 m_1   =   6 \\left( y_1 - y_0 \\right)
+\\]
+</div>
+
+
+<p>Similarly, at the right-end knot (t = 1), we have:</p>
+
+<div markdown="0">
+\\[
+2 m_0 + 4 m_1   =   6 \\left( y_{n-1} - y_{n-2} \\right)
+\\]
+</div>
+
+
+<p>And so for a natural spline endpoint policy the matrix equation looks like this:</p>
+
+<div markdown="0">
+\\[
+\\left( \\begin{array} {ccccc}
+4 & 2 &   &   &   \\\\
+2 & 8 & 2 &   &   \\\\
+  & 2 & 8 & 2 &   \\\\
+  &   & \\vdots &   &   \\\\
+  &   & 2 & 8 & 2 \\\\ 
+  &   &   & 2 & 4 \\\\
+\\end{array} \\right)
+
+\\left( \\begin{array} {c}
+m_0 \\\\
+m_1 \\\\
+ \\\\
+\\vdots \\\\
+ \\\\
+m_{n-1}
+\\end{array} \\right)
+=
+\\left( \\begin{array} {c}
+6 \\left( y_1 - y_0 \\right) \\\\
+6 \\left( y_2 - y_0 \\right) \\\\
+6 \\left( y_3 - y_1 \\right) \\\\
+\\vdots \\\\
+6 \\left( y_{n-1} - y_{n-3} \\right) \\\\
+6 \\left( y_{n-1} - y_{n-2} \\right) \\\\
+\\end{array} \\right)
+\\]
+</div>
+
+
+<p>The derivation above is for uniform (and unit) intervals, where t runs from 0 to 1 on each knot interval.  I'll now discuss the variation where knot intervals are non-uniform.   The non-uniform form of the interpolation equation is:</p>
+
+<div markdown="0">
+\\[
+y(x) = h_{00}(t) y_j + h_{10}(t) d_j m_j + h_{01}(t) y_{j+1} + h_{11}(t) d_j m_{j+1} \\\\
+\\text{ } \\\\
+\\text{where:} \\\\
+\\text{ }  \\\\
+d_j = x_{j+1} - x_j \\text{  for  } j = 0, 1, ... n-2 \\\\
+t = (x - x_j) / d_j
+\\]
+</div>
+
+
+<p>Taking \( t = t(x) \) and applying the chain rule, we see that 2nd derivative equation now looks like:</p>
+
+<div markdown="0">
+\\[
+y"(x) = \\frac { \\left( 12 t - 6 \\right) y_{j} + \\left( 6 t - 4 \\right) d_j m_{j}  + \\left( 6 - 12 t \\right) y_{j+1} + \\left( 6 t - 2 \\right) d_j m_{j+1} } { d_j^2 }
+\\]
+</div>
+
+
+<p>Applying a derivation similar to the above, we find that our (interior) equations look like this:</p>
+
+<div markdown="0">
+\\[
+\\frac {2} { d_{j-1} }  m_{j-1} + \\left( \\frac {4} { d_{j-1} } + \\frac {4} { d_j } \\right) m_j + \\frac {2} {d_j} m_{j+1}
+=
+\\frac { 6 \\left( y_{j+1} - y_{j} \\right) } { d_j^2 } + \\frac { 6 \\left( y_{j} - y_{j-1} \\right) } { d_{j-1}^2 }
+\\]
+</div>
+
+
+<p>and natural spline endpoint equations are:</p>
+
+<div markdown="0">
+\\[
+\\text{left:  } \\frac {4} {d_0} m_0 + \\frac {2} {d_0} m_1   =   \\frac {6 \\left( y_1 - y_0 \\right)} {d_0^2} \\\\
+\\text{right: } \\frac {2} {d_{n-1}} m_0 + \\frac {4} {d_{n-1}} m_1   =   \\frac {6 \\left( y_{n-1} - y_{n-2} \\right)} {d_{n-1}^2}
+\\]
+</div>
+
+
+<p>And so the matrix equation for specified endpoint gradients is:</p>
+
+<div markdown="0">
+\\[
+\\scriptsize
+\\left( \\begin{array} {ccccc}
+\\normalsize 1 \\scriptsize &   &   &   &   \\\\
+\\frac{2}{d_0} & \\frac{4}{d_0} {+} \\frac{4}{d_1} & \\frac{2}{d_1} &   &   \\\\
+  & \\frac{2}{d_1} & \\frac{4}{d_1} {+} \\frac{4}{d_2} & \\frac{2}{d_2} &   \\\\
+  &   & \\vdots &   &   \\\\
+  &   & \\frac{2}{d_{n-3}} & \\frac{4}{d_{n-3}} {+} \\frac{4}{d_{n-2}} & \\frac{2}{d_{n-2}} \\\\ 
+  &   &   &   & \\normalsize 1 \\scriptsize \\\\
+\\end{array} \\right)
+
+\\left( \\begin{array} {c}
+m_0 \\\\
+m_1 \\\\
+ \\\\
+\\vdots \\\\
+ \\\\
+m_{n-1}
+\\end{array} \\right)
+=
+\\left( \\begin{array} {c}
+G \\\\
+6 \\left( \\frac{y_2 {-} y_1}{d_1^2} {+} \\frac{y_1 {-} y_0}{d_0^2} \\right) \\\\
+6 \\left( \\frac{y_3 {-} y_2}{d_2^2} {+} \\frac{y_2 {-} y_1}{d_1^2} \\right)  \\\\
+\\vdots \\\\
+6 \\left( \\frac{y_{n-1} {-} y_{n-2}}{d_{n-2}^2} {+} \\frac{y_{n-2} {-} y_{n-3}}{d_{n-3}^2} \\right) \\\\
+H \\\\
+\\end{array} \\right)
+\\normalsize
+\\]
+</div>
+
+
+<p>And the equation for natural spline endpoints is:</p>
+
+<div markdown="0">
+\\[
+\\scriptsize
+\\left( \\begin{array} {ccccc}
+\\frac{4}{d_0} & \\frac{2}{d_0}  &   &   &   \\\\
+\\frac {2} {d_0} & \\frac {4} {d_0} {+} \\frac {4} {d_1} & \\frac{2}{d_1} &   &   \\\\
+  & \\frac{2}{d_1} & \\frac{4}{d_1} {+} \\frac{4}{d_2} & \\frac{2}{d_2} &   \\\\
+  &   & \\vdots &   &   \\\\
+  &   & \\frac{2}{d_{n-3}} & \\frac{4}{d_{n-3}} {+} \\frac{4}{d_{n-2}} & \\frac{2}{d_{n-2}} \\\\ 
+  &   &   & \\frac{2}{d_{n-2}} & \\frac{4}{d_{n-2}} \\\\
+\\end{array} \\right)
+
+\\left( \\begin{array} {c}
+m_0 \\\\
+m_1 \\\\
+ \\\\
+\\vdots \\\\
+ \\\\
+m_{n-1}
+\\end{array} \\right)
+=
+\\left( \\begin{array} {c}
+\\frac{6 \\left( y_1 {-} y_0 \\right)}{d_0^2} \\\\
+6 \\left( \\frac{y_2 {-} y_1}{d_1^2}  {+}  \\frac{y_1 {-} y_0}{d_0^2} \\right) \\\\
+6 \\left( \\frac{y_3 {-} y_2}{d_2^2}  {+}  \\frac{y_2 {-} y_1}{d_1^2} \\right)  \\\\
+\\vdots \\\\
+6 \\left( \\frac{y_{n-1} {-} y_{n-2}}{d_{n-2}^2}  {+}  \\frac{y_{n-2} {-} y_{n-3}}{d_{n-3}^2} \\right) \\\\
+\\frac{6 \\left( y_{n-1} {-} y_{n-2} \\right)}{d_{n-2}^2} \\\\
+\\end{array} \\right)
+\\normalsize
+\\]
+</div>
+
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Examining the Modulus of Random Variables]]></title>
@@ -424,21 +706,6 @@ slot1_1@rorschach | 1
 <p>It is an open question which of these models (or some other completely different options) should be supported.  Conceivably all of them could be provided as options.</p>
 
 <p>Currently my personal preference leans toward Approach 3.  It is easy to reason about and configure.  It yields a well defined W(R) in all circumstances, with no corner cases, that is straightforward to compute and enforce automatically.  It is easy to configure heterogeneous consumption policies that cost different resource assets in different ways, simply by tuning minimum charge C(a) appropriately for each asset.  This includes claim capacity models where jobs are assumed to use very small amounts of any resource, including fractional shares of cpu assets.</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Rethinking the Semantics of Group Quotas and Slot Weights: Claim Capacity Model]]></title>
-    <link href="http://erikerlandson.github.com/blog/2012/11/15/rethinking-the-semantics-of-group-quotas-and-slot-weights-claim-capacity-model/"/>
-    <updated>2012-11-15T17:22:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2012/11/15/rethinking-the-semantics-of-group-quotas-and-slot-weights-claim-capacity-model</id>
-    <content type="html"><![CDATA[<p>In my previous post about <a href="http://erikerlandson.github.com/blog/2012/11/13/rethinking-the-semantics-of-group-quotas-and-slot-weights-for-heterogeneous-and-multidimensional-compute-resources">Rethinking the Semantics of Group Quotas and Slot Weights</a>, I proposed a concept for unifying the semantics of accounting group quotas and slot weights across arbitrary resource allocation strategies.</p>
-
-<p>My initial terminology was that the weight of a slot (i.e. resource ad) is a measure of the <em>maximum</em> number of jobs that might match against that ad, given the currently available resource quantities and the allocation policy.  The cost of a match becomes the amount by which that measure is reduced, after the match's resources are removed from the ad.</p>
-
-<p>In the HTCondor vocabulary, a job acquires a <em>claim</em> on resources to actually run after it has been matched.  It has been proposed that it may be beneficial for HTCondor to evolve toward a model where there are (aggregate) resource ads, and claims against those ads, as a simplification of the current model which involves static, partitionable and dynamic slots, with claims.  With this in mind, a preferable terminology for group quota and weight semantics might be that a resource ad (or slot) has a measure of the maximum number of claims it could dispense: a <em>claim capacity</em> measure.  The cost of a claim (or match) is the corresponding reduction of the resource's claim capacity.</p>
-
-<p>So, this semantic model could be referred to as the Claim Capacity Model of group quotas and slot weights.  With this terminology, the shared 'unit' for group quotas and slot weights would be <em>claims</em> instead of <em>jobs</em>.</p>
 ]]></content>
   </entry>
   
