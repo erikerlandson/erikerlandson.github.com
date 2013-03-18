@@ -192,7 +192,7 @@ and natural spline endpoint equations are:
 <div markdown="0">
 \\[
 \\text{left:  } \\frac {4} {d_0} m_0 + \\frac {2} {d_0} m_1   =   \\frac {6 \\left( y_1 - y_0 \\right)} {d_0^2} \\\\
-\\text{right: } \\frac {2} {d_{n-1}} m_0 + \\frac {4} {d_{n-1}} m_1   =   \\frac {6 \\left( y_{n-1} - y_{n-2} \\right)} {d_{n-1}^2}
+\\text{right: } \\frac {2} {d_{n-2}} m_0 + \\frac {4} {d_{n-2}} m_1   =   \\frac {6 \\left( y_{n-1} - y_{n-2} \\right)} {d_{n-2}^2}
 \\]
 </div>
 
