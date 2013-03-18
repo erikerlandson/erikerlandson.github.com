@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2013-03-17T21:26:01-07:00</updated>
+  <updated>2013-03-17T21:28:54-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -216,7 +216,7 @@ y"(x) = \\frac { \\left( 12 t - 6 \\right) y_{j} + \\left( 6 t - 4 \\right) d_j 
 <div markdown="0">
 \\[
 \\text{left:  } \\frac {4} {d_0} m_0 + \\frac {2} {d_0} m_1   =   \\frac {6 \\left( y_1 - y_0 \\right)} {d_0^2} \\\\
-\\text{right: } \\frac {2} {d_{n-1}} m_0 + \\frac {4} {d_{n-1}} m_1   =   \\frac {6 \\left( y_{n-1} - y_{n-2} \\right)} {d_{n-1}^2}
+\\text{right: } \\frac {2} {d_{n-2}} m_0 + \\frac {4} {d_{n-2}} m_1   =   \\frac {6 \\left( y_{n-1} - y_{n-2} \\right)} {d_{n-2}^2}
 \\]
 </div>
 
