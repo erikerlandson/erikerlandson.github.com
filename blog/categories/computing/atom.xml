@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2013-03-17T21:28:54-07:00</updated>
+  <updated>2013-03-21T17:19:45-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,56 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[The Impact of Negotiator Cycle Cadence on Slot Loading]]></title>
+    <link href="http://erikerlandson.github.com/blog/2013/03/21/the-impact-of-negotiator-cycle-cadence-on-slot-loading/"/>
+    <updated>2013-03-21T15:10:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2013/03/21/the-impact-of-negotiator-cycle-cadence-on-slot-loading</id>
+    <content type="html"><![CDATA[<p>The <a href="http://research.cs.wisc.edu/htcondor/manual/v7.8/3_1Introduction.html#8555">HTCondor negotiator</a> assigns jobs (resource requests) to slots (compute resources) at regular intervals, configured by the <a href="http://research.cs.wisc.edu/htcondor/manual/v7.8/3_3Configuration.html#20544">NEGOTIATOR_INTERVAL</a> parameter.  This interval (the cycle <em>cadence</em>) has a fundamental impact on a pool <em>loading factor</em> -- the fraction of time that slots are being productively utilized.</p>
+
+<p>Consider the following diagram, which illustrates the utilization of a slot over the lifetime of a job.  When a job completes, its slot will remain empty until it can be assigned a new job on the next negotiation cycle.</p>
+
+<p><img src="/assets/images/slot_load_study/loading_factor_diagram.png" width="750"></p>
+
+<p>As the diagram above shows, the loading factor for a slot can be expressed as D/Z, where D is the duration of the job, and Z is the total time until the next cycle occurring after the job completes.  We can also write Z = D+I, where I is the "idle time" from job completion to the start of the next negotiation cycle.   Loading factor is always &lt;= 1, where a value of 1 corresponds to ideal loading -- every slot is utilized 100% of the time.  In general, loading will be &lt; 1, as jobs rarely complete exactly on a cycle boundary.</p>
+
+<p>It is worth briefly noting that the <a href="http://research.cs.wisc.edu/htcondor/manual/v7.8/3_3Configuration.html#18202">claim reuse</a> feature was developed to help address this problem.  However, claim re-use is not compatible with all other features -- for example enabling claim re-use can cause accounting group starvation -- and so what follows remains relevant to many HTCondor configurations.</p>
+
+<p>Given a particular negotiation cycle cadence, how does a slot's loading factor behave, as a function of job duration?  The loading factor can be expressed as:</p>
+
+<div markdown="0">
+\\[
+\\text{Loading Factor} = \\frac{D}{C \\left( q + \\lceil r \\rceil \\right)} \\\\
+ \\\\
+\\text{where:} \\\\
+D = \\text{job duration} \\\\
+C = \\text{cycle cadence} \\\\
+q = \\lfloor D / C \\rfloor \\\\
+r = \\left( D / C \\right) - q \\\\
+\\]
+</div>
+
+
+<p>The following plot illustrates how the loading factor changes with job duration, assuming a cadence of 300 seconds (5 minutes):</p>
+
+<p><img src="/assets/images/slot_load_study/load_factor_300s.png" width="750"></p>
+
+<p>We immediately see that there is a saw-tooth pattern to the plot.  As the job duration increases towards the boundary of a cycle, there is less and less idle time until the next cycle, and so the loading approaches 1.0.  However, once the job's end crosses the thresold to <em>just past</em> the start of the cycle, it immediately drops to the worse possible case: the slot will be idle for nearly an entire cycle.</p>
+
+<p>The other important pattern is that the bottom of the saw-tooth gradually increases.  As a job's duration occupies more whole negotiation cycles, the idle time at the end of the last cycle represents a decreasing fraction of the total time.</p>
+
+<p>Observe that the most important 'unit' in this plot is the number of negotiation cycles.  Since the saw-toothing scales with the cycle interval, we can express the same plot in units of cycles instead of seconds:</p>
+
+<p><img src="/assets/images/slot_load_study/load_factor_cu.png" width="750"></p>
+
+<p>The results above suggest a couple possible approaches for tuning negotiator cycle cadence to optimize slot loading in an HTCondor pool.  The first is to configure the negotiator interval to be small relative to a typical job duration, as the lower-bound on loading factor increases with the number of cycles a job's duration occupies.  For example, if a typical job duration is 10 minutes, then a cycle cadence of 60 seconds ensures that in general 9 out of 10 cycles will be fully utilized, and so loading will be around 90%.  However, if one has mostly very short jobs, this can be difficult, as negotiation cycle cadences much less than 60 seconds may risk causing performance problems even on a moderately loaded pool.</p>
+
+<p>A second approach is to try and tune the cadence so that as many jobs as possible complete <em>near the end</em> of a cycle, thus minimizing delay until the next cycle.  For example, if job durations are relatively consistent, say close to 90 seconds, then setting the negotiator interval to something like 50 seconds will induce those jobs to finish near the end of the 2nd negotiation cycle (at t+100 seconds), for a loading factor around 90%.  The caveat here is that job durations are frequently <em>not</em> that consistent, and as job duration spread increases, one's ability to play this game <a href="http://erikerlandson.github.com/blog/2013/03/15/examining-the-modulus-of-random-variables/">rapidly evaporates</a>.</p>
+
+<p>In this post, I have focused on the behavior of individual jobs and individual slots.  An obvious next question is what happens to aggregate pool loading when job durations are treated as population sampling from random variables, which I plan to explore in future posts.</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Smooth Gradients for Cubic Hermite Splines]]></title>
@@ -669,43 +719,6 @@ $ ccdump condor_status Name TotalSlotCpus
 slot1@rorschach | 10
 slot1_1@rorschach | 1
 </code></pre>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Rethinking the Semantics of Group Quotas and Slot Weights: Computing Claim Capacity from Consumption Policy]]></title>
-    <link href="http://erikerlandson.github.com/blog/2012/11/26/rethinking-the-semantics-of-group-quotas-and-slot-weights-computing-claim-capacity-from-consumption-policy/"/>
-    <updated>2012-11-26T13:52:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2012/11/26/rethinking-the-semantics-of-group-quotas-and-slot-weights-computing-claim-capacity-from-consumption-policy</id>
-    <content type="html"><![CDATA[<p>In two previous posts, I made a case to motivate the need for a better definition of slot weights and group quotas that could accommodate use cases involving aggregate resources (partitionable slots) with heterogeneous consumption policies and also provide a principled unit analysis for weights and quotas.  These previous posts can be viewed here:</p>
-
-<ul>
-<li><a href="http://erikerlandson.github.com/blog/2012/11/13/rethinking-the-semantics-of-group-quotas-and-slot-weights-for-heterogeneous-and-multidimensional-compute-resources/">Rethinking the Semantics of Group Quotas and Slot Weights for Heterogeneous and Multidimensional Compute Resources</a></li>
-<li><a href="http://erikerlandson.github.com/blog/2012/11/15/rethinking-the-semantics-of-group-quotas-and-slot-weights-claim-capacity-model/">Rethinking the Semantics of Group Quotas and Slot Weights: Claim Capacity Model</a></li>
-</ul>
-
-
-<p>As previously mentioned, a Claim Capacity Model of accounting group quotas and slot weights (or "resource consumption costs") requires a resource claiming model that assigns a well defined finite value for the maximum number of claims that each resource and its consumption policy can support.  It must also be re-evaluatable on a resource as its assets are consumed, so that the cost of a proposed claim (or match, in negotiation-speak) can be defined as W(R) - W(R'), were R' embodies the amounts of all assets remaining after the claim has taken its share.  (Here, I will be using the term 'assets' to refer to quantities such as cpus, memory, disk, swap or any <a href="http://spinningmatt.wordpress.com/2012/11/19/extensible-machine-resources/">extensible resources</a> defined, to clarify the difference between an aggregate resource (i.e. a partitionable slot) versus a single resource dimension such as cpus, memory, etc).</p>
-
-<p>This almost immediately raises the question of how best to define such a resource claiming model.  In this post I will briefly describe a few possible approaches, focusing on models which are easy reason about, easy to configure and additionally allow claim capacity for a resource - W(R) - to be computed automatically for the user, thus making a sane relationship between consumption policies and consumption costs possible to enforce.</p>
-
-<h3>Approach 1: fixed claim consumption model</h3>
-
-<p>The simplest-possible approach is arguably to just directly configure a fixed number, M, of claims attached to a resource.  In this model, each match of a job against a resource consumes one of the M claims.   Here, match cost W(R) - W(R') = 1 in all cases, and is independent of the 'size' of assets consumed from a resource.</p>
-
-<p>A possible use case for such a model is that one might wish to declare that a resource can run up to a certain number of jobs, without assigning any particular cost to consuming individual assets.  If the pool users' workload consists of large numbers of resource-cheap jobs that can effectively share cpu, memory, etc, then such a model might be a good fit.</p>
-
-<h3>Approach 2: configure asset quantization levels</h3>
-
-<p>Another approach that makes the relation between consumption policy and claim capacity easy to think about is to configure a quantization level for each resource asset.  For example, here we might quantize memory into 20 levels, i.e. Q(memory) = 20.  Similarly we might define Q(cpus) = 10 (note that HTCondor does not currently handle fractional cpus on resources, but this kind of model would benefit if floating point asset fractions were supported).  At any time, a resource R has some number q(a) left of the original Q(a).  A job requests an amount r(a) for asset (a).   Here, a claim gets a quantized approximation of any requested asset = V(a)(n(a)/Q(a)), where V(a) is the total original value available for asset (a), and n(a) = ceiling(r(a)Q(a)/V(a)).   Here there are two possible sub-policies.  If we demand that each claim consume >= 1 quantum of every asset (i.e. n(a) >= 1), then the claim capacity W(R) is the minimum of q(a), for (a) over all assets.  However, if a claim is allowed to consume a zero quantity of some individual assets (n(a)=0), then the claim capacity is the <em>maximum</em> of the q(a).   In this case, one must address the corner case of a claim attempting to consume (n(a)=0) over all assets.  The resulting resource R' has q'(a) = q(a)-n(a), and W(R') is the minium (or maximum) over the new q'(a).</p>
-
-<h3>Approach 3: configure minimum asset charges</h3>
-
-<p>A third approach is to configure a <em>minimum</em> amount of each asset that any claim must be charged.   For example, we might define a minimum amount of memory C(memory) to charge any claim.   If a job requests an amount r(a), it will always receive max(r(a), C(a)).  As above, q(a) is the number of quanta currently available for asset (a).  Let v(a) be the amount of (a) currently available.  Here we define q(a) for an asset (a) to be floor(v(a)/C(a)).   If we adhere to a reasonable restriction that C(a) must be strictly > 0 for all (a), we are guaranteed a well defined W(R) = min over the q(a).</p>
-
-<p>It is an open question which of these models (or some other completely different options) should be supported.  Conceivably all of them could be provided as options.</p>
-
-<p>Currently my personal preference leans toward Approach 3.  It is easy to reason about and configure.  It yields a well defined W(R) in all circumstances, with no corner cases, that is straightforward to compute and enforce automatically.  It is easy to configure heterogeneous consumption policies that cost different resource assets in different ways, simply by tuning minimum charge C(a) appropriately for each asset.  This includes claim capacity models where jobs are assumed to use very small amounts of any resource, including fractional shares of cpu assets.</p>
 ]]></content>
   </entry>
   

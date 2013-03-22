@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="One of the advantages of cubic Hermite splines is that their interval interpolation formula is an explicit function of gradients \( m_0, m_1, &#8230 &hellip;">
+  <meta name="description" content="The HTCondor negotiator assigns jobs (resource requests) to slots (compute resources) at regular intervals, configured by the NEGOTIATOR_INTERVAL &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,85 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2013/03/21/the-impact-of-negotiator-cycle-cadence-on-slot-loading/">The Impact of Negotiator Cycle Cadence on Slot Loading</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2013-03-21T15:10:00-07:00" pubdate data-updated="true">Mar 21<span>st</span>, 2013</time>
+        
+         | <a href="/blog/2013/03/21/the-impact-of-negotiator-cycle-cadence-on-slot-loading/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>The <a href="http://research.cs.wisc.edu/htcondor/manual/v7.8/3_1Introduction.html#8555">HTCondor negotiator</a> assigns jobs (resource requests) to slots (compute resources) at regular intervals, configured by the <a href="http://research.cs.wisc.edu/htcondor/manual/v7.8/3_3Configuration.html#20544">NEGOTIATOR_INTERVAL</a> parameter.  This interval (the cycle <em>cadence</em>) has a fundamental impact on a pool <em>loading factor</em> &#8211; the fraction of time that slots are being productively utilized.</p>
+
+<p>Consider the following diagram, which illustrates the utilization of a slot over the lifetime of a job.  When a job completes, its slot will remain empty until it can be assigned a new job on the next negotiation cycle.</p>
+
+<p><img src="/assets/images/slot_load_study/loading_factor_diagram.png" width="750"></p>
+
+<p>As the diagram above shows, the loading factor for a slot can be expressed as D/Z, where D is the duration of the job, and Z is the total time until the next cycle occurring after the job completes.  We can also write Z = D+I, where I is the &#8220;idle time&#8221; from job completion to the start of the next negotiation cycle.   Loading factor is always &lt;= 1, where a value of 1 corresponds to ideal loading &#8211; every slot is utilized 100% of the time.  In general, loading will be &lt; 1, as jobs rarely complete exactly on a cycle boundary.</p>
+
+<p>It is worth briefly noting that the <a href="http://research.cs.wisc.edu/htcondor/manual/v7.8/3_3Configuration.html#18202">claim reuse</a> feature was developed to help address this problem.  However, claim re-use is not compatible with all other features &#8211; for example enabling claim re-use can cause accounting group starvation &#8211; and so what follows remains relevant to many HTCondor configurations.</p>
+
+<p>Given a particular negotiation cycle cadence, how does a slot&#8217;s loading factor behave, as a function of job duration?  The loading factor can be expressed as:</p>
+
+<div markdown="0">
+&#92;[
+&#92;text{Loading Factor} = &#92;frac{D}{C &#92;left( q + &#92;lceil r &#92;rceil &#92;right)} &#92;&#92;
+ &#92;&#92;
+&#92;text{where:} &#92;&#92;
+D = &#92;text{job duration} &#92;&#92;
+C = &#92;text{cycle cadence} &#92;&#92;
+q = &#92;lfloor D / C &#92;rfloor &#92;&#92;
+r = &#92;left( D / C &#92;right) - q &#92;&#92;
+&#92;]
+</div>
+
+
+<p>The following plot illustrates how the loading factor changes with job duration, assuming a cadence of 300 seconds (5 minutes):</p>
+
+<p><img src="/assets/images/slot_load_study/load_factor_300s.png" width="750"></p>
+
+<p>We immediately see that there is a saw-tooth pattern to the plot.  As the job duration increases towards the boundary of a cycle, there is less and less idle time until the next cycle, and so the loading approaches 1.0.  However, once the job&#8217;s end crosses the thresold to <em>just past</em> the start of the cycle, it immediately drops to the worse possible case: the slot will be idle for nearly an entire cycle.</p>
+
+<p>The other important pattern is that the bottom of the saw-tooth gradually increases.  As a job&#8217;s duration occupies more whole negotiation cycles, the idle time at the end of the last cycle represents a decreasing fraction of the total time.</p>
+
+<p>Observe that the most important &#8216;unit&#8217; in this plot is the number of negotiation cycles.  Since the saw-toothing scales with the cycle interval, we can express the same plot in units of cycles instead of seconds:</p>
+
+<p><img src="/assets/images/slot_load_study/load_factor_cu.png" width="750"></p>
+
+<p>The results above suggest a couple possible approaches for tuning negotiator cycle cadence to optimize slot loading in an HTCondor pool.  The first is to configure the negotiator interval to be small relative to a typical job duration, as the lower-bound on loading factor increases with the number of cycles a job&#8217;s duration occupies.  For example, if a typical job duration is 10 minutes, then a cycle cadence of 60 seconds ensures that in general 9 out of 10 cycles will be fully utilized, and so loading will be around 90%.  However, if one has mostly very short jobs, this can be difficult, as negotiation cycle cadences much less than 60 seconds may risk causing performance problems even on a moderately loaded pool.</p>
+
+<p>A second approach is to try and tune the cadence so that as many jobs as possible complete <em>near the end</em> of a cycle, thus minimizing delay until the next cycle.  For example, if job durations are relatively consistent, say close to 90 seconds, then setting the negotiator interval to something like 50 seconds will induce those jobs to finish near the end of the 2nd negotiation cycle (at t+100 seconds), for a loading factor around 90%.  The caveat here is that job durations are frequently <em>not</em> that consistent, and as job duration spread increases, one&#8217;s ability to play this game <a href="http://erikerlandson.github.com/blog/2013/03/15/examining-the-modulus-of-random-variables/">rapidly evaporates</a>.</p>
+
+<p>In this post, I have focused on the behavior of individual jobs and individual slots.  An obvious next question is what happens to aggregate pool loading when job durations are treated as population sampling from random variables, which I plan to explore in future posts.</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1281,196 +1360,6 @@ queue 100
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/10/05/hosting-a-blog-feed-aggregator-with-octopress/">Hosting a Blog Feed Aggregator With Octopress</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-10-05T12:52:00-07:00" pubdate data-updated="true">Oct 5<span>th</span>, 2012</time>
-        
-         | <a href="/blog/2012/10/05/hosting-a-blog-feed-aggregator-with-octopress/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>I have written an Octopress plugin to allow turnkey support for hosting a blog feed aggregator, in Octopress idiomatic style.  I will describe the steps to install it and use it below.  Some of its current features are:</p>
-
-<ul>
-<li>Easy configuration and deployment, providing all feed aggregator parameters as yaml front-matter</li>
-<li>Turn-key generation of feed aggregator pages, in the configured site style</li>
-<li>Optional generation of a &#8216;meta-feed&#8217; in atom.xml format, from aggregated feed entries</li>
-<li>Automatic removal of duplicate feed list urls, and automatic removal of duplicate posts (e.g. if multiple category feeds from the same author are listed)</li>
-<li>Automatic generation of feed author list as an Octopress &#8216;aside&#8217;</li>
-<li>Inclusion/exclusion of posts based on number of posts and/or post age</li>
-<li>Display of full or summary content based on number of posts and/or post age</li>
-</ul>
-
-
-<h3>Install the feed_aggregator.rb plugin</h3>
-
-<p>Currently, you can obtain a copy of &#8220;feed_aggregator.rb&#8221; here:</p>
-
-<p><a href="https://github.com/erikerlandson/octopress/blob/feed_aggregator/plugins/feed_aggregator.rb">feed_aggregator.rb</a></p>
-
-<p>Simply copy this file into the plugins directory for your octopress repo:</p>
-
-<pre><code>$ cp feed_aggregator.rb /path/to/your/octopress/repo/plugins
-</code></pre>
-
-<h3>Install feed aggregator layout files</h3>
-
-<p>You can obtain a copy of the layout files here:</p>
-
-<ul>
-<li><a href="https://github.com/erikerlandson/octopress/blob/feed_aggregator/.themes/classic/source/_layouts/feed_aggregator.html">feed_aggregator.html</a></li>
-<li><a href="https://github.com/erikerlandson/octopress/blob/feed_aggregator/.themes/classic/source/_layouts/feed_aggregator_page.html">feed_aggregator_page.html</a></li>
-<li><a href="https://github.com/erikerlandson/octopress/blob/feed_aggregator/.themes/classic/source/_layouts/feed_aggregator_meta.xml">feed_aggregator_meta.xml</a></li>
-</ul>
-
-
-<p>Copy the layouts files to your &#8216;_layouts&#8217; directory:</p>
-
-<pre><code>$ cp feed_aggregator.html /path/to/your/octopress/repo/source/_layouts
-$ cp feed_aggregator_page.html /path/to/your/octopress/repo/source/_layouts
-$ cp feed_aggregator_meta.xml /path/to/your/octopress/repo/source/_layouts
-</code></pre>
-
-<h3>Add feedzirra dependency to the Octopress Gemfile</h3>
-
-<p>Octopress wants its dependencies bundled, so you will want to add this dependency to /path/to/your/octopress/repo/Gemfile:</p>
-
-<pre><code>gem 'feedzirra', '~&gt; 0.1.3'
-</code></pre>
-
-<p>Then update the bundles:</p>
-
-<pre><code>$ bundle update
-</code></pre>
-
-<h3>Create a page for your feed aggregator</h3>
-
-<p>Here is an example feed aggregator:</p>
-
-<pre><code>---
-# use the 'feed_aggregator' layout to generate a feed aggregator page
-layout: feed_aggregator
-
-# Title to display for the feed
-title: My Blog Feed Aggregator
-
-# maximum number of entries from each feed url to display (defaults to 5)
-# use '0' for 'no limit'
-post_limit: 5
-
-# limit on total posts for feed (defaults to 100)
-# use 0 for 'no limit'
-post_total_limit: 50
-
-# maximum post age to include: &lt;N&gt; { seconds | minutes | hours | days | weeks | months | years }
-# abbreviations and plurals are supported, e.g.  w, week, weeks
-# defaults to '1 year'
-# use '0 &lt;any-unit&gt;' for 'no limit'
-post_age_limit: 6 months
-
-# only render full content for the first &lt;N&gt; posts 
-# (default is 'full content for all posts')
-# use a limit of 0 to use all summaries
-full_post_limit: 10
-
-# use summaries for all posts older than this 
-# (default is 'no maximum age')
-# works like post_age_limit
-full_post_age_limit: 1 month
-
-# generate a 'meta-feed' atom file, with the given name 'atom.xml' (meta feeds are optional)
-# (with no directory, generates in same directory as the feed aggregator page)
-meta_feed: atom.xml
-
-# list all urls to aggregate here
-# You can either specify a single feed url, or explicitly specify 'url', 'author' 
-# and/or 'author_url' params for the feed aggregator to use.
-# feed_aggregator does its best to supply these values automatically otherwise.
-feed_list:
-  - http://blog_site_1.com/atom.xml
-  - http://blog_site_2.com/atom.xml
-  - url: http://www.john_doe.com/feed/feed.rss
-    author: John Doe
-    author_url: http://www.john_doe.com
----
-</code></pre>
-
-<p>As you can see, you only need to supply some yaml front-matter.  Page formatting/rendering is performed automatically from the information in the header.  You must use <code>layout: feed_aggregator</code>, and include the standard <code>title</code> to use for the aggregator title, and the <code>feed_list</code> to supply the individual feeds to aggregate.  Other parameters have default values and behaviors, which are described above.  Various <code>meta_feed</code> path behaviors are described in their own section below.</p>
-
-<p>Once you&#8217;ve created the page, you can publish as usual:</p>
-
-<pre><code>$ rake generate
-$ rake deploy
-</code></pre>
-
-<p>If you want to update your feed automatically, you can set up a cron job:</p>
-
-<pre><code>cd /path/to/octopress/repo
-rake generate
-rake deploy
-</code></pre>
-
-<h3>Screen Shot</h3>
-
-<p>Here is a screen shot of a feed aggregator.  It respects whatever style theme is configured for the site.  The aggregator title is at the top, and a list of contributing authors is automatically generated as an &#8216;aside&#8217;.  Each author name links to the parent blog of the author&#8217;s feed.  In addition to the standard date, the author&#8217;s name is also included.  Post titles link back to the original post url.</p>
-
-<p><img src="/assets/feed_aggregator/screen1.png" alt="Aggregator Screen Shot" /></p>
-
-<h3>Meta feed generation</h3>
-
-<p>You may optionally request that a meta feed, created from the aggregated posts, be generated.  The meta feed is created in atom format.  Following are some examples of specifying meta feed files</p>
-
-<pre><code># Generate a meta feed called 'atom.xml' in the same directory as the feed aggregator page
-# e.g. if the url for the feed aggregator page is  http://blog.site.com/aggregator/index.html, 
-# then the path to the meta-feed will be: http://blog.site.com/aggregator/atom.xml
-meta_feed: atom.xml
-
-# Generate a meta feed called 'wilma.xml' in subdirectory 'flintstones' of the website.
-# the url for this file will be:   http://blog.site.com/flintstones/wilma.xml
-meta_feed: /flintstones/wilma.xml
-
-# url for this will be http://blog.site.com/metafeed.xml
-meta_feed: /metafeed.xml
-
-# Supplying no file name is equivalent to 'meta_feed: atom.xml'
-meta_feed:
-</code></pre>
-
-<h3>To Do</h3>
-
-<ul>
-<li>It might be nice to support the display of an avatar/icon for authors</li>
-</ul>
-
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/2/">&larr; Older</a>
@@ -1490,6 +1379,10 @@ meta_feed:
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2013/03/21/the-impact-of-negotiator-cycle-cadence-on-slot-loading/">The Impact of Negotiator Cycle Cadence on Slot Loading</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2013/03/16/smooth-gradients-for-cubic-hermite-splines/">Smooth Gradients for Cubic Hermite Splines</a>
       </li>
     
@@ -1503,10 +1396,6 @@ meta_feed:
     
       <li class="post">
         <a href="/blog/2012/12/03/a-demonstration-of-negotiator-side-resource-consumption/">A Demonstration of Negotiator-Side Resource Consumption</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2012/11/26/rethinking-the-semantics-of-group-quotas-and-slot-weights-computing-claim-capacity-from-consumption-policy/">Rethinking the Semantics of Group Quotas and Slot Weights: Computing Claim Capacity from Consumption Policy</a>
       </li>
     
   </ul>

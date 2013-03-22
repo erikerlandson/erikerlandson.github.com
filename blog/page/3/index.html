@@ -9,8 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="In which I join the 21st century, kicking and screaming.
-">
+  <meta name="description" content="I was recently profiling the Condor collector, and was a bit stunned to discover that the standard C library function mktime() was burning 60% of the &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -75,6 +74,131 @@
       
   <header>
     
+      <h1 class="entry-title"><a href="/blog/2012/03/19/interaction-between-mktime-and-tm-isdst-a-compute-cycle-landmine/">Interaction between mktime() and tm_isdst - a compute cycle landmine</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-03-19T13:18:00-07:00" pubdate data-updated="true">Mar 19<span>th</span>, 2012</time>
+        
+         | <a href="/blog/2012/03/19/interaction-between-mktime-and-tm-isdst-a-compute-cycle-landmine/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>I was recently profiling the <a href="http://research.cs.wisc.edu/condor/">Condor</a> collector, and was a bit stunned to discover that the standard C library function <a href="http://www.cplusplus.com/reference/clibrary/ctime/mktime/">mktime</a>() was burning <em>60% of the collector&#8217;s cycles</em>.</p>
+
+<p><a href="http://spinningmatt.wordpress.com/">Matt</a> helpfully attempted to reproduce, but his profile showed <code>mktime()</code> using almost none of the cycles, which is exactly the sane result one would expect.</p>
+
+<p>In the code, I noticed that <code>tm_isdst</code> was set to 1, in other words &#8220;assert that DST is in effect.&#8221;  This made my eye twitch, because I live in Arizona, where we boldy do not observe DST.  I created a little test rig to help confirm my suspicion that time zone might have something to do with it:</p>
+
+<pre><code>#include &lt;stdlib.h&gt;
+#include &lt;time.h&gt;
+#include &lt;iostream&gt;
+
+using std::cout;
+
+time_t mktA(struct tm* tmp) {
+    tmp-&gt;tm_isdst = -1;
+    return mktime(tmp);
+}
+
+time_t mktB(struct tm* tmp) {
+    tmp-&gt;tm_isdst = 0;
+    return mktime(tmp);
+}
+
+time_t mktC(struct tm* tmp) {
+    tmp-&gt;tm_isdst = 1;
+    return mktime(tmp);
+}
+
+int main(int argc, char** argv) {
+    struct tm stm;
+    stm.tm_year = 2012 - 1900;
+    stm.tm_mon = 3-1;
+    stm.tm_mday = 17-1;
+    stm.tm_hour = 0;
+    stm.tm_min = 0;
+    stm.tm_sec = 0;
+
+    // this gets altered for each testing function:
+    stm.tm_isdst = 0;
+
+    cout &lt;&lt; mktA(&amp;stm) &lt;&lt; "\n";
+    cout &lt;&lt; mktB(&amp;stm) &lt;&lt; "\n";
+    cout &lt;&lt; mktC(&amp;stm) &lt;&lt; "\n";
+
+    return 0;
+}
+</code></pre>
+
+<p>Then I built the test rig, which I expertly named <code>test_mktime</code>, and profiled it using valgrind/callgrind:</p>
+
+<pre><code># build the test rig
+$ make test_mktime
+g++     test_mktime.cpp   -o test_mktime
+
+# profile using valgrind/callgrind:
+$ valgrind --tool=callgrind ./test_mktime
+==2671== Callgrind, a call-graph generating cache profiler
+==2671== Copyright (C) 2002-2009, and GNU GPL'd, by Josef Weidendorfer et al.
+==2671== Using Valgrind-3.5.0 and LibVEX; rerun with -h for copyright info
+==2671== Command: ./test_mktime
+==2671== 
+==2671== For interactive control, run 'callgrind_control -h'.
+1331881200
+1331881200
+1331881200
+==2671== 
+==2671== Events    : Ir
+==2671== Collected : 4125723
+==2671== 
+==2671== I   refs:      4,125,723
+
+# massage the raw output into something (more or less) human readable:
+$ callgrind_annotate --inclusive=yes --tree=calling callgrind.out.2671 &gt; mktprof.txt
+</code></pre>
+
+<p>Examining the massaged output in <code>mktprof.txt</code>, I observed that calling <code>mktime()</code> with <code>tm_isdst = {-1|0}</code> (<code>mktA()</code> and <code>mktB()</code>) takes the small amount of time one would expect, calling with <code>tm_isdst = 1</code> (<code>mktC()</code>) uses a completely insane number of cycles, and clearly nearly all of the cycles burned by the test rig:</p>
+
+<pre><code>2,749,933  *  ???:main [/home/eje/mktime/test_mktime]
+2,655,457  &gt;   ???:mktC(tm*) (1x) [/home/eje/mktime/test_mktime]
+    4,428  &gt;   ???:std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp; std::operator&lt;&lt; &lt;std::char_traits&lt;char&gt; &gt;(std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp;, char const*) (3x) [/usr/lib64/libstdc++.so.6.0.13]
+   11,260  &gt;   ???:std::ostream::operator&lt;&lt;(long) (3x) [/usr/lib64/libstdc++.so.6.0.13]
+    4,064  &gt;   ???:mktB(tm*) (1x) [/home/eje/mktime/test_mktime]
+    3,989  &gt;   ???:_dl_runtime_resolve (2x) [/lib64/ld-2.11.2.so]
+   74,212  &gt;   ???:mktA(tm*) (1x) [/home/eje/mktime/test_mktime]
+</code></pre>
+
+<p>Again, Matt verified that he could reproduce the weird behavior if he set <em>his</em> timezone to &#8220;Arizona&#8221;.</p>
+
+<p>The bottom line appears to be that invoking <code>mktime()</code> with <code>tm_isdst = 1</code>, in a time zone that does not observe DST, can set off a nuclear cycle-stealing land mine of inefficiency and horror.</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
       <h1 class="entry-title"><a href="/blog/2012/03/19/dont-try-to-stop-me/">Don&#8217;t try to stop me. I&#8217;m on a rampage.</a></h1>
     
     
@@ -127,6 +251,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2013/03/21/the-impact-of-negotiator-cycle-cadence-on-slot-loading/">The Impact of Negotiator Cycle Cadence on Slot Loading</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2013/03/16/smooth-gradients-for-cubic-hermite-splines/">Smooth Gradients for Cubic Hermite Splines</a>
       </li>
     
@@ -140,10 +268,6 @@
     
       <li class="post">
         <a href="/blog/2012/12/03/a-demonstration-of-negotiator-side-resource-consumption/">A Demonstration of Negotiator-Side Resource Consumption</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2012/11/26/rethinking-the-semantics-of-group-quotas-and-slot-weights-computing-claim-capacity-from-consumption-policy/">Rethinking the Semantics of Group Quotas and Slot Weights: Computing Claim Capacity from Consumption Policy</a>
       </li>
     
   </ul>
