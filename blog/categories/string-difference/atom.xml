@@ -4,7 +4,7 @@
   <title><![CDATA[Category: string difference | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/string-difference/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2014-02-21T21:16:25-07:00</updated>
+  <updated>2014-02-22T13:53:49-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -138,14 +138,14 @@ for (ku = -P, kd = P+delta;  ku &lt;= delta;  ku += 1) {
 
 <p>There is method to this madness.  Observe that for any particular P value, the smallest edit distances are at the outside, and get larger as one moves inward.  The minimum distance 2P+delta is always when k == -P, and k == P+delta.  As we proceed inward, the corresponding edit distance increases towards its maximum of 4P+delta.   This allows <em>two</em> optimizations.  The first is that if we hit an overlapping path, we can now exit the loop immediately, as we know that any other such overlapping paths to our inside will have a larger edit distance, and so do not need to be considered.</p>
 
-<p>The second optimization is to recall that path distances are a function of P, k and delta.  We can use this information to solve for k and obtain a useful adaptive bound on how far we loop.  From previous sections, also recall we are keeping a best-known distance Dbest.  We know that we do not have to explore any paths whose distance is >= Dbest.  So, we can set up the following inequality: 2(vf+vr)+delta &lt; Dbest, where vf = P, and vr = P + k, where k &lt; 0, which is the region where distance is growing.  Therefore, we have 2(P + P + k)+delta &lt; Dbest.  Solving for k, we have:  k &lt;= ((Dbest-delta)/2)-2P.  For the reverse-path looping, we can set up a similar inequality:  2(P + P + delta - k) + delta &lt; Dbest, which yields:  k >= ((delta-Dbest)/2)+delta+2P.</p>
+<p>The second optimization is to recall that path distances are a function of P, k and delta.  We can use this information to solve for k and obtain a useful adaptive bound on how far we loop.  From previous sections, also recall we are keeping a best-known distance Dbest.  We know that we do not have to explore any paths whose distance is >= Dbest.  So, we can set up the following inequality: 2(vf+vr)+delta &lt; Dbest, where vf = P, and vr = (P-1)+k, where k &lt; 0, which is the region where distance is growing.  Therefore, we have 2(P+(P-1)+k)+delta &lt; Dbest.  Solving for k, we have:  k &lt; ((Dbest-delta)/2)-2P+1.  The looping wants to use '&lt;=', so we can rewrite as: k &lt;= ((Dbest-delta-1)/2)-2P+1.  For the reverse-path looping, we can set up a similar inequality:  2(P+P+delta-k)+delta &lt; Dbest, which yields:  k >= ((1+delta-Dbest)/2)+delta+2P.</p>
 
 <p>Note that if these bound expressions evaluate to a value past the nominal bound, then the nominal bound remains in effect: e.g. the operative forward looping bound = min(delta, ((Dbest-delta)/2)-2P).   Also note that these constraints do not break the computation of the endpoints, because when the bounds move, they always retreat toward the outside by 2 on each iteration of P.  Since computation proceeds outside in, that means the necessary values are always correctly populated from the previous iteration.</p>
 
 <p>In the code, the forward path looping looks like this:</p>
 
 <pre><code>// compute our adaptive loop bound (using P-1 for reverse)
-bound = min(delta, ((Dbest-delta)/2)-(2*(P-1)));
+bound = min(delta, ((Dbest-delta-1)/2)-(2*P)+1);
 
 // constrain our search by bound:
 for (ku = -P, kd = P+delta;  ku &lt;= bound;  ku += 1) {
@@ -198,7 +198,7 @@ while (true) {
     if (Dmin &gt;= Dbest) return Dbest;
 
     // adaptive bound for the forward looping
-    bound = min(delta, ((Dbest-delta)/2)-(2*(P-1)));
+    bound = min(delta, ((Dbest-delta-1)/2)-(2*P)+1);
 
     // advance forward diagonals
     for (ku = -P, kd = P+delta;  ku &lt;= bound;  ku += 1) {
@@ -247,7 +247,7 @@ while (true) {
     }
 
     // adaptive bound for the reverse looping
-    bound = max(diff_type(0), ((delta-Dbest)/2)+delta+(2*P));
+    bound = max(0, ((1+delta-Dbest)/2)+delta+(2*P));
 
     // advance reverse-path diagonals:
     for (kd=P+delta, ku=-P;  kd &gt;= bound;  kd -= 1) {
