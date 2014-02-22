@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2013-03-21T17:19:45-07:00</updated>
+  <updated>2014-02-21T21:16:25-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,297 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[A Bi-directional Variation of the O(NP) Edit Distance Algorithm]]></title>
+    <link href="http://erikerlandson.github.com/blog/2014/02/20/a-bi-directional-variation-of-the-o-np-edit-distance-algorithm/"/>
+    <updated>2014-02-20T19:51:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2014/02/20/a-bi-directional-variation-of-the-o-np-edit-distance-algorithm</id>
+    <content type="html"><![CDATA[<p>The O(ND) edit distance algorithm <a href="#ref1">[1]</a> is a standard for efficient computation of the edit distance between two sequences, appearing in applications such as the GNU diff tool.  There is also a variation <a href="#ref2">[2]</a> that operates in O(NP) time, where P is the number of deletions in the shortest edit path, and which has lower computational complexity, since P &lt;= D (and may be &lt;&lt; D in some circumstances).  In order to apply these algorithms to obtain an <em>edit script</em> in linear space, they must be adapted into a bidirectional form that enables recursive divide-and-conquer.   The basic principles of a bidirectional adaptation of the O(ND) algorithm are described in <a href="#ref1">[1]</a>.   However, no such discussion of a bidirectional O(NP) algorithm is provided in <a href="#ref2">[2]</a>.  Understanding this adaptation involves some observations that aren't immediately obvious.  In this post, I will describe these key observations.</p>
+
+<h3>Notation</h3>
+
+<p>My code segments are written as C/C++, however written in a simplified style I hope will be clear regardless of what languages the reader is familiar with.  If you wish to port this (pseudo-ish)code, it may be worth keeping in mind that indexing is zero-based in C/C++.</p>
+
+<h3>Sequence Lengths</h3>
+
+<p>A brief note on the O(NP) algorithm and sequence lengths: the algorithm assumes that the length of its second sequence argument is >= its first (that is, N >= M).   In the following discussions, I will be making the same assumption, however the modification to address N &lt; M is relatively easy, and can be seen in the references to actual source code below.</p>
+
+<h3>Indexing</h3>
+
+<p>A note on naming:  In <a href="#ref2">[2]</a>, the authors use 'fp' for the name of the array holding path endpoints.  I will use 'Vf' for the array holding forward endpoints, and 'Vr' for the corresponding array holding reverse endpoints.</p>
+
+<p>The O(ND) and O(NP) algorithms operate by iteratively extending the frontier of edit paths through the implicit graph of possible paths, where each iteration is computed as a function of the previous.  In the O(NP) algorithm, this computation has to proceed from the outside in, as described in the paper:</p>
+
+<pre><code>for (k = -P;  k &lt; delta;  k += 1) {
+    y = max(Vf[k-1] + 1, Vf[k+1]);
+    Vf[k] = snake(y-k, y);
+}
+for (k = P + delta;  k &gt;= delta;  k -= 1) {
+    y = max(Vf[k-1] + 1, Vf[k+1]);
+    Vf[k] = snake(y-k, y);
+}
+</code></pre>
+
+<p>In order to implement a bi-directional algorithm, we must also run the algorithm in reverse, beginning at the "lower right corner" of the graph (M,N) and working backward to the origin (0,0).  The indexing is the mirror image of the above:</p>
+
+<pre><code>for (k = P+delta;  k &gt; 0;  k -= 1) {
+    y = min(Vr[k-1], Vr[k+1] - 1);
+    Vr[k] = rsnake(y-k, y);
+}
+for (k = -P;  k &lt;= 0;  k += 1) {
+    y = min(Vr[k-1], Vr[k+1] - 1);
+    Vr[k] = rsnake(y-k, y);
+}
+</code></pre>
+
+<p>In the above, 'rsnake' is the reverse-direction snake function.  A note on initialization:  whereas the forward algorithm initializes its Vf array to (-1), the symmetric initial value for the reverse algorithm Vr array is (N+1) (In the general case, 1 plus the length of the longest sequence).</p>
+
+<h3>Detecting Path Overlap</h3>
+
+<p>The uni-directional O(NP) algorithm halts when Vf[delta] == N.  However, the bi-directional algorithms halt when shortest opposing paths meet -- or overlap -- each other, as described in the O(ND) paper <a href="#ref1">[1]</a>.  The semantics of storing paths in working arrays is the same in both algorithms, with the exception that in the O(NP) algorithm it is the (y) values that are stored.  Myers describes the predicate for detecting meeting paths in O(ND) as: (x >= u)  &amp;&amp;  (x-y == u-v), where (x,y) are forward endpoints and (u,v) are reverse endpoints.  Observe that since y = x-k, then (x-y == u-v) is equivalent to "forward-k == reverse-k".  However, in operation one always checks the opposing path with the <em>same</em> k index, and so this clause is redundant.  It is sufficient to check that (x >= u), or in the case of O(NP), that (y >= v).  In the code, this looks something like:</p>
+
+<pre><code>y = max(Vf[k-1] + 1, Vf[k+1]);
+if (y &gt;= Vr[k]) {
+    // overlapping paths detected 
+}
+</code></pre>
+
+<p>The other checks for forward and reverse are similar.  Note that these checks happen at the <em>beginning</em> of each 'snake', that is prior to invoking the snake extension logic.  The semantic is that the opposing path overlaps the run (snake) one is about to start.</p>
+
+<h3>Computing Distance</h3>
+
+<p>When two overlapping paths are detected, we must compute the path distance associated with their union.  In the O(ND) algorithm, we know that distance implicitly, as the paths are extended over successive iterations of D.  In the O(NP) algorithm, however, the current path endpoints are associated with a particular value of P, and so we must consider how to obtain the actual distance.</p>
+
+<p>A little algebra comes to the rescue.  At iteration P, consider the number of deletions along the forward-path at the kth endpoint, which I will denote as 'vf' (the authors refer to it as V(x,y)).  In <a href="#ref2">[2]</a>, the authors show that P == vf when k &lt; delta, and P == vf+k-delta, when k > delta (note that either formula applies for k == delta).  Solving for vf, we have:   vf == P for k &lt; delta and vf == P+delta-k for k > delta.  The authors also show that: vf = (df-k)/2, where df is the total edit distance along the path up to the current endpoint (the authors refer to df as D(x,y)).   Therefore, we have: df = 2(vf)+k, where we can obtain vf from the expression we just derived.</p>
+
+<p>It remains to derive the expressions for the reverse direction, where we want 'vr' and 'dr'.  Here, I note that the mirror-image indexing of the reverse algorithm implies that the expressions above work if we transform k --> delta-k.  Making that transform gives us:   vr == P for k > 0 and vr == P+k for k &lt; 0 (again, either applies for k == 0).  And dr = 2(vr)+delta-k.</p>
+
+<p>And so the actual edit distance covered by our overlapping paths is:  d == (df+dr) == 2(vf+vr)+delta.  Note now pleasing this is, as vf+vr is the number of deletions of the combined paths, and so this corresponds to the original formula D == 2P+delta, where P is the number of deletions over the entire pathway.  We also see from the above that at a given Pth iteration, P does <em>not</em> equal the number of deletions in all paths with endpoints at the current iteration.  The true number of deletions for a given endpoint is a function of P, k and delta.</p>
+
+<p>A note on implementation: when one is advancing forward paths, an overlapping reverse-path will be from previous iteration (P-1), as the reverse paths for (P) have not happened yet.  That will show up in the distance formula for (vr) by using (P-1) in place of P, as in this example code:</p>
+
+<pre><code>y = max(Vf[k-1] + 1, Vf[k+1]);
+if (y &gt;= Vr[k]) {
+    // we found overlapping path, so compute corresponding edit distance
+    vf = (k&gt;delta) ? (P + delta - k) : P;
+    // use (P-1) for reverse paths:
+    vr = (k&lt;0) ? (P-1 + k) : P-1;
+    d = 2*(vf+vr)+delta;
+}
+
+// ....
+
+y = min(Vr[k-1], Vr[k+1] - 1);
+if (y &lt;= Vf[k]) {
+    // we can use P for both since forward-paths have been advanced:
+    vf = (k&gt;delta) ? (P + delta - k) : P;
+    vr = (k&lt;0) ? (P + k) : P;
+    d = 2*(vf+vr)+delta;
+}
+</code></pre>
+
+<h3>Shortest Path</h3>
+
+<p>With respect to halting conditions, the O(NP) algorithm differs in one imporant way from the O(ND) algorithm: The O(ND) algorithm maintains path endpoints corresponding to increasing <em>distance</em> (D) values.  Therefore, when two paths meet, they form a shortest-distance path by definition, and the algorithm can halt on the first such overlap it detects.</p>
+
+<p>The same is <em>not true</em> for the O(NP) algorithm.  It stores endpoints at a particular P value.  However, at a given value of P, actual <em>distances</em> may vary considerably.  On a given iteration over P, actual path distances may vary from 2(P-1)+delta up to 4P+delta.</p>
+
+<p>This problem is dealt with by maintaining a best-known distance, 'Dbest', which is initialized to its maximum possible value of N+M, the sum of both sequence lengths.  Whenever two overlapping paths are detected, their corresponding distance 'd' is computed as described earlier, and the running minimum is maintainted:  Dbest = min(Dbest,d).  As mentioned above, we know that the mimimum possible distance at a given iteration is Dmin = 2(P-1)+delta, and so when Dmin >= Dbest, we halt and return Dbest as our result.</p>
+
+<h3>Loop Bounding</h3>
+
+<p>Some important computational efficiency can be obtained by reorganizing the looping over the endpoints.   As mentioned above, conceptually the looping proceeds from the outside, inward.  Suppose we organize the looping over k values such that we explore k = {-P, P+delta, -P+1, P+delta-1, -P+2, P+delta-2 ... }  Note that the symmetry breaks a bit when we get to k==delta, as here we stop iterating backward, but continue iterating forward until we hit delta from below.  In the code, this looping pattern looks something like:</p>
+
+<pre><code>// advance forward paths: reverse path looping is similar
+for (ku = -P, kd = P+delta;  ku &lt;= delta;  ku += 1) {
+    // advance diagonals from -P, upwards:
+    y = max(1+Vf[ku-1], Vf[ku+1]);
+
+    // check for overlapping path
+
+    Vf[ku] = snake(y-ku, y);
+
+    // stop searching backward past here:
+    if (kd &lt;= delta) continue;
+
+    // advance diagonals from P+delta, downwards:
+    y = max(1+Vf[kd-1], Vf[kd+1]);
+
+    // check for overlapping path
+
+    Vf[kd] = snake(y-kd, y);
+    kd -= 1;
+}
+</code></pre>
+
+<p>There is method to this madness.  Observe that for any particular P value, the smallest edit distances are at the outside, and get larger as one moves inward.  The minimum distance 2P+delta is always when k == -P, and k == P+delta.  As we proceed inward, the corresponding edit distance increases towards its maximum of 4P+delta.   This allows <em>two</em> optimizations.  The first is that if we hit an overlapping path, we can now exit the loop immediately, as we know that any other such overlapping paths to our inside will have a larger edit distance, and so do not need to be considered.</p>
+
+<p>The second optimization is to recall that path distances are a function of P, k and delta.  We can use this information to solve for k and obtain a useful adaptive bound on how far we loop.  From previous sections, also recall we are keeping a best-known distance Dbest.  We know that we do not have to explore any paths whose distance is >= Dbest.  So, we can set up the following inequality: 2(vf+vr)+delta &lt; Dbest, where vf = P, and vr = P + k, where k &lt; 0, which is the region where distance is growing.  Therefore, we have 2(P + P + k)+delta &lt; Dbest.  Solving for k, we have:  k &lt;= ((Dbest-delta)/2)-2P.  For the reverse-path looping, we can set up a similar inequality:  2(P + P + delta - k) + delta &lt; Dbest, which yields:  k >= ((delta-Dbest)/2)+delta+2P.</p>
+
+<p>Note that if these bound expressions evaluate to a value past the nominal bound, then the nominal bound remains in effect: e.g. the operative forward looping bound = min(delta, ((Dbest-delta)/2)-2P).   Also note that these constraints do not break the computation of the endpoints, because when the bounds move, they always retreat toward the outside by 2 on each iteration of P.  Since computation proceeds outside in, that means the necessary values are always correctly populated from the previous iteration.</p>
+
+<p>In the code, the forward path looping looks like this:</p>
+
+<pre><code>// compute our adaptive loop bound (using P-1 for reverse)
+bound = min(delta, ((Dbest-delta)/2)-(2*(P-1)));
+
+// constrain our search by bound:
+for (ku = -P, kd = P+delta;  ku &lt;= bound;  ku += 1) {
+    y = max(1+Vf[ku-1], Vf[ku+1]);
+    if (y &gt;= Vr[k]) {
+        vf = (k&gt;delta) ? (P + delta - k) : P;
+        vr = (k&lt;0) ? (P-1 + k) : P-1;
+
+        // maintain minimum distance:
+        Dbest = min(Dbest, 2*(vf+vr)+delta);
+
+        // we can now halt this loop immediately:
+        break;
+    }
+
+    Vf[ku] = snake(y-ku, y);
+
+    if (kd &lt;= delta) continue;
+
+    y = max(1+Vf[kd-1], Vf[kd+1]);
+    if (y &gt;= Vr[k]) {
+        vf = (k&gt;delta) ? (P + delta - k) : P;
+        vr = (k&lt;0) ? (P-1 + k) : P-1;
+
+        // maintain minimum distance:
+        Dbest = min(Dbest, 2*(vf+vr)+delta);
+
+        // we can now halt this loop immediately:
+        break;
+    }
+
+    Vf[kd] = snake(y-kd, y);
+    kd -= 1;
+}
+</code></pre>
+
+<h3>Implementation</h3>
+
+<p>In conclusion, I will display a code segment with all of the ideas presented above, coming together.  This segment was taken from my <a href="https://github.com/erikerlandson/algorithm/blob/order_np_alg/include/boost/algorithm/sequence/detail/edit_distance.hpp#L342">working prototype code</a>, with some syntactic clutter removed and variable names changed to conform a bit more closely to <a href="#ref2">[2]</a>.  The implementation of O(NP) below is performing about 25% faster than the corresponding O(ND) algorithm in my benchmarking tests, and also uses substantially less memory.</p>
+
+<pre><code>// initialize this with the maximum possible distance:
+Dbest = M+N;
+
+P = 0;
+while (true) {
+    // the minimum possible distance for the current P value
+    Dmin = 2*(P-1) + delta;
+
+    // if the minimum possible distance is &gt;= our best-known distance, we can halt
+    if (Dmin &gt;= Dbest) return Dbest;
+
+    // adaptive bound for the forward looping
+    bound = min(delta, ((Dbest-delta)/2)-(2*(P-1)));
+
+    // advance forward diagonals
+    for (ku = -P, kd = P+delta;  ku &lt;= bound;  ku += 1) {
+        y = max(1+Vf[ku-1], Vf[ku+1]);
+        x = y-ku;
+
+        // path overlap detected
+        if (y &gt;= Vr[ku]) {
+            vf = (ku&gt;delta) ? (P + delta - ku) : P;
+            vr = (ku&lt;0) ? (P-1 + ku) : P-1;
+            Dbest = min(Dbest, 2*(vf+vr)+delta);
+            break;
+        }
+
+        // extend forward snake
+        if (N &gt;= M) {
+            while (x &lt; M  &amp;&amp;  y &lt; N  &amp;&amp;  equal(S1[x], S2[y])) { x += 1;  y += 1; }
+        } else {
+            while (x &lt; N  &amp;&amp;  y &lt; M  &amp;&amp;  equal(S1[y], S2[x])) { x += 1;  y += 1; }
+        }
+
+        Vf[ku] = y;
+
+        if (kd &lt;= delta) continue;
+
+        y = max(1+Vf[kd-1], Vf[kd+1]);
+        x = y-kd;
+
+        // path overlap detected
+        if (y &gt;= Vr[kd]) {
+            vf = (kd&gt;delta) ? (P + delta - kd) : P;
+            vr = (kd&lt;0) ? (P-1 + kd) : P-1;
+            Dbest = min(Dbest, 2*(vf+vr)+delta);
+            break;
+        }
+
+        // extend forward snake
+        if (N &gt;= M) {
+            while (x &lt; M  &amp;&amp;  y &lt; N  &amp;&amp;  equal(S1[x], S2[y])) { x += 1;  y += 1; }
+        } else {
+            while (x &lt; N  &amp;&amp;  y &lt; M  &amp;&amp;  equal(S1[y], S2[x])) { x += 1;  y += 1; }
+        }
+
+        Vf[kd] = y;
+        kd -= 1;
+    }
+
+    // adaptive bound for the reverse looping
+    bound = max(diff_type(0), ((delta-Dbest)/2)+delta+(2*P));
+
+    // advance reverse-path diagonals:
+    for (kd=P+delta, ku=-P;  kd &gt;= bound;  kd -= 1) {
+        y = min(Vr[kd-1], Vr[kd+1]-1);
+        x = y-kd;
+
+        // path overlap detected
+        if (y &lt;= Vf[kd]) {
+            vf = (kd&gt;delta) ? (P + delta - kd) : P;
+            vr = (kd&lt;0) ? (P + kd) : P;
+            Dbest = min(Dbest, 2*(vf+vr)+delta);
+            break;
+        }
+
+        // extend reverse snake
+        if (N &gt;= M) {
+            while (x &gt; 0  &amp;&amp;  y &gt; 0  &amp;&amp;  equal(S1[x-1], S2[y-1])) { x -= 1;  y -= 1; }
+        } else {
+            while (x &gt; 0  &amp;&amp;  y &gt; 0  &amp;&amp;  equal(S1[y-1], S2[x-1])) { x -= 1;  y -= 1; }
+        }
+
+        Vr[kd] = y;
+
+        if (ku &gt;= 0) continue;
+
+        y = min(Vr[ku-1], Vr[ku+1]-1);
+        x = y-ku;
+
+        // path overlap detected
+        if (y &lt;= Vf[ku]) {
+            vf = (ku&gt;delta) ? (P + delta - ku) : P;
+            vr = (ku&lt;0) ? (P + ku) : P;
+            Dbest = min(Dbest, 2*(vf+vr)+delta);
+            break;
+        }
+
+        // extend reverse snake
+        if (N &gt;= M) {
+            while (x &gt; 0  &amp;&amp;  y &gt; 0  &amp;&amp;  equal(S1[x-1], S2[y-1])) { x -= 1;  y -= 1; }
+        } else {
+            while (x &gt; 0  &amp;&amp;  y &gt; 0  &amp;&amp;  equal(S1[y-1], S2[x-1])) { x -= 1;  y -= 1; }
+        }
+
+        Vr[ku] = y;
+        ku += 1;
+    }
+}
+</code></pre>
+
+<h3>References</h3>
+
+<p><a name="anchor1" id="ref1">[1] </a><a href="http://www.xmailserver.org/diff2.pdf">An O(ND) Difference Algorithm and its Variations</a>, Eugene W. Myers<br>
+<a name="anchor2" id="ref2">[2] </a><a href="http://www.itu.dk/stud/speciale/bepjea/xwebtex/litt/an-onp-sequence-comparison-algorithm.pdf">An O(NP) Sequence Comparison Algorithm</a>, Sun Wu, Udi Manber, Gene Myers</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[The Impact of Negotiator Cycle Cadence on Slot Loading]]></title>
@@ -545,180 +836,6 @@ m_{n-1}
 <p><img src="/assets/images/rv_modulus_mean.png" title="An example demonstrating that E[X mod m] != E[X] mod m" alt="Random Variable Images" /></p>
 
 <p>As we see from the example above, the random variables X and Y have the same mean:  E[X] = E[Y] = 0.75, however E[X mod 1] = 0.75 while E[Y mod 1] = 0.5.  One implication is that computing the moments of the modulus of random variables must be on a per-distribution basis, perhaps via monte carlo methods.</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[A Demonstration of Negotiator-Side Resource Consumption]]></title>
-    <link href="http://erikerlandson.github.com/blog/2012/12/03/a-demonstration-of-negotiator-side-resource-consumption/"/>
-    <updated>2012-12-03T08:25:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2012/12/03/a-demonstration-of-negotiator-side-resource-consumption</id>
-    <content type="html"><![CDATA[<p>HTCondor supports a notion of aggregate compute resources known as partitionable slots (p-slots), which may be consumed by multiple jobs.   Historically, at most one job could be matched against such a slot in a single negotiation cycle, which limited the rate at which partitionable slot resources could be utilized.  More recently, the scheduler has been enhanced with logic to allow it to acquire multiple claims against a partitionable slot, which increases the p-slot utilization rate. However, as this potentially bypasses the negotiator's accounting of global pool resources such as accounting group quotas and concurrency limits, it places some contraints on what jobs can can safely acquire multiple claims against any particular p-slot: for example, only other jobs on the same scheduler can be considered.  Additionally, candidate job requirements must match the requirements of the job that originally matched in the negotiator.  Another significant impact is that the negotiator is still forced to match an entire p-slot, which may have a large match cost (weight): these large match costs cause <a href="https://htcondor-wiki.cs.wisc.edu/index.cgi/tktview?tn=3013">accounting difficulties</a> when submitter shares and/or group quotas drop below the cost of a slot.  This particular problem is growing steadily larger, as machines with ever-larger numbers of cores and other resources appear in HTCondor pools.</p>
-
-<p>An alternative approach to scheduler-side resource consumption is to enhance the negotiator with the ability to match multiple jobs against a resource (p-slot) -- negotiator-side resource consumption.   The advantages of negotiator-side consumption are that it places fewer limitations on what jobs can consume a given resource.  The negotiator already handles global resource accounting, and so jobs are not required to adhere to the same requirements expression to safely consume assets from the same resource.  Furthermore, jobs from any scheduler may be considered.  Each match is only charged the cost of resources consumed, and so p-slots with large amounts of resources do not cause difficulties with large match costs.   Another considerable benefit of this approach is that it facilitates the support of <a href="http://spinningmatt.wordpress.com/2012/11/13/no-longer-thinking-in-slots-thinking-in-aggregate-resources-and-consumption-policies/">configurable resource consumption policies</a></p>
-
-<p>I have developed a working draft of negotiator-side resource consumption on my HTCondor github fork, topic branch <a href="https://github.com/erikerlandson/htcondor/tree/V7_9-prototype-negside-pslot-splits">V7_9-prototype-negside-pslot-splits</a> which also implements support for configurable resource consumption policies.   I will briefly demonstrate this implementation and some of its advantages below.</p>
-
-<p>First I will demonstrate an example with a consumption policy that is essentially equivalent to HTCondor's current default policies.  Consider this configuration:</p>
-
-<pre><code># spoof some cores
-NUM_CPUS = 10
-
-# configure an aggregate resource (p-slot) to consume
-SLOT_TYPE_1 = 100%
-SLOT_TYPE_1_PARTITIONABLE = True
-# declare multiple claims for negotiator to use
-# may also use global: NUM_CLAIMS
-SLOT_TYPE_1_NUM_CLAIMS = 20
-NUM_SLOTS_TYPE_1 = 1
-
-# turn off schedd-side resource splitting since we're demonstrating neg-side alternative
-CLAIM_PARTITIONABLE_LEFTOVERS = False
-
-# turn this off to demonstrate that consumption policy will handle this kind of logic
-MUST_MODIFY_REQUEST_EXPRS = False
-
-# configure a consumption policy.   This policy is modeled on
-# current 'modify-request-exprs' defaults:
-# "my" is resource ad, "target" is job ad
-STARTD_EXPRS = ConsumptionCpus, ConsumptionMemory, ConsumptionDisk
-ConsumptionCpus = quantize(target.RequestCpus, {1})
-ConsumptionMemory = quantize(target.RequestMemory, {128})
-ConsumptionDisk = quantize(target.RequestDisk, {1024})
-# swap doesn't seem to be actually supported in resource accounting
-
-# keep slot weights enabled for match costing
-NEGOTIATOR_USE_SLOT_WEIGHTS = True
-
-# weight used to derive match cost: W(before-consumption) - W(after-consumption)
-SlotWeight = Cpus
-
-# for simplicity, turn off preemption, caching, worklife
-CLAIM_WORKLIFE=0
-MAXJOBRETIREMENTTIME = 3600
-PREEMPT = False
-RANK = 0
-PREEMPTION_REQUIREMENTS = False
-NEGOTIATOR_CONSIDER_PREEMPTION = False
-NEGOTIATOR_MATCHLIST_CACHING = False
-
-# verbose logging
-ALL_DEBUG = D_FULLDEBUG
-
-# reduce daemon update latencies
-NEGOTIATOR_INTERVAL = 30
-SCHEDD_INTERVAL = 15
-</code></pre>
-
-<p>In the above configuration, we declare a typical aggregate (that is, partitionable) resource <code>SLOT_TYPE_1</code>, but then we also configure a <em>consumption policy</em>, by advertising <code>ConsumptionCpus</code>, <code>ConsumptionMemory</code> and <code>ConsumptionDisk</code>.  Note that these are defined with quantizing expressions currently used as default values for the <code>MODIFY_REQUEST_EXPRS</code> behavior.  The startd and the negotiatior will <em>both</em> use these expressions by examining the slot ads.</p>
-
-<p>Next, we submit 15 jobs.  Note that this more than the 10 cores advertised by the p-slot:</p>
-
-<pre><code>universe = vanilla
-cmd = /bin/sleep
-args = 60
-should_transfer_files = if_needed
-when_to_transfer_output = on_exit
-queue 15
-</code></pre>
-
-<p>If we watch the negotiator log, we will see that negotiator matches the 10 jobs supported by the p-slot on the next cycle (note that it uses slot1 each time):</p>
-
-<pre><code>$ tail -f NegotiatorLog | grep -e '\-\-\-\-\-'  -e 'matched
-12/03/12 11:53:10 ---------- Finished Negotiation Cycle ----------
-12/03/12 11:53:25 ---------- Started Negotiation Cycle ----------
-12/03/12 11:53:25       Successfully matched with slot1@rorschach
-12/03/12 11:53:25       Successfully matched with slot1@rorschach
-12/03/12 11:53:25       Successfully matched with slot1@rorschach
-12/03/12 11:53:25       Successfully matched with slot1@rorschach
-12/03/12 11:53:25       Successfully matched with slot1@rorschach
-12/03/12 11:53:25       Successfully matched with slot1@rorschach
-12/03/12 11:53:25       Successfully matched with slot1@rorschach
-12/03/12 11:53:25       Successfully matched with slot1@rorschach
-12/03/12 11:53:25       Successfully matched with slot1@rorschach
-12/03/12 11:53:25       Successfully matched with slot1@rorschach
-12/03/12 11:53:25 ---------- Finished Negotiation Cycle ----------
-</code></pre>
-
-<p>You can use <code>condor_q</code> to verify that the 10 jobs subsequently run.   The jobs run against 10 dynamic slots (d-slots) in the standard way:</p>
-
-<pre><code>$ ccdump condor_status Name TotalSlotCpus
-slot1@rorschach | 10
-slot1_10@rorschach | 1
-slot1_1@rorschach | 1
-slot1_2@rorschach | 1
-slot1_3@rorschach | 1
-slot1_4@rorschach | 1
-slot1_5@rorschach | 1
-slot1_6@rorschach | 1
-slot1_7@rorschach | 1
-slot1_8@rorschach | 1
-slot1_9@rorschach | 1
-</code></pre>
-
-<p>Next we consider altering the resource consumption policy.  As a simple example, suppose we wish to allocate memory more coarsely.  We could alter the configuration above by changing <code>ConsumptionMemory</code> to:</p>
-
-<pre><code>ConsumptionMemory = quantize(target.RequestMemory, {512})
-</code></pre>
-
-<p>Perhaps we then also want to express match cost in a memory-centric way, instead of the usual cpu-centric way:</p>
-
-<pre><code>SlotWeight = floor(Memory / 512)
-</code></pre>
-
-<p>Here it is worth noting that in this implementation of negotiator-side consumption, the cost of a match is defined as W(S) - W(S'), where W(S) is the weight of the slot <em>prior</em> to consuming resources from the match and consumption policy, and W(S`) is the weight evaluated for the slot <em>after</em> those resources are subtracted.  This modification enables multiple matches to be made against a single p-slot, and furthermore it paves the way to possible avenues for a <a href="http://erikerlandson.github.com/blog/2012/11/26/rethinking-the-semantics-of-group-quotas-and-slot-weights-computing-claim-capacity-from-consumption-policy/">better unit analysis of slot weights and accounting groups</a>.</p>
-
-<p>Continuing the example, if we re-run the example with this new consumption policy, we should see that memory limits reduce the number of jobs matched against <code>slot1</code> to 3:</p>
-
-<pre><code>$ tail -f NegotiatorLog | grep -e '\-\-\-\-\-'  -e 'matched'
-12/03/12 12:58:22 ---------- Finished Negotiation Cycle ----------
-12/03/12 12:58:37 ---------- Started Negotiation Cycle ----------
-12/03/12 12:58:37       Successfully matched with slot1@rorschach
-12/03/12 12:58:37       Successfully matched with slot1@rorschach
-12/03/12 12:58:37       Successfully matched with slot1@rorschach
-12/03/12 12:58:37 ---------- Finished Negotiation Cycle ----------
-</code></pre>
-
-<p>Examining the slot memory assets, we see that there is insufficient memory for a fourth match when our consumption policy sets the minimum at 512:</p>
-
-<pre><code>$ ccdump condor_status Name TotalSlotMemory
-slot1@rorschach | 1903
-slot1_1@rorschach | 512
-slot1_2@rorschach | 512
-slot1_3@rorschach | 512
-</code></pre>
-
-<p>As a final example, I'll demonstrate the positive impact of negotiator side matching on interactions with accounting groups (or submitter shares).  Again returning to my original example, modify the configuration with a simple accounting group policy:</p>
-
-<pre><code>GROUP_NAMES = a
-GROUP_QUOTA_a = 1
-GROUP_ACCEPT_SURPLUS = False
-GROUP_AUTOREGROUP = False
-</code></pre>
-
-<p>Now submit 2 jobs against accounting group <code>a</code>:</p>
-
-<pre><code>universe = vanilla
-cmd = /bin/sleep
-args = 60
-should_transfer_files = if_needed
-when_to_transfer_output = on_exit
-+AccountingGroup="a.u"
-queue 2
-</code></pre>
-
-<p>We see that accounting groups are respected: one job runs, and it does not suffer from insufficient share to acquire resources from <code>slot1</code> <a href="https://htcondor-wiki.cs.wisc.edu/index.cgi/tktview?tn=3013">(GT3013)</a>, because match cost is computed using only the individual job's impact on slot weight, instead of being required to match the entire p-slot:</p>
-
-<pre><code>$ tail -f ~/condor/local/log/NegotiatorLog | grep -e '\-\-\-\-\-' -e matched
-12/03/12 14:57:50 ---------- Finished Negotiation Cycle ----------
-12/03/12 14:58:08 ---------- Started Negotiation Cycle ----------
-12/03/12 14:58:08       Successfully matched with slot1@rorschach
-12/03/12 14:58:09 ---------- Finished Negotiation Cycle ----------
-
-$ ccdump condor_status Name TotalSlotCpus
-slot1@rorschach | 10
-slot1_1@rorschach | 1
-</code></pre>
 ]]></content>
   </entry>
   

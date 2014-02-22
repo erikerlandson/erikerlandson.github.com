@@ -2,138 +2,144 @@
 <urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'>
     <url>
         <loc>http://erikerlandson.github.com/blog/2012/03/19/dont-try-to-stop-me/</loc>
-        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/03/19/interaction-between-mktime-and-tm-isdst-a-compute-cycle-landmine/
         </loc>
-        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/05/16/pretty-good-random-sampling-from-database-queries/
         </loc>
-        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
         <loc>http://erikerlandson.github.com/blog/2012/05/20/the-joy-of-anonymized-data/</loc>
-        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/06/27/maintaining-accounting-group-quotas-with-preemption-policy/
         </loc>
-        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/06/29/easy-histograms-and-tables-from-condor-jobs-and-slots/
         </loc>
-        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/07/05/deriving-an-incremental-form-of-the-polynomial-regression-equations/
         </loc>
-        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/07/10/configuring-minimum-and-maximum-resources-for-mission-critical-jobs-in-a-condor-pool/
         </loc>
-        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/07/19/lifo-and-fifo-preemption-policies-for-a-condor-pool/
         </loc>
-        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/07/27/driving-a-condor-job-renice-policy-with-accounting-groups/
         </loc>
-        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/09/26/improved-parse-checking-for-classad-log-files-in-condor/
         </loc>
-        <lastmod>2012-10-25T16:22:02-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/10/05/hosting-a-blog-feed-aggregator-with-octopress/
         </loc>
-        <lastmod>2012-10-25T16:44:20-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/10/31/randomized-sleep-jobs-in-htcondor-using-delayed-evaluation/
         </loc>
-        <lastmod>2012-10-31T15:07:42-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/11/01/using-accounting-groups-with-wallaby/
         </loc>
-        <lastmod>2012-11-01T14:21:31-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/11/13/rethinking-the-semantics-of-group-quotas-and-slot-weights-for-heterogeneous-and-multidimensional-compute-resources/
         </loc>
-        <lastmod>2012-11-13T16:38:32-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/11/15/rethinking-the-semantics-of-group-quotas-and-slot-weights-claim-capacity-model/
         </loc>
-        <lastmod>2012-11-15T17:44:38-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/11/26/rethinking-the-semantics-of-group-quotas-and-slot-weights-computing-claim-capacity-from-consumption-policy/
         </loc>
-        <lastmod>2012-11-26T16:10:40-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2012/12/03/a-demonstration-of-negotiator-side-resource-consumption/
         </loc>
-        <lastmod>2013-02-06T16:29:06-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2013/01/02/the-mean-of-the-modulus-does-not-equal-the-modulus-of-the-mean/
         </loc>
-        <lastmod>2013-01-02T09:15:51-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2013/03/15/examining-the-modulus-of-random-variables/
         </loc>
-        <lastmod>2013-03-15T17:40:28-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2013/03/16/smooth-gradients-for-cubic-hermite-splines/
         </loc>
-        <lastmod>2013-03-17T21:28:42-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://erikerlandson.github.com/blog/2013/03/21/the-impact-of-negotiator-cycle-cadence-on-slot-loading/
         </loc>
-        <lastmod>2013-03-21T17:18:14-07:00</lastmod>
+        <lastmod>2013-03-23T07:16:14-07:00</lastmod>
     </url>
     <url>
-        <loc>http://erikerlandson.github.com/</loc>
-        <lastmod>2013-03-21T17:18:14-07:00</lastmod>
+        <loc>
+            http://erikerlandson.github.com/blog/2014/02/20/a-bi-directional-variation-of-the-o-np-edit-distance-algorithm/
+        </loc>
+        <lastmod>2014-02-21T21:14:39-07:00</lastmod>
     </url>
     <url>
         <loc>http://erikerlandson.github.com/blog/archives/</loc>
-        <lastmod>2013-03-21T17:18:14-07:00</lastmod>
+        <lastmod>2014-02-21T21:14:39-07:00</lastmod>
+    </url>
+    <url>
+        <loc>http://erikerlandson.github.com/</loc>
+        <lastmod>2014-02-21T21:14:39-07:00</lastmod>
     </url>
 </urlset>
