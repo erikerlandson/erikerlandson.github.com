@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
 
-  <title><![CDATA[Category: sequence comparison | tool monkey]]></title>
-  <link href="http://erikerlandson.github.com/blog/categories/sequence-comparison/atom.xml" rel="self"/>
+  <title><![CDATA[Category: divide and conquer | tool monkey]]></title>
+  <link href="http://erikerlandson.github.com/blog/categories/divide-and-conquer/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
   <updated>2014-02-23T13:24:43-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
