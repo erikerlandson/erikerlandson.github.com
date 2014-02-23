@@ -3,7 +3,7 @@ layout: post
 title: "A Bi-directional Variation of the O(NP) Edit Distance Algorithm"
 date: 2014-02-20 19:51
 comments: true
-categories: [ computing, edit distance, string distance, string difference, sequence comparison, myers algorithm, optimization ]
+categories: [ computing, edit distance, string distance, string difference, sequence comparison, myers algorithm, optimization, bidirectional, divide and conquer ]
 ---
 The O(ND) edit distance algorithm [[1]](#ref1) is a standard for efficient computation of the edit distance between two sequences, appearing in applications such as the GNU diff tool.  There is also a variation [[2]](#ref2) that operates in O(NP) time, where P is the number of deletions in the shortest edit path, and which has lower computational complexity, since P <= D (and may be << D in some circumstances).  In order to apply these algorithms to obtain an _edit script_ in linear space, they must be adapted into a bidirectional form that enables recursive divide-and-conquer.   The basic principles of a bidirectional adaptation of the O(ND) algorithm are described in [[1]](#ref1).   However, no such discussion of a bidirectional O(NP) algorithm is provided in [[2]](#ref2).  Understanding this adaptation involves some observations that aren't immediately obvious.  In this post, I will describe these key observations.
 
