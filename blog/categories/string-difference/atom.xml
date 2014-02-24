@@ -4,7 +4,7 @@
   <title><![CDATA[Category: string difference | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/string-difference/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2014-02-23T13:24:43-07:00</updated>
+  <updated>2014-02-24T11:00:24-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -18,7 +18,7 @@
     <link href="http://erikerlandson.github.com/blog/2014/02/20/a-bi-directional-variation-of-the-o-np-edit-distance-algorithm/"/>
     <updated>2014-02-20T19:51:00-07:00</updated>
     <id>http://erikerlandson.github.com/blog/2014/02/20/a-bi-directional-variation-of-the-o-np-edit-distance-algorithm</id>
-    <content type="html"><![CDATA[<p>The O(ND) edit distance algorithm <a href="#ref1">[1]</a> is a standard for efficient computation of the edit distance between two sequences, appearing in applications such as the GNU diff tool.  There is also a variation <a href="#ref2">[2]</a> that operates in O(NP) time, where P is the number of deletions in the shortest edit path, and which has lower computational complexity, since P &lt;= D (and may be &lt;&lt; D in some circumstances).  In order to apply these algorithms to obtain an <em>edit script</em> in linear space, they must be adapted into a bidirectional form that enables recursive divide-and-conquer.   The basic principles of a bidirectional adaptation of the O(ND) algorithm are described in <a href="#ref1">[1]</a>.   However, no such discussion of a bidirectional O(NP) algorithm is provided in <a href="#ref2">[2]</a>.  Understanding this adaptation involves some observations that aren't immediately obvious.  In this post, I will describe these key observations.</p>
+    <content type="html"><![CDATA[<p>The O(ND) edit distance algorithm <a href="#ref1">[1]</a> is a standard for efficient computation of the edit distance between two sequences, appearing in applications such as the GNU diff tool.  There is also a variation <a href="#ref2">[2]</a> that operates in O(NP) time, where P is the number of deletions in the shortest edit path.  This O(NP) algorithm has a lower computational cost, since P &lt;= D/2 (and may be &lt;&lt; D/2 in some circumstances) <a href="#ref3">[3]</a>.  In order to apply these algorithms to obtain an <em>edit script</em> in linear space, they must be adapted into a bidirectional form that enables recursive divide-and-conquer.   The basic principles of a bidirectional adaptation of the O(ND) algorithm are described in <a href="#ref1">[1]</a>.   However, no such discussion of a bidirectional O(NP) algorithm is provided in <a href="#ref2">[2]</a>.  Understanding this adaptation involves some observations that aren't immediately obvious.  In this post, I will describe these key observations.</p>
 
 <h3>Notation</h3>
 
@@ -26,7 +26,9 @@
 
 <h3>Sequence Lengths</h3>
 
-<p>A brief note on the O(NP) algorithm and sequence lengths: the algorithm assumes that the length of its second sequence argument is >= its first (that is, N >= M).   In the following discussions, I will be making the same assumption, however the modification to address N &lt; M is relatively easy, and can be seen in the references to actual source code below.</p>
+<p><a name="anchor3" id="ref3">[3] </a>A brief note on the O(NP) algorithm and sequence lengths: the algorithm assumes that the length of its second sequence argument is >= its first (that is, N >= M).  Observe that total edit distance D = P+H, where P is the number of deletions and H is the number of insertions.   Note also that deletions are w.r.t. the 1st sequence, and insertions are w.r.t. the second.  Therefore, by always applying the algorithm such that N >= M, we keep P &lt;= H and hence P &lt;= D/2.  In cases where N >> M, then we see that P &lt;&lt; H and also P &lt;&lt; D/2.</p>
+
+<p>In the following discussions, I will also assume that N >= M for simplicity, however the modification to address N &lt; M is relatively easy, and can be seen in the references to actual source code below.</p>
 
 <h3>Indexing</h3>
 
