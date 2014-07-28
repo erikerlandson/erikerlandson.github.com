@@ -4,7 +4,7 @@
   <title><![CDATA[Category: RDD | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/rdd/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2014-07-27T17:08:30-07:00</updated>
+  <updated>2014-07-28T08:23:27-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -31,7 +31,7 @@ res1: List[Int] = List(2, 3)
 val data = sparkContext.textFile("data.txt").drop(1)
 </code></pre>
 
-<p>Implementing <code>drop</code> for RDDs is possible, and in fact can be done with a <a href="https://github.com/erikerlandson/spark/compare/rdd_drop_blogpost">small amount of code</a>, however it comes at the price of an impact to the RDD lazy computing model.</p>
+<p>Implementing <code>drop</code> for RDDs is possible, and in fact can be done with a <a href="https://github.com/erikerlandson/spark/compare/erikerlandson:rdd_drop_blogpost_base...rdd_drop_blogpost">small amount of code</a>, however it comes at the price of an impact to the RDD lazy computing model.</p>
 
 <p>To see why, recall that RDDs are composed of partitions, and so in order to drop the first (n) rows of an RDD, one must first identify the partition that contains the (n-1),(n) row boundary.  In the resulting RDD, this partition will be the first one to contain any data.  Identifying this "boundary" partition cannot have a closed-form solution, because partition sizes are not in general equal;  the partition interface does not even support the concept of a <code>count</code> method.  In order to obtain the size of a partition, one is forced to actually compute its contents.  The diagram below illustrates one example of why this is so -- the contents of the partitions in the filtered RDD on the right cannot be known without actually running the filter on the parent RDD:</p>
 
@@ -40,7 +40,7 @@ val data = sparkContext.textFile("data.txt").drop(1)
 <p>Given all this, the structure of a <code>drop</code> implementation is to compute the first partition, find its length, and see if it contains the requested (n-1),(n) boundary.  If not, compute the next partition, and so on, until the boundary partition is identified.  All prior partitions are ignored in the result.  All subsequent partitions are passed on with no change.  The boundary partition is passed through its own <code>drop</code> to eliminate rows up to (n).</p>
 
 <p>The code implementing the concept described above can be viewed here:
-<a href="https://github.com/erikerlandson/spark/compare/rdd_drop_blogpost">https://github.com/erikerlandson/spark/compare/rdd_drop_blogpost</a></p>
+<a href="https://github.com/erikerlandson/spark/compare/erikerlandson:rdd_drop_blogpost_base...rdd_drop_blogpost">https://github.com/erikerlandson/spark/compare/erikerlandson:rdd_drop_blogpost_base...rdd_drop_blogpost</a></p>
 
 <p>The following diagram illustrates the relation between input and output partitions in a call to <code>drop</code>:</p>
 
