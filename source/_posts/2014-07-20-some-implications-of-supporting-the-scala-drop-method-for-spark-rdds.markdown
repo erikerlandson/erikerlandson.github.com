@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "Some Implications of Supporting the Scala drop Method for Spark RDDs"
-date: 2014-07-20 07:57
+date: 2014-07-27 17:08
 comments: true
 categories: [ computing, spark, scala, RDD ]
 ---
@@ -16,7 +16,7 @@ Spark RDDs also support various standard sequence methods, for example `filter`,
     // Use drop (hypothetically) to skip the header of a text file:
     val data = sparkContext.textFile("data.txt").drop(1)
 
-Implementing `drop` for RDDs is possible, and in fact can be done with a [small amount of code](https://github.com/apache/spark/pull/1254/files), however it comes at the price of an impact to the RDD lazy computing model. 
+Implementing `drop` for RDDs is possible, and in fact can be done with a [small amount of code](https://github.com/erikerlandson/spark/compare/rdd_drop_blogpost), however it comes at the price of an impact to the RDD lazy computing model. 
 
 To see why, recall that RDDs are composed of partitions, and so in order to drop the first (n) rows of an RDD, one must first identify the partition that contains the (n-1),(n) row boundary.  In the resulting RDD, this partition will be the first one to contain any data.  Identifying this "boundary" partition cannot have a closed-form solution, because partition sizes are not in general equal;  the partition interface does not even support the concept of a `count` method.  In order to obtain the size of a partition, one is forced to actually compute its contents.  The diagram below illustrates one example of why this is so -- the contents of the partitions in the filtered RDD on the right cannot be known without actually running the filter on the parent RDD:
 
@@ -26,7 +26,7 @@ To see why, recall that RDDs are composed of partitions, and so in order to drop
 Given all this, the structure of a `drop` implementation is to compute the first partition, find its length, and see if it contains the requested (n-1),(n) boundary.  If not, compute the next partition, and so on, until the boundary partition is identified.  All prior partitions are ignored in the result.  All subsequent partitions are passed on with no change.  The boundary partition is passed through its own `drop` to eliminate rows up to (n).  
 
 The code implementing the concept described above can be viewed here:
-https://github.com/apache/spark/pull/1254/files
+[https://github.com/erikerlandson/spark/compare/rdd_drop_blogpost](https://github.com/erikerlandson/spark/compare/rdd_drop_blogpost)
 
 The following diagram illustrates the relation between input and output partitions in a call to `drop`:
 
