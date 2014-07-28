@@ -18,7 +18,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   
-  <link rel="canonical" href="http://erikerlandson.github.com/blog/2014/07/20/some-implications-of-supporting-the-scala-drop-method-for-spark-rdds/">
+  <link rel="canonical" href="http://erikerlandson.github.com/blog/2014/07/27/some-implications-of-supporting-the-scala-drop-method-for-spark-rdds/">
   <link href="/favicon.png" rel="icon">
   <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
   <script src="/javascripts/modernizr-2.0.js"></script>
@@ -87,7 +87,7 @@
   
 
 
-<time datetime="2014-07-20T07:57:00-07:00" pubdate data-updated="true">Jul 20<span>th</span>, 2014</time>
+<time datetime="2014-07-27T17:08:00-07:00" pubdate data-updated="true">Jul 27<span>th</span>, 2014</time>
         
          | <a href="#disqus_thread">Comments</a>
         
@@ -109,7 +109,7 @@ res1: List[Int] = List(2, 3)
 val data = sparkContext.textFile("data.txt").drop(1)
 </code></pre>
 
-<p>Implementing <code>drop</code> for RDDs is possible, and in fact can be done with a <a href="https://github.com/apache/spark/pull/1254/files">small amount of code</a>, however it comes at the price of an impact to the RDD lazy computing model.</p>
+<p>Implementing <code>drop</code> for RDDs is possible, and in fact can be done with a <a href="https://github.com/erikerlandson/spark/compare/rdd_drop_blogpost">small amount of code</a>, however it comes at the price of an impact to the RDD lazy computing model.</p>
 
 <p>To see why, recall that RDDs are composed of partitions, and so in order to drop the first (n) rows of an RDD, one must first identify the partition that contains the (n-1),(n) row boundary.  In the resulting RDD, this partition will be the first one to contain any data.  Identifying this &#8220;boundary&#8221; partition cannot have a closed-form solution, because partition sizes are not in general equal;  the partition interface does not even support the concept of a <code>count</code> method.  In order to obtain the size of a partition, one is forced to actually compute its contents.  The diagram below illustrates one example of why this is so &#8211; the contents of the partitions in the filtered RDD on the right cannot be known without actually running the filter on the parent RDD:</p>
 
@@ -118,7 +118,7 @@ val data = sparkContext.textFile("data.txt").drop(1)
 <p>Given all this, the structure of a <code>drop</code> implementation is to compute the first partition, find its length, and see if it contains the requested (n-1),(n) boundary.  If not, compute the next partition, and so on, until the boundary partition is identified.  All prior partitions are ignored in the result.  All subsequent partitions are passed on with no change.  The boundary partition is passed through its own <code>drop</code> to eliminate rows up to (n).</p>
 
 <p>The code implementing the concept described above can be viewed here:
-https://github.com/apache/spark/pull/1254/files</p>
+<a href="https://github.com/erikerlandson/spark/compare/rdd_drop_blogpost">https://github.com/erikerlandson/spark/compare/rdd_drop_blogpost</a></p>
 
 <p>The following diagram illustrates the relation between input and output partitions in a call to <code>drop</code>:</p>
 
@@ -157,7 +157,7 @@ https://github.com/apache/spark/pull/1254/files</p>
   
 
 
-<time datetime="2014-07-20T07:57:00-07:00" pubdate data-updated="true">Jul 20<span>th</span>, 2014</time>
+<time datetime="2014-07-27T17:08:00-07:00" pubdate data-updated="true">Jul 27<span>th</span>, 2014</time>
       
 
 <span class="categories">
@@ -171,7 +171,7 @@ https://github.com/apache/spark/pull/1254/files</p>
     
       <div class="sharing">
   
-  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://erikerlandson.github.com/blog/2014/07/20/some-implications-of-supporting-the-scala-drop-method-for-spark-rdds/" data-via="" data-counturl="http://erikerlandson.github.com/blog/2014/07/20/some-implications-of-supporting-the-scala-drop-method-for-spark-rdds/" >Tweet</a>
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://erikerlandson.github.com/blog/2014/07/27/some-implications-of-supporting-the-scala-drop-method-for-spark-rdds/" data-via="" data-counturl="http://erikerlandson.github.com/blog/2014/07/27/some-implications-of-supporting-the-scala-drop-method-for-spark-rdds/" >Tweet</a>
   
   
   
@@ -206,7 +206,7 @@ https://github.com/apache/spark/pull/1254/files</p>
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/2014/07/20/some-implications-of-supporting-the-scala-drop-method-for-spark-rdds/">Some Implications of Supporting the Scala drop Method for Spark RDDs</a>
+        <a href="/blog/2014/07/27/some-implications-of-supporting-the-scala-drop-method-for-spark-rdds/">Some Implications of Supporting the Scala drop Method for Spark RDDs</a>
       </li>
     
       <li class="post">
@@ -281,8 +281,8 @@ https://github.com/apache/spark/pull/1254/files</p>
       
         
         // var disqus_developer = 1;
-        var disqus_identifier = 'http://erikerlandson.github.com/blog/2014/07/20/some-implications-of-supporting-the-scala-drop-method-for-spark-rdds/';
-        var disqus_url = 'http://erikerlandson.github.com/blog/2014/07/20/some-implications-of-supporting-the-scala-drop-method-for-spark-rdds/';
+        var disqus_identifier = 'http://erikerlandson.github.com/blog/2014/07/27/some-implications-of-supporting-the-scala-drop-method-for-spark-rdds/';
+        var disqus_url = 'http://erikerlandson.github.com/blog/2014/07/27/some-implications-of-supporting-the-scala-drop-method-for-spark-rdds/';
         var disqus_script = 'embed.js';
       
     (function () {
