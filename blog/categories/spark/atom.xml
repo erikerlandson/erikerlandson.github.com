@@ -4,7 +4,7 @@
   <title><![CDATA[Category: spark | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/spark/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2014-07-28T08:23:27-07:00</updated>
+  <updated>2014-07-29T13:53:05-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,76 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Deferring Spark Actions to Lazy Transforms With the Promise RDD]]></title>
+    <link href="http://erikerlandson.github.com/blog/2014/07/29/deferring-spark-actions-to-lazy-transforms-with-the-promise-rdd/"/>
+    <updated>2014-07-29T13:53:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2014/07/29/deferring-spark-actions-to-lazy-transforms-with-the-promise-rdd</id>
+    <content type="html"><![CDATA[<p>In a <a href="http://erikerlandson.github.io/blog/2014/07/27/some-implications-of-supporting-the-scala-drop-method-for-spark-rdds/">previous post</a> I described a method for implementing the Scala <code>drop</code> transform for Spark RDDs.  That implementation came at a cost of subverting the RDD lazy transform model; it forced the computation of one or more input RDD partitions at call time instead of deferring partition computation, and so behaved more like a Spark action than a transform.</p>
+
+<p>In this followup post I will describe how to implement <code>drop</code> as a true lazy RDD transform, using a new RDD subclass: the Promise RDD.  A Promise RDD can be used to embed computations in the lazy transform formalism that otherwise would require non-lazy actions.</p>
+
+<p>The Promise RDD (aka <code>PromiseRDD</code> subclass) is designed to encapsulate a single expression value in an RDD having exactly one row, to be evaluated <em>only</em> if and when its single partition is computed. It behaves somewhat analogously to a Scala <code>promise</code> structure, as it abstracts the expression such that any requests for its value (and hence its actual computation) may be deferred.</p>
+
+<p>The definition of PromiseRDD is compact:</p>
+
+<pre><code>class PromisePartition extends Partition {
+  // A PromiseRDD has exactly one partition, by construction:
+  override def index = 0
+}
+
+/**
+ * A way to represent the concept of a promised expression as an RDD, so that it
+ * can operate naturally inside the lazy-transform formalism
+ */
+class PromiseRDD[V: ClassTag](expr: =&gt; (TaskContext =&gt; V),
+                              context: SparkContext, deps: Seq[Dependency[_]])
+  extends RDD[V](context, deps) {
+
+  // This RDD has exactly one partition by definition, since it will contain
+  // a single row holding the 'promised' result of evaluating 'expr' 
+  override def getPartitions = Array(new PromisePartition)
+
+  // compute evaluates 'expr', yielding an iterator over a sequence of length 1:
+  override def compute(p: Partition, ctx: TaskContext) = List(expr(ctx)).iterator
+}
+</code></pre>
+
+<p>A PromiseRDD is constructed with the expression of choice, embodied as a function from a <code>TaskContext</code> to the implied expression type.   Note that <em>only</em> the task context is a parameter;  Any other inputs needed to evaluate the expression must be present in the closure of <code>expr</code>.  This allows the expression to be of very general form: its value may depend on a single input RDD, or multiple RDDs, or no RDDs at all.  It receives an arbitrary sequence of partition dependencies which is the responsibility of the calling code to assemble.  Again, this allows substantial generality in the form of the expression: the PromiseRDD dependencies can correspond to any arbitrary input dependencies assumed by the expression.  The dependencies can be tuned to exactly what input partitions are required.</p>
+
+<p>As a motivating example, consider how a PromiseRDD can be used to promote <code>drop</code> to a true lazy transform.  The aspect of computing <code>drop</code> that threatens laziness is the necessity of determining the location of the boundary partition (<a href="http://erikerlandson.github.io/blog/2014/07/27/some-implications-of-supporting-the-scala-drop-method-for-spark-rdds/">see previous discussion</a>).  However, this portion of the computation can in fact be encapsulated in a PromiseRDD.  The details of constructing such a PromiseRDD can be <a href="https://github.com/erikerlandson/spark/blob/promise_rdd_blog/core/src/main/scala/org/apache/spark/rdd/DropRDDFunctions.scala#L46">viewed here</a>.  The following illustration summarizes the topology of the dependency DAG that is constructed:</p>
+
+<p><img src="/assets/images/rdd_drop/rdd_drop_promise.png" alt="image" /></p>
+
+<p>As the dependency diagram shows, the PromiseRDD responsible for locating the boundary partition depends on each partition of the original input RDD.  The actual computation is likely to only request the first input partition, but all partitions might be required to handle all possible arguments to <code>drop</code>.   In turn, the location information given by the PromiseRDD is depended upon by each output partition.  Input partitions are either passed to the output, or used to compute the boundary, and so none of the partition computation is wasted.</p>
+
+<p>Observe that the scheduler remains in charge of when partitions are computed.  An advantage to using a PromiseRDD is that it works within Spark's computational model, instead of forcing it.</p>
+
+<p>The following brief example demonstrates that <code>drop</code> implemented using a PromiseRDD satisfies the lazy transform model:</p>
+
+<pre><code>// create data rdd with values 0 thru 9
+scala&gt; val data = sc.parallelize(0 until 10)
+data: org.apache.spark.rdd.RDD[Int] = ParallelCollectionRDD[0] at parallelize at &lt;console&gt;:12
+
+// drop the first 3 rows
+// note that no action is performed -- this transform is lazy
+scala&gt; val rdd = data.drop(3)
+rdd: org.apache.spark.rdd.RDD[Int] = $anon$1[2] at drop at &lt;console&gt;:14
+
+// collect the values.  This action kicks off job scheduling and execution
+scala&gt; rdd.collect
+14/07/28 12:16:13 INFO SparkContext: Starting job: collect at &lt;console&gt;:17
+... job scheduling and execution output ...
+
+res0: Array[Int] = Array(3, 4, 5, 6, 7, 8, 9)
+
+scala&gt;
+</code></pre>
+
+<p>In this post, I have described the Promise RDD, an RDD subclass that can be used to encapsulate computations in the lazy transform formalism that would otherwise require non-lazy actions.  As an example, I have outlined a lazy transform implementation of <code>drop</code> that uses PromiseRDD.</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Some Implications of Supporting the Scala drop Method for Spark RDDs]]></title>
