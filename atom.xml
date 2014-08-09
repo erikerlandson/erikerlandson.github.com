@@ -4,7 +4,7 @@
   <title><![CDATA[tool monkey]]></title>
   <link href="http://erikerlandson.github.com/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2014-07-29T20:21:11-07:00</updated>
+  <updated>2014-08-09T11:56:03-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,47 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Implementing an RDD scanLeft Transform With Cascade RDDs]]></title>
+    <link href="http://erikerlandson.github.com/blog/2014/08/09/implementing-an-rdd-scanleft-transform-with-cascade-rdds/"/>
+    <updated>2014-08-09T09:10:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2014/08/09/implementing-an-rdd-scanleft-transform-with-cascade-rdds</id>
+    <content type="html"><![CDATA[<p>In Scala, sequence (and iterator) data types support the <code>scanLeft</code> method for computing a sequential prefix scan on sequence elements:</p>
+
+<pre><code>// Use scanLeft to compute the cumulative sum of some integers
+scala&gt; List(1, 2, 3).scanLeft(0)(_ + _)
+res0: List[Int] = List(0, 1, 3, 6)
+</code></pre>
+
+<p>Spark RDDs are logically a sequence of row objects, and so <code>scanLeft</code> is in principle well defined on RDDs.  In this post I will describe how to cleanly implement a <code>scanLeft</code> RDD transform by applying an RDD variation called Cascade RDDs.</p>
+
+<p>A Cascade RDD is an RDD having one partition which is a function of an input RDD partition and an optional predecessor Cascade RDD partition.  You can see that this definition is somewhat recursive, where the basis case is a Cascade RDD having no precedessor.  The following diagram illustrates both cases of Cascade RDD:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/rdd_scanleft/rdd_scan_1.png" alt="image" /></p>
+
+<p>As implied by the above diagram, a series of Cascade RDDs falling out of an input RDD will have as many Cascade RDDs as there are input partitions.  This situation begs for an abstraction to re-assemble the cascade back into a single output RDD, and so the method <code>cascadePartitions</code> is defined, as illustrated:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/rdd_scanleft/rdd_scan_3.png" alt="image" /></p>
+
+<p>The <code>cascadePartitions</code> method takes a function argument <code>f</code>, with the signature:</p>
+
+<pre><code>f(input: Iterator[T], cascade: Option[Iterator[U]]): Iterator[U]
+</code></pre>
+
+<p>in a manner somewhat analogous to <code>mapPartitions</code>.  The function <code>f</code> must address the fact that <code>cascade</code> is optional and will be <code>None</code> in case where there is no predecessor Cascade RDD.  The interested reader can examine the details of how the <code>CascadeRDD</code> class and its companion method <code>cascadePartitions</code> are <a href="https://github.com/erikerlandson/spark/blob/rdd_scan_blog/core/src/main/scala/org/apache/spark/rdd/CascadeRDDFunctions.scala">implemented here.</a></p>
+
+<p>With Cascade RDDs it is now straightforward to define a <code>scanLeft</code> transform for RDDs.  We wish to run <code>scanLeft</code> on each input partition, with the condition that we want to start where the previous input partition left off.  The Scala <code>scanLeft</code> function makes this easy, as the starting point is its first parameter (z): <code>scanLeft(z)(f)</code>.  The following figure illustrates what this looks like:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/rdd_scanleft/rdd_scan_2.png" alt="image" /></p>
+
+<p>As the above schematic demonstrates, almost all the work is accomplished with a single call to <code>cascadePartitions</code>, using a thin wrapper around <code>f</code> which determines where to start the next invocation of Scala <code>scanLeft</code> &#8211; either the input parameter <code>z</code>, or the last output element of the previous cascade.   One final transform must be applied to remove the initial element that Scala <code>scanLeft</code> inserts into its output, excepting the first output partition, where it is kept to be consistent with the <code>scanLeft</code> definition.</p>
+
+<p>All computation is accomplished in the standard RDD formalism, and so <code>scanLeft</code> is a proper lazy RDD transform.</p>
+
+<p>The actual implementation is as compact as the above description implies, and you can see the <a href="https://github.com/erikerlandson/spark/blob/rdd_scan_blog/core/src/main/scala/org/apache/spark/rdd/ScanRDDFunctions.scala#L144">code here.</a></p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Deferring Spark Actions to Lazy Transforms With the Promise RDD]]></title>
@@ -2410,96 +2451,6 @@ a_m &#92;&#92;
 
 
 <p>The coefficient of multiple determination generalizes in the analogous way.</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Easy Histograms and Tables from Condor Jobs and Slots]]></title>
-    <link href="http://erikerlandson.github.com/blog/2012/06/29/easy-histograms-and-tables-from-condor-jobs-and-slots/"/>
-    <updated>2012-06-29T09:46:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2012/06/29/easy-histograms-and-tables-from-condor-jobs-and-slots</id>
-    <content type="html"><![CDATA[<p>Several <a href="http://research.cs.wisc.edu/condor/">Condor</a> commands, including condor_status, condor_q and condor_history, provide a nice feature for outputting formatted subsets of classad attributes: the <code>-format &lt;format&gt; &lt;attr&gt;</code> option.  In this post, I assume basic familiarity with <code>-format</code>.  You can read more <a href="http://research.cs.wisc.edu/condor/manual/v7.8/condor_status.html#SECTION0011453000000000000000">here</a></p>
-
-<p>The <code>-format</code> option can be used to generate tables and histograms of attributes, in a classic &#8216;unix one-liner&#8217; fashion.  For example, supposing I wanted to use condor_status to create a nice histogram of the values for slot type, state, activity and accounting group.  I might issue a one-liner like this:</p>
-
-<pre><code>$ condor_status -format "%s" 'ifThenElse(SlotType =!= undefined, string(SlotType), "undefined")' \
-&gt; -format " | %s" 'ifThenElse(State =!= undefined, string(State), "undefined")' \
-&gt; -format " | %s" 'ifThenElse(Activity =!= undefined, string(Activity), "undefined")' \
-&gt; -format " | %s\n" 'ifThenElse(AccountingGroup =!= undefined, string(AccountingGroup), "undefined")' \
-&gt; | sort | uniq -c | awk '{ print $0; t += $1 } END { printf("%7d total\n",t) }'
-      3 Static | Claimed | Busy | A.user@localdomain
-      2 Static | Claimed | Busy | B.user@localdomain
-     10 Static | Unclaimed | Idle | undefined
-     15 total
-</code></pre>
-
-<p>Note that in this command I was extra pedantic and careful about converting expressions to strings, and using the ClassAd ifThenElse to trap and handle possible undefined values (which do indeed occur for AccountingGroup, when a slot is not in use).</p>
-
-<p>We can see that a lot of this would benefit from some programmatic automation.  To that end I wrote some <a href="https://github.com/erikerlandson/bash_condor_tools">convenience bash functions</a> for automating the tedious portions of this process: <code>cchist</code>, <code>ccsort</code> and <code>ccdump</code>.  For example I could use <code>cchist</code> to generate the histogram from the example above much more cleanly:</p>
-
-<pre><code>$ cchist condor_status SlotType State Activity AccountingGroup
-      3 Static | Claimed | Busy | A.user@localdomain
-      2 Static | Claimed | Busy | B.user@localdomain
-     10 Static | Unclaimed | Idle | undefined
-     15 total
-</code></pre>
-
-<p>The <code>ccdump</code> command simply dumps the table of values, uncollated, while <code>ccsort</code> outputs the table of values, but sorted:</p>
-
-<pre><code>$ ccdump condor_status SlotType State Activity AccountingGroup
-Static | Claimed | Busy | A.user@localdomain
-Static | Claimed | Busy | A.user@localdomain
-Static | Claimed | Busy | B.user@localdomain
-Static | Unclaimed | Idle | undefined
-Static | Claimed | Busy | A.user@localdomain
-Static | Unclaimed | Idle | undefined
-Static | Unclaimed | Idle | undefined
-Static | Claimed | Busy | B.user@localdomain
-Static | Unclaimed | Idle | undefined
-Static | Unclaimed | Idle | undefined
-Static | Unclaimed | Idle | undefined
-Static | Unclaimed | Idle | undefined
-Static | Unclaimed | Idle | undefined
-Static | Unclaimed | Idle | undefined
-Static | Unclaimed | Idle | undefined
-$ ccsort condor_status SlotType State Activity AccountingGroup
-Static | Claimed | Busy | A.user@localdomain
-Static | Claimed | Busy | A.user@localdomain
-Static | Claimed | Busy | A.user@localdomain
-Static | Claimed | Busy | B.user@localdomain
-Static | Claimed | Busy | B.user@localdomain
-Static | Unclaimed | Idle | undefined
-Static | Unclaimed | Idle | undefined
-Static | Unclaimed | Idle | undefined
-Static | Unclaimed | Idle | undefined
-Static | Unclaimed | Idle | undefined
-Static | Unclaimed | Idle | undefined
-Static | Unclaimed | Idle | undefined
-Static | Unclaimed | Idle | undefined
-Static | Unclaimed | Idle | undefined
-Static | Unclaimed | Idle | undefined
-</code></pre>
-
-<p>If you are interested in providing the actual raw unix command that was executed, you can use the <code>-cmd</code> option (note, this currently must appear <em>first</em>)</p>
-
-<pre><code>$ cchist -cmd condor_status SlotType State Activity AccountingGroup
-condor_status -format "%s" 'ifThenElse(SlotType isnt undefined, string(SlotType), "undefined")' -format " | %s" 'ifThenElse(State isnt undefined, string(State), "undefined")' -format " | %s" 'ifThenElse(Activity isnt undefined, string(Activity), "undefined")' -format " | %s\n" 'ifThenElse(AccountingGroup isnt undefined, string(AccountingGroup), "undefined")' -constraint 'True' | sort | uniq -c | awk '{ print $0; t += $1 } END { printf("%7d total\n",t) }'
-</code></pre>
-
-<p>As you can see, the command condor_status is a parameter.  You can also use the same commands with condor_q and condor_history:</p>
-
-<pre><code>$ cchist condor_q AccountingGroup LastJobStatus
-      3 A.user | 1
-      2 B.user | 1
-      5 total
-$ cchist condor_history AccountingGroup LastJobStatus
-     18 A.user | 2
-     26 B.user | 2
-     20 C.user | 2
-     64 total
-</code></pre>
-
-<p>You can obtain cchist and friends at the <a href="https://github.com/erikerlandson/bash_condor_tools">bash_condor_tools github repo</a></p>
 ]]></content>
   </entry>
   

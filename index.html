@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="In a previous post I described a method for implementing the Scala drop transform for Spark RDDs. That implementation came at a cost of subverting &hellip;">
+  <meta name="description" content="In Scala, sequence (and iterator) data types support the scanLeft method for computing a sequential prefix scan on sequence elements: // Use scanLeft &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,76 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2014/08/09/implementing-an-rdd-scanleft-transform-with-cascade-rdds/">Implementing an RDD scanLeft Transform With Cascade RDDs</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-08-09T09:10:00-07:00" pubdate data-updated="true">Aug 9<span>th</span>, 2014</time>
+        
+         | <a href="/blog/2014/08/09/implementing-an-rdd-scanleft-transform-with-cascade-rdds/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>In Scala, sequence (and iterator) data types support the <code>scanLeft</code> method for computing a sequential prefix scan on sequence elements:</p>
+
+<pre><code>// Use scanLeft to compute the cumulative sum of some integers
+scala&gt; List(1, 2, 3).scanLeft(0)(_ + _)
+res0: List[Int] = List(0, 1, 3, 6)
+</code></pre>
+
+<p>Spark RDDs are logically a sequence of row objects, and so <code>scanLeft</code> is in principle well defined on RDDs.  In this post I will describe how to cleanly implement a <code>scanLeft</code> RDD transform by applying an RDD variation called Cascade RDDs.</p>
+
+<p>A Cascade RDD is an RDD having one partition which is a function of an input RDD partition and an optional predecessor Cascade RDD partition.  You can see that this definition is somewhat recursive, where the basis case is a Cascade RDD having no precedessor.  The following diagram illustrates both cases of Cascade RDD:</p>
+
+<p><img src="/assets/images/rdd_scanleft/rdd_scan_1.png" alt="image" /></p>
+
+<p>As implied by the above diagram, a series of Cascade RDDs falling out of an input RDD will have as many Cascade RDDs as there are input partitions.  This situation begs for an abstraction to re-assemble the cascade back into a single output RDD, and so the method <code>cascadePartitions</code> is defined, as illustrated:</p>
+
+<p><img src="/assets/images/rdd_scanleft/rdd_scan_3.png" alt="image" /></p>
+
+<p>The <code>cascadePartitions</code> method takes a function argument <code>f</code>, with the signature:</p>
+
+<pre><code>f(input: Iterator[T], cascade: Option[Iterator[U]]): Iterator[U]
+</code></pre>
+
+<p>in a manner somewhat analogous to <code>mapPartitions</code>.  The function <code>f</code> must address the fact that <code>cascade</code> is optional and will be <code>None</code> in case where there is no predecessor Cascade RDD.  The interested reader can examine the details of how the <code>CascadeRDD</code> class and its companion method <code>cascadePartitions</code> are <a href="https://github.com/erikerlandson/spark/blob/rdd_scan_blog/core/src/main/scala/org/apache/spark/rdd/CascadeRDDFunctions.scala">implemented here.</a></p>
+
+<p>With Cascade RDDs it is now straightforward to define a <code>scanLeft</code> transform for RDDs.  We wish to run <code>scanLeft</code> on each input partition, with the condition that we want to start where the previous input partition left off.  The Scala <code>scanLeft</code> function makes this easy, as the starting point is its first parameter (z): <code>scanLeft(z)(f)</code>.  The following figure illustrates what this looks like:</p>
+
+<p><img src="/assets/images/rdd_scanleft/rdd_scan_2.png" alt="image" /></p>
+
+<p>As the above schematic demonstrates, almost all the work is accomplished with a single call to <code>cascadePartitions</code>, using a thin wrapper around <code>f</code> which determines where to start the next invocation of Scala <code>scanLeft</code> &#8211; either the input parameter <code>z</code>, or the last output element of the previous cascade.   One final transform must be applied to remove the initial element that Scala <code>scanLeft</code> inserts into its output, excepting the first output partition, where it is kept to be consistent with the <code>scanLeft</code> definition.</p>
+
+<p>All computation is accomplished in the standard RDD formalism, and so <code>scanLeft</code> is a proper lazy RDD transform.</p>
+
+<p>The actual implementation is as compact as the above description implies, and you can see the <a href="https://github.com/erikerlandson/spark/blob/rdd_scan_blog/core/src/main/scala/org/apache/spark/rdd/ScanRDDFunctions.scala#L144">code here.</a></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1484,50 +1554,6 @@ slot1_1@rorschach | 1
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/11/15/rethinking-the-semantics-of-group-quotas-and-slot-weights-claim-capacity-model/">Rethinking the Semantics of Group Quotas and Slot Weights: Claim Capacity Model</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-11-15T17:22:00-07:00" pubdate data-updated="true">Nov 15<span>th</span>, 2012</time>
-        
-         | <a href="/blog/2012/11/15/rethinking-the-semantics-of-group-quotas-and-slot-weights-claim-capacity-model/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>In my previous post about <a href="http://erikerlandson.github.com/blog/2012/11/13/rethinking-the-semantics-of-group-quotas-and-slot-weights-for-heterogeneous-and-multidimensional-compute-resources">Rethinking the Semantics of Group Quotas and Slot Weights</a>, I proposed a concept for unifying the semantics of accounting group quotas and slot weights across arbitrary resource allocation strategies.</p>
-
-<p>My initial terminology was that the weight of a slot (i.e. resource ad) is a measure of the <em>maximum</em> number of jobs that might match against that ad, given the currently available resource quantities and the allocation policy.  The cost of a match becomes the amount by which that measure is reduced, after the match&#8217;s resources are removed from the ad.</p>
-
-<p>In the HTCondor vocabulary, a job acquires a <em>claim</em> on resources to actually run after it has been matched.  It has been proposed that it may be beneficial for HTCondor to evolve toward a model where there are (aggregate) resource ads, and claims against those ads, as a simplification of the current model which involves static, partitionable and dynamic slots, with claims.  With this in mind, a preferable terminology for group quota and weight semantics might be that a resource ad (or slot) has a measure of the maximum number of claims it could dispense: a <em>claim capacity</em> measure.  The cost of a claim (or match) is the corresponding reduction of the resource&#8217;s claim capacity.</p>
-
-<p>So, this semantic model could be referred to as the Claim Capacity Model of group quotas and slot weights.  With this terminology, the shared &#8216;unit&#8217; for group quotas and slot weights would be <em>claims</em> instead of <em>jobs</em>.</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/2/">&larr; Older</a>
@@ -1547,6 +1573,10 @@ slot1_1@rorschach | 1
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/08/09/implementing-an-rdd-scanleft-transform-with-cascade-rdds/">Implementing an RDD scanLeft Transform With Cascade RDDs</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/07/29/deferring-spark-actions-to-lazy-transforms-with-the-promise-rdd/">Deferring Spark Actions to Lazy Transforms With the Promise RDD</a>
       </li>
     
@@ -1560,10 +1590,6 @@ slot1_1@rorschach | 1
     
       <li class="post">
         <a href="/blog/2013/03/21/the-impact-of-negotiator-cycle-cadence-on-slot-loading/">The Impact of Negotiator Cycle Cadence on Slot Loading</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2013/03/16/smooth-gradients-for-cubic-hermite-splines/">Smooth Gradients for Cubic Hermite Splines</a>
       </li>
     
   </ul>

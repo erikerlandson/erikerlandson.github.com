@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="There is a straightforward technique to leverage a Condor preemption policy to direct preemptions in a way that helps maintain resource usages as &hellip;">
+  <meta name="description" content="Several Condor commands, including condor_status, condor_q and condor_history, provide a nice feature for outputting formatted subsets of classad &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,125 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2012/06/29/easy-histograms-and-tables-from-condor-jobs-and-slots/">Easy Histograms and Tables from Condor Jobs and Slots</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-06-29T09:46:00-07:00" pubdate data-updated="true">Jun 29<span>th</span>, 2012</time>
+        
+         | <a href="/blog/2012/06/29/easy-histograms-and-tables-from-condor-jobs-and-slots/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Several <a href="http://research.cs.wisc.edu/condor/">Condor</a> commands, including condor_status, condor_q and condor_history, provide a nice feature for outputting formatted subsets of classad attributes: the <code>-format &lt;format&gt; &lt;attr&gt;</code> option.  In this post, I assume basic familiarity with <code>-format</code>.  You can read more <a href="http://research.cs.wisc.edu/condor/manual/v7.8/condor_status.html#SECTION0011453000000000000000">here</a></p>
+
+<p>The <code>-format</code> option can be used to generate tables and histograms of attributes, in a classic &#8216;unix one-liner&#8217; fashion.  For example, supposing I wanted to use condor_status to create a nice histogram of the values for slot type, state, activity and accounting group.  I might issue a one-liner like this:</p>
+
+<pre><code>$ condor_status -format "%s" 'ifThenElse(SlotType =!= undefined, string(SlotType), "undefined")' \
+&gt; -format " | %s" 'ifThenElse(State =!= undefined, string(State), "undefined")' \
+&gt; -format " | %s" 'ifThenElse(Activity =!= undefined, string(Activity), "undefined")' \
+&gt; -format " | %s\n" 'ifThenElse(AccountingGroup =!= undefined, string(AccountingGroup), "undefined")' \
+&gt; | sort | uniq -c | awk '{ print $0; t += $1 } END { printf("%7d total\n",t) }'
+      3 Static | Claimed | Busy | A.user@localdomain
+      2 Static | Claimed | Busy | B.user@localdomain
+     10 Static | Unclaimed | Idle | undefined
+     15 total
+</code></pre>
+
+<p>Note that in this command I was extra pedantic and careful about converting expressions to strings, and using the ClassAd ifThenElse to trap and handle possible undefined values (which do indeed occur for AccountingGroup, when a slot is not in use).</p>
+
+<p>We can see that a lot of this would benefit from some programmatic automation.  To that end I wrote some <a href="https://github.com/erikerlandson/bash_condor_tools">convenience bash functions</a> for automating the tedious portions of this process: <code>cchist</code>, <code>ccsort</code> and <code>ccdump</code>.  For example I could use <code>cchist</code> to generate the histogram from the example above much more cleanly:</p>
+
+<pre><code>$ cchist condor_status SlotType State Activity AccountingGroup
+      3 Static | Claimed | Busy | A.user@localdomain
+      2 Static | Claimed | Busy | B.user@localdomain
+     10 Static | Unclaimed | Idle | undefined
+     15 total
+</code></pre>
+
+<p>The <code>ccdump</code> command simply dumps the table of values, uncollated, while <code>ccsort</code> outputs the table of values, but sorted:</p>
+
+<pre><code>$ ccdump condor_status SlotType State Activity AccountingGroup
+Static | Claimed | Busy | A.user@localdomain
+Static | Claimed | Busy | A.user@localdomain
+Static | Claimed | Busy | B.user@localdomain
+Static | Unclaimed | Idle | undefined
+Static | Claimed | Busy | A.user@localdomain
+Static | Unclaimed | Idle | undefined
+Static | Unclaimed | Idle | undefined
+Static | Claimed | Busy | B.user@localdomain
+Static | Unclaimed | Idle | undefined
+Static | Unclaimed | Idle | undefined
+Static | Unclaimed | Idle | undefined
+Static | Unclaimed | Idle | undefined
+Static | Unclaimed | Idle | undefined
+Static | Unclaimed | Idle | undefined
+Static | Unclaimed | Idle | undefined
+$ ccsort condor_status SlotType State Activity AccountingGroup
+Static | Claimed | Busy | A.user@localdomain
+Static | Claimed | Busy | A.user@localdomain
+Static | Claimed | Busy | A.user@localdomain
+Static | Claimed | Busy | B.user@localdomain
+Static | Claimed | Busy | B.user@localdomain
+Static | Unclaimed | Idle | undefined
+Static | Unclaimed | Idle | undefined
+Static | Unclaimed | Idle | undefined
+Static | Unclaimed | Idle | undefined
+Static | Unclaimed | Idle | undefined
+Static | Unclaimed | Idle | undefined
+Static | Unclaimed | Idle | undefined
+Static | Unclaimed | Idle | undefined
+Static | Unclaimed | Idle | undefined
+Static | Unclaimed | Idle | undefined
+</code></pre>
+
+<p>If you are interested in providing the actual raw unix command that was executed, you can use the <code>-cmd</code> option (note, this currently must appear <em>first</em>)</p>
+
+<pre><code>$ cchist -cmd condor_status SlotType State Activity AccountingGroup
+condor_status -format "%s" 'ifThenElse(SlotType isnt undefined, string(SlotType), "undefined")' -format " | %s" 'ifThenElse(State isnt undefined, string(State), "undefined")' -format " | %s" 'ifThenElse(Activity isnt undefined, string(Activity), "undefined")' -format " | %s\n" 'ifThenElse(AccountingGroup isnt undefined, string(AccountingGroup), "undefined")' -constraint 'True' | sort | uniq -c | awk '{ print $0; t += $1 } END { printf("%7d total\n",t) }'
+</code></pre>
+
+<p>As you can see, the command condor_status is a parameter.  You can also use the same commands with condor_q and condor_history:</p>
+
+<pre><code>$ cchist condor_q AccountingGroup LastJobStatus
+      3 A.user | 1
+      2 B.user | 1
+      5 total
+$ cchist condor_history AccountingGroup LastJobStatus
+     18 A.user | 2
+     26 B.user | 2
+     20 C.user | 2
+     64 total
+</code></pre>
+
+<p>You can obtain cchist and friends at the <a href="https://github.com/erikerlandson/bash_condor_tools">bash_condor_tools github repo</a></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -488,6 +607,10 @@ $ callgrind_annotate --inclusive=yes --tree=calling callgrind.out.2671 &gt; mktp
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/08/09/implementing-an-rdd-scanleft-transform-with-cascade-rdds/">Implementing an RDD scanLeft Transform With Cascade RDDs</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/07/29/deferring-spark-actions-to-lazy-transforms-with-the-promise-rdd/">Deferring Spark Actions to Lazy Transforms With the Promise RDD</a>
       </li>
     
@@ -501,10 +624,6 @@ $ callgrind_annotate --inclusive=yes --tree=calling callgrind.out.2671 &gt; mktp
     
       <li class="post">
         <a href="/blog/2013/03/21/the-impact-of-negotiator-cycle-cadence-on-slot-loading/">The Impact of Negotiator Cycle Cadence on Slot Loading</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2013/03/16/smooth-gradients-for-cubic-hermite-splines/">Smooth Gradients for Cubic Hermite Splines</a>
       </li>
     
   </ul>
