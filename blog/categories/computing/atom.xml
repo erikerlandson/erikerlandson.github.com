@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2014-08-09T11:56:03-07:00</updated>
+  <updated>2014-08-12T11:37:58-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,31 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Implementing Parallel Prefix Scan as a Spark RDD Transform]]></title>
+    <link href="http://erikerlandson.github.com/blog/2014/08/12/implementing-parallel-prefix-scan-as-a-spark-rdd-transform/"/>
+    <updated>2014-08-12T11:37:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2014/08/12/implementing-parallel-prefix-scan-as-a-spark-rdd-transform</id>
+    <content type="html"><![CDATA[<p>In my <a href="/blog/2014/08/09/implementing-an-rdd-scanleft-transform-with-cascade-rdds/">previous post</a>, I described how to implement the Scala <code>scanLeft</code> function as an RDD transform.  By definition <code>scanLeft</code> invokes a sequential-only prefix scan algorithm; it does not assume that either its input function <code>f</code> or its initial-value <code>z</code> can be applied in a parallel fashion.   Its companion function <code>scan</code>, however, computes a <em>parallel</em> prefix scan.  In this post I will describe an implementation of parallel prefix <code>scan</code> as an RDD transform.</p>
+
+<p>As was the case with <code>scanLeft</code>, a basic strategy is to begin by applying <code>scan</code> to each RDD partition.  Provided that appropriate "offsets" <code>{z1, z2, ...}</code> can be computed for each partition, these can be applied to the partial, per-partition results to yield the output.   In fact, the desired <code>{z1, z2, ...}</code> are the parallel prefix scan of the last element in each per-partition scan.  The following diagram illustrates:</p>
+
+<p><img src="/assets/images/rdd_scan/rdd_scan_4.png" alt="image" /></p>
+
+<p>The diagram above glosses over the details of computing <code>scan</code> to obtain <code>{z1, z2, ...}</code>.   I will first describe the implementation I currently use, and then also discuss a possible alternative.  The current implementation takes the approach of encoding the <a href="http://en.wikipedia.org/wiki/Prefix_sum#Parallel_algorithm">logic of a parallel prefix scan</a> directly into an RDD computation DAG.   Each iteration, or "ply," of the parallel algorithm is represented by an RDD.  Each element resides in its own partition, and so the computation dependency for each element is directly representable in the RDD dependency substructure.  This construction is illustrated in the following schematic (for a vector of 8 z-values):</p>
+
+<p><img src="/assets/images/rdd_scan/rdd_scan_5.png" alt="image" /></p>
+
+<p>The parallel prefix scan algorithm executes O(log(n)) plies, which materializes as O(log(n)) RDDs shown in the diagram above.  In this context, (n) is the number of input RDD <em>partitions</em>, not to be confused with the number of data rows in the RDD.   There are O((n)log(n)) partitions, each having a single row containing the z-value for a corresponding output partition.   Some z-values are determined earlier than others.  For example z1 is immediately available in ply(0), and ply(3) can refer directly back to that ply(0) partition in the interest of efficiency, as called out by the red DAG arcs.</p>
+
+<p>This scheme allows each final output partition to obtain its z-value directly from a single dedicated partition, which ensures that minimal data needs to be transferred across worker processes.  Final output partitions can be computed local to their corresponding input partitions.  Data transfer may be limited to the intermediate z-values, which are small single-row affairs by construction.</p>
+
+<p>The code implementing the logic above can be <a href="https://github.com/erikerlandson/spark/blob/rdd_scan_blog/core/src/main/scala/org/apache/spark/rdd/ScanRDDFunctions.scala#L161">viewed here.</a></p>
+
+<p>I will conclude by noting that there is an alternative to this highly distributed computation of <code>{z1, z2, ...}</code>, which is to collect the last-values in the per-partition intermediate scan ouputs into a single array, and run <code>scan</code> directly on that array.   This has the advantage of avoiding the construction of log(n) intermediate RDDs.   It does, however, require a monolithic 'fan-in' of data into a single RDD to receive the collection of values.  That is followed by a fan-out of the array, where each output partition picks its single z-value from the array.  It is for this reason I suspect this alternative incurs substantially more transfer overhead across worker processes.  However, one might also partition the resulting z-values in some optimal way, so that each final output partition needs to request only the partition that contains its z-value.  Future experimentation might show that this can out-perform the current fully-distributed implementation.</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Implementing an RDD scanLeft Transform With Cascade RDDs]]></title>
@@ -459,56 +484,6 @@ while (true) {
 
 <p><a name="anchor1" id="ref1">[1] </a><a href="http://www.xmailserver.org/diff2.pdf">An O(ND) Difference Algorithm and its Variations</a>, Eugene W. Myers<br>
 <a name="anchor2" id="ref2">[2] </a><a href="http://www.itu.dk/stud/speciale/bepjea/xwebtex/litt/an-onp-sequence-comparison-algorithm.pdf">An O(NP) Sequence Comparison Algorithm</a>, Sun Wu, Udi Manber, Gene Myers</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[The Impact of Negotiator Cycle Cadence on Slot Loading]]></title>
-    <link href="http://erikerlandson.github.com/blog/2013/03/21/the-impact-of-negotiator-cycle-cadence-on-slot-loading/"/>
-    <updated>2013-03-21T15:10:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2013/03/21/the-impact-of-negotiator-cycle-cadence-on-slot-loading</id>
-    <content type="html"><![CDATA[<p>The <a href="http://research.cs.wisc.edu/htcondor/manual/v7.8/3_1Introduction.html#8555">HTCondor negotiator</a> assigns jobs (resource requests) to slots (compute resources) at regular intervals, configured by the <a href="http://research.cs.wisc.edu/htcondor/manual/v7.8/3_3Configuration.html#20544">NEGOTIATOR_INTERVAL</a> parameter.  This interval (the cycle <em>cadence</em>) has a fundamental impact on a pool <em>loading factor</em> -- the fraction of time that slots are being productively utilized.</p>
-
-<p>Consider the following diagram, which illustrates the utilization of a slot over the lifetime of a job.  When a job completes, its slot will remain empty until it can be assigned a new job on the next negotiation cycle.</p>
-
-<p><img src="/assets/images/slot_load_study/loading_factor_diagram.png" width="750"></p>
-
-<p>As the diagram above shows, the loading factor for a slot can be expressed as D/Z, where D is the duration of the job, and Z is the total time until the next cycle occurring after the job completes.  We can also write Z = D+I, where I is the "idle time" from job completion to the start of the next negotiation cycle.   Loading factor is always &lt;= 1, where a value of 1 corresponds to ideal loading -- every slot is utilized 100% of the time.  In general, loading will be &lt; 1, as jobs rarely complete exactly on a cycle boundary.</p>
-
-<p>It is worth briefly noting that the <a href="http://research.cs.wisc.edu/htcondor/manual/v7.8/3_3Configuration.html#18202">claim reuse</a> feature was developed to help address this problem.  However, claim re-use is not compatible with all other features -- for example enabling claim re-use can cause accounting group starvation -- and so what follows remains relevant to many HTCondor configurations.</p>
-
-<p>Given a particular negotiation cycle cadence, how does a slot's loading factor behave, as a function of job duration?  The loading factor can be expressed as:</p>
-
-<div markdown="0">
-\\[
-\\text{Loading Factor} = \\frac{D}{C \\left( q + \\lceil r \\rceil \\right)} \\\\
- \\\\
-\\text{where:} \\\\
-D = \\text{job duration} \\\\
-C = \\text{cycle cadence} \\\\
-q = \\lfloor D / C \\rfloor \\\\
-r = \\left( D / C \\right) - q \\\\
-\\]
-</div>
-
-
-<p>The following plot illustrates how the loading factor changes with job duration, assuming a cadence of 300 seconds (5 minutes):</p>
-
-<p><img src="/assets/images/slot_load_study/load_factor_300s.png" width="750"></p>
-
-<p>We immediately see that there is a saw-tooth pattern to the plot.  As the job duration increases towards the boundary of a cycle, there is less and less idle time until the next cycle, and so the loading approaches 1.0.  However, once the job's end crosses the thresold to <em>just past</em> the start of the cycle, it immediately drops to the worse possible case: the slot will be idle for nearly an entire cycle.</p>
-
-<p>The other important pattern is that the bottom of the saw-tooth gradually increases.  As a job's duration occupies more whole negotiation cycles, the idle time at the end of the last cycle represents a decreasing fraction of the total time.</p>
-
-<p>Observe that the most important 'unit' in this plot is the number of negotiation cycles.  Since the saw-toothing scales with the cycle interval, we can express the same plot in units of cycles instead of seconds:</p>
-
-<p><img src="/assets/images/slot_load_study/load_factor_cu.png" width="750"></p>
-
-<p>The results above suggest a couple possible approaches for tuning negotiator cycle cadence to optimize slot loading in an HTCondor pool.  The first is to configure the negotiator interval to be small relative to a typical job duration, as the lower-bound on loading factor increases with the number of cycles a job's duration occupies.  For example, if a typical job duration is 10 minutes, then a cycle cadence of 60 seconds ensures that in general 9 out of 10 cycles will be fully utilized, and so loading will be around 90%.  However, if one has mostly very short jobs, this can be difficult, as negotiation cycle cadences much less than 60 seconds may risk causing performance problems even on a moderately loaded pool.</p>
-
-<p>A second approach is to try and tune the cadence so that as many jobs as possible complete <em>near the end</em> of a cycle, thus minimizing delay until the next cycle.  For example, if job durations are relatively consistent, say close to 90 seconds, then setting the negotiator interval to something like 50 seconds will induce those jobs to finish near the end of the 2nd negotiation cycle (at t+100 seconds), for a loading factor around 90%.  The caveat here is that job durations are frequently <em>not</em> that consistent, and as job duration spread increases, one's ability to play this game <a href="http://erikerlandson.github.com/blog/2013/03/15/examining-the-modulus-of-random-variables/">rapidly evaporates</a>.</p>
-
-<p>In this post, I have focused on the behavior of individual jobs and individual slots.  An obvious next question is what happens to aggregate pool loading when job durations are treated as population sampling from random variables, which I plan to explore in future posts.</p>
 ]]></content>
   </entry>
   

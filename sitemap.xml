@@ -153,11 +153,17 @@
         <lastmod>2014-08-09T11:54:15-07:00</lastmod>
     </url>
     <url>
+        <loc>
+            http://erikerlandson.github.com/blog/2014/08/12/implementing-parallel-prefix-scan-as-a-spark-rdd-transform/
+        </loc>
+        <lastmod>2014-08-12T11:37:42-07:00</lastmod>
+    </url>
+    <url>
         <loc>http://erikerlandson.github.com/blog/archives/</loc>
-        <lastmod>2014-08-09T11:54:15-07:00</lastmod>
+        <lastmod>2014-08-12T11:37:42-07:00</lastmod>
     </url>
     <url>
         <loc>http://erikerlandson.github.com/</loc>
-        <lastmod>2014-08-09T11:54:15-07:00</lastmod>
+        <lastmod>2014-08-12T11:37:42-07:00</lastmod>
     </url>
 </urlset>
