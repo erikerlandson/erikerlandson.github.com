@@ -115,6 +115,7 @@ def slice(from: Int, until: Int): Iterator[A] = {
     toDrop -= 1
   }
 
+  // I am a ticking quadratic time bomb:
   new AbstractIterator[A] {
     private var remaining = until - lo
     def hasNext = remaining &gt; 0 &amp;&amp; self.hasNext
