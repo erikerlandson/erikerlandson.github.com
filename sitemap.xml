@@ -159,11 +159,17 @@
         <lastmod>2014-08-12T11:37:42-07:00</lastmod>
     </url>
     <url>
+        <loc>
+            http://erikerlandson.github.com/blog/2014/09/03/matryoshka-class-construction-from-the-scala-iterator-drop-method/
+        </loc>
+        <lastmod>2014-09-03T17:23:58-07:00</lastmod>
+    </url>
+    <url>
         <loc>http://erikerlandson.github.com/blog/archives/</loc>
-        <lastmod>2014-08-12T11:37:42-07:00</lastmod>
+        <lastmod>2014-09-03T17:23:58-07:00</lastmod>
     </url>
     <url>
         <loc>http://erikerlandson.github.com/</loc>
-        <lastmod>2014-08-12T11:37:42-07:00</lastmod>
+        <lastmod>2014-09-03T17:23:58-07:00</lastmod>
     </url>
 </urlset>
