@@ -1,0 +1,8 @@
+<br>
+<a id="feedback"></a>Feedback • 
+ {% if site.twitter_user and page.skip_twitter_feedback != true %}
+    <script type="text/javascript" src="//platform.twitter.com/widgets.js"></script>
+    {% capture tweet_text %}@{{site.twitter_user}} re: {{site.url}}{{page.url}}{% endcapture %}
+  <a href="https://twitter.com/intent/tweet?text={{ tweet_text | uri_escape }}">Reply to this post on Twitter</a> • 
+ {% endif %}
+<a href="mailto:{{site.email}}">Email the author</a>
