@@ -4,7 +4,7 @@
   <title><![CDATA[tool monkey]]></title>
   <link href="http://erikerlandson.github.com/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2014-09-11T07:54:53-07:00</updated>
+  <updated>2014-09-11T15:06:48-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,176 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Faster Random Samples With Gap Sampling]]></title>
+    <link href="http://erikerlandson.github.com/blog/2014/09/11/faster-random-samples-with-gap-sampling/"/>
+    <updated>2014-09-11T07:57:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2014/09/11/faster-random-samples-with-gap-sampling</id>
+    <content type="html"><![CDATA[<p>Generating a random sample of a collection is, logically, a O(np) operation, where (n) is the sample size and (p) is the sampling probability.  For example, extracting a random sample, without replacement, from an array might look like this in pseudocode:</p>
+
+<pre><code>sample(data: array, p: real) {
+    n = length(data)
+    m = floor(p * n)
+    for j = 0 to m-1 {
+        k = random(j, n-1)
+        swap(data[j], data[k])
+    }
+    emit the first m elements of 'data' to output
+}
+</code></pre>
+
+<p>We can see that this sampling algorithm is indeed O(np).  However, it makes some nontrivial assumptions about its input data:</p>
+
+<ul>
+<li>It is random access</li>
+<li>It is writable</li>
+<li>Its size is known</li>
+<li>It can be destructively modified</li>
+</ul>
+
+
+<p>These assumptions can be violated in several ways.  The input data might not support random access, for example it might be a list, or stream, or an iterator over the same.  We might not know its size a priori.  It might be read-only.  It might be up-cast to some superclass where knowledge about these assumed properties is no longer available.</p>
+
+<p>In cases such as this, there is another common sampling algorithm:</p>
+
+<pre><code>sample(data: sequence, p: real) {
+    while not end(data) {
+        v = next(data)
+        if p &lt; random(0.0, 1.0) then emit v to output
+    }
+}
+</code></pre>
+
+<p>The above algorithm enjoys all the advantage in flexibility.  It requires only linear access, does not require writable input, and makes no assumptions about input size.  However it comes at a price: this algorithm is no longer O(np), it is O(n).  Each element must be traversed directly, and worse yet the random number generagor (RNG) must be invoked on each element.  O(n) invocation of the RNG is a substantial cost &#8211; random number generation is typically very expensive compared to the cost of iterating to the next element in a sequence.</p>
+
+<p>But&#8230; does linear sampling truly require us to invoke our RNG on every element?   Consider the pattern of data access, divorced from code.   It looks like a sequence of choices: for each element we either (skip) or (sample):</p>
+
+<pre><code>(skip) (skip) (sample) (skip) (sample) (skip) (sample) (sample) (skip) (skip) (sample) ...
+</code></pre>
+
+<p>The number of consecutive (skip) events between each (sample) &#8211; the <em>sampling gap</em> &#8211; can itself be modeled as a random variable.  Each (skip)/(sample) choice is an independent Bernoulli trial, where the probability of (skip) is (1-p).   The PMF of the sampling gap for gap of {0, 1, 2, &#8230;} is therefore the geometric distribution parameterized by (p):  P(k) = p(1-p)<sup>k</sup></p>
+
+<p>This suggests an alternative algorithm for sampling, where we only need to randomly choose sample gaps instead of randomly choosing whether we sample each individual element:</p>
+
+<pre><code>// choose a random sampling gap 'k' from P(k) = p(1-p)^k
+// caution: this explodes for p = 0 or p = 1
+random_gap(p: real) {
+    u = max(random(0.0, 1.0), epsilon)
+    return floor(log(u) / log(1-p))
+}
+
+sample(data: sequence, p: real) {
+    advance(data, random_gap(p))
+    while not end(data) {
+        emit next(data) to output
+        advance(data, random_gap(p))
+    }
+}
+</code></pre>
+
+<p>The above algorithm calls the RNG only once per actual collected sample, and so the cost of RNG calls is O(np).  Note that the algorithm is still O(n), but the cost of the RNG tends to dominate the cost of sequence traversal, and so the resulting efficiency improvement is substantial.  I measured the following performance improvements with gap sampling, compared to traditional linear sequence sampling, on a <a href="https://gist.github.com/erikerlandson/05db1f15c8d623448ff6">Scala prototype testing rig</a>:</p>
+
+<p><head><style>
+table, th, td {
+border: 1px solid black;
+border-collapse: collapse;
+}
+th, td {
+padding: 10px;
+}
+th {
+text-align: center;
+}
+</style></head></p>
+
+<table>
+<tr> <th>Type</th> <th>p</th> <th>linear</th> <th>gap</th> </tr>
+<tr> <td>Array</td> <td>0.001</td> <td>2784</td> <td>8</td> </tr>
+<tr> <td>Array</td> <td>0.01</td> <td>2817</td> <td>77</td> </tr>
+<tr> <td>Array</td> <td>0.1</td> <td>3075</td> <td>686</td> </tr>
+<tr> <td>Array</td> <td>0.5</td> <td>4221</td> <td>3756</td> </tr>
+<tr> <td>List</td> <td>0.001</td> <td>2662</td> <td>238</td> </tr>
+<tr> <td>List</td> <td>0.01</td> <td>2662</td> <td>298</td> </tr>
+<tr> <td>List</td> <td>0.1</td> <td>2936</td> <td>301</td> </tr>
+<tr> <td>List</td> <td>0.5</td> <td>3995</td> <td>305</td> </tr>
+</table>
+
+
+
+
+<br>
+
+
+<p>In the results above, we see that for the Array data the gap sampling times are linear in (p) &#8211; Arrays are random access, and the operation of skipping sample-gaps is constant time.   Gap sampling on random access data allows marked improvement with small sampling probabities, where there are large sampling gaps that can be skipped in constant time.  The List data timings reflect that the sampling traverses all elements in either case.  The time savings here is due to reduced calls to the RNG.</p>
+
+<p>Note that while the gap sampling numbers for Array are better than linear sampling, they show signs of gaining on the linear sampling times.  I will touch on this again at the end of the post.</p>
+
+<p>The gap-sampling algorithm described above is for sampling <em>without</em> replacement.   However, the same approach can be modified to generate sampling <em>with</em> replacement.</p>
+
+<p>When sampling with replacement, it is useful to consider the <em>replication factor</em> of each element (where a replication factor of zero means the element wasn&#8217;t sampled).  Pretend for the moment that the actual data size (n) is known.  The sample size (m) = (n)(p).  The probability that each element gets sampled, per trial, is 1/n, with (m) independent trials, and so the replication factor (r) for each element obeys a binomial distribution: Binomial(m, 1/n).  If we substitute (n)(p) for (m), we have Binomial(np, 1/n).  As the (n) grows, the Binomial is <a href="http://en.wikipedia.org/wiki/Binomial_distribution#Poisson_approximation">well approximated by a Poisson distribution</a> Poisson(L), where (L) = (np)(1/n) = (p).  And so for our purposes we may sample from Poisson(p), where P(r) = (p<sup>k</sup> / k!)e<sup>(-p),</sup> for our sampling replication factors.  Note that we have now discarded any dependence on sample size (n), as we desire.</p>
+
+<p>In our gap-sampling context, the sampling gaps are now elements whose replication factor is zero, which occurs with probability P(0) = e<sup>(-p).</sup>  And so our sampling gaps are now drawn from geometric distribution P(k) = (1-q)(q)<sup>k,</sup> where q = e<sup>(-p).</sup>   When we <em>do</em> sample an element, its replication factor is drawn from Poisson(p), however <em>conditioned such that the value is >= 1.</em>  It is straightforward to adapt a <a href="http://en.wikipedia.org/wiki/Poisson_distribution#Generating_Poisson-distributed_random_variables">standard Poisson generator</a>, as shown below.</p>
+
+<p>Given the above, gap sampling with replacement in pseudocode looks like:</p>
+
+<pre><code>// sample 'k' from Poisson(p), conditioned to k &gt;= 1
+poisson_ge1(p: real) {
+    q = e^(-p)
+    // simulate a poisson trial such that k &gt;= 1
+    t = q + (1-q)*random(0.0, 1.0)
+    k = 1
+
+    // continue standard poisson generation trials
+    t = t * random(0.0, 1.0)
+    while (t &gt; q) {
+        k = k + 1
+        t = t * random(0.0, 1.0)
+    }
+    return k
+}
+
+// choose a random sampling gap 'k' from P(k) = p(1-p)^k
+// caution: this explodes for p = 0 or p = 1
+random_gap(p: real) {
+    u = max(random(0.0, 1.0), epsilon)
+    return floor(log(u) / -p)
+}
+
+sample(data: sequence, p: real) {
+    advance(data, random_gap(p))
+    while not end(data) {
+        rf = poisson_ge1(p)
+        v = next(data)
+        emit (rf) copies of (v) to output
+        advance(data, random_gap(p))
+    }
+}
+</code></pre>
+
+<p>The efficiency improvements I have measured for gap sampling with replacement are shown here:</p>
+
+<table>
+<tr> <th>Type</th> <th>p</th> <th>linear</th> <th>gap</th> </tr>
+<tr> <td>Array</td> <td>0.001</td> <td>1635</td> <td>12</td> </tr>
+<tr> <td>Array</td> <td>0.01</td> <td>1807</td> <td>130</td> </tr>
+<tr> <td>Array</td> <td>0.1</td> <td>2087</td> <td>1101</td> </tr>
+<tr> <td>Array</td> <td>0.5</td> <td>3258</td> <td>4733</td> </tr>
+<tr> <td>List</td> <td>0.001</td> <td>1341</td> <td>233</td> </tr>
+<tr> <td>List</td> <td>0.01</td> <td>1400</td> <td>411</td> </tr>
+<tr> <td>List</td> <td>0.1</td> <td>1729</td> <td>472</td> </tr>
+<tr> <td>List</td> <td>0.5</td> <td>3342</td> <td>361</td> </tr>
+</table>
+
+
+
+
+<br>
+
+
+<p>The table above shows that there is a crossover point in the Array timings where gap sampling costs more time than linear sampling.  Although the random access in Scala Array allows for increasing improvements as sampling probability grows small, there appears to be an increased cost factor that allows for the crossover point.  This is a subject for further investigation, but may have to do with allocation cost of Array iterator data structures in Scala.</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[The Scala Iterator 'drop' Method Generates a Matryoshka Class Nesting]]></title>
@@ -2005,142 +2175,6 @@ $ ps -eo "%p %C %n %a" | grep 'burn 600'
 22403 10.2  10 /bin/sh /home/eje/bin/burn 600
 22406 93.2   0 /bin/sh /home/eje/bin/burn 600
 22411 90.6   0 /bin/sh /home/eje/bin/burn 600
-</code></pre>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[LIFO and FIFO Preemption Policies for a Condor Pool]]></title>
-    <link href="http://erikerlandson.github.com/blog/2012/07/19/lifo-and-fifo-preemption-policies-for-a-condor-pool/"/>
-    <updated>2012-07-19T13:57:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2012/07/19/lifo-and-fifo-preemption-policies-for-a-condor-pool</id>
-    <content type="html"><![CDATA[<p>On a Condor pool, a Last In First Out (LIFO) preemption policy favors choosing the longest-running job from the available preemption options.  Correspondingly, a First In First Out (FIFO) policy favors the most-recent job for preemption.</p>
-
-<p>Configuring a LIFO or FIFO policy is easy, using the <code>PREEMPTION_RANK</code> configuration variable.  <code>PREEMPTION_RANK</code> defines a ClassAd expression that is evaluated for all slots that are candidates for claim preemption, and causes those candidates to be sorted so that the candidates with the highest rank value are considered first.   Therefore, to implement a LIFO (or FIFO) preemption policy, one needs reference an expression that represents the claiming job&#8217;s running time:</p>
-
-<pre><code># LIFO preemption: favor preempting jobs that have been running the longest
-PREEMPTION_RANK = TotalJobRunTime
-# turn this into FIFO by using (-TotalJobRunTime)
-</code></pre>
-
-<p>The attribute <code>TotalJobRunTime</code> represents the amount of time a job has been running on its claim (generally, this is effectively equivalent to total running time, unless your job supports some form of checkpointing), and so ranking preemption candidates by this attribute results in LIFO preemption, and ranking by its negative provides FIFO preemption.</p>
-
-<p>Note that <code>PREEMPTION_RANK</code> applies <em>only</em> to candidates that have already met the requirements defined on <code>PREEMPTION_REQUIREMENTS</code>, or the slot-centric preemption policy defined by <code>RANK</code>.  <code>PREEMPTION_RANK</code> does not itself determine what claimed slots are considered by a job for preemption.</p>
-
-<p>To demonstrate LIFO and FIFO preemption in action, consider the following configuration:</p>
-
-<pre><code># turn off scheduler optimizations, as they can sometimes obscure the
-# negotiator/matchmaker behavior
-CLAIM_WORKLIFE = 0
-CLAIM_PARTITIONABLE_LEFTOVERS = False
-
-# reduce update latencies for faster testing response
-UPDATE_INTERVAL = 15
-NEGOTIATOR_INTERVAL = 20
-SCHEDD_INTERVAL = 15
-
-# for demonstration purposes, make sure basic preemption knobs are 'on'
-MAXJOBRETIREMENTTIME = 0
-PREEMPTION_REQUIREMENTS = True
-NEGOTIATOR_CONSIDER_PREEMPTION = True
-RANK = 0.0
-
-# LIFO preemption: favor preempting jobs that have been running the longest
-PREEMPTION_RANK = TotalJobRunTime
-# turn this into FIFO by using (-TotalJobRunTime)
-
-# define 3 cpus to provide fodder for preemption
-NUM_CPUS = 3
-</code></pre>
-
-<p>Begin by spinning up a condor pool with the configuration above.  When the pool is operating, fill the three slots with jobs for &#8216;user1&#8217;, with a delay to ensure that jobs have easily distinguishable values for <code>TotalJobRunTime</code>:</p>
-
-<pre><code>$ cat /tmp/user1.jsub 
-universe = vanilla
-cmd = /bin/sleep
-args = 600
-should_transfer_files = if_needed
-when_to_transfer_output = on_exit
-+AccountingGroup="user1"
-queue 1
-
-$ condor_submit /tmp/user1.jsub ; sleep 30 ; condor_submit /tmp/user1.jsub ; sleep 30 ; condor_submit /tmp/user1.jsub
-</code></pre>
-
-<p>Once these jobs have all started running, verify their run times using <a href="http://erikerlandson.github.com/blog/2012/06/29/easy-histograms-and-tables-from-condor-jobs-and-slots/">ccsort</a>:</p>
-
-<pre><code>$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
-1.0 | 78 | user1@localdomain
-2.0 | 36 | user1@localdomain
-3.0 | 16 | user1@localdomain
-</code></pre>
-
-<p>to make preemption easy, give user1 a low priority:</p>
-
-<pre><code>$ condor_userprio -setprio user1@localdomain 10
-</code></pre>
-
-<p>Now, we will submit some jobs for &#8216;user2&#8217;: which will be allowed to preempt jobs for &#8216;user1&#8217;.  We should see that the longest-running job for user1 is chosen each time:</p>
-
-<pre><code>$ condor_submit /tmp/user2.jsub
-Submitting job(s).
-1 job(s) submitted to cluster 4.
-
-$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
-2.0 | 81 | user1@localdomain
-3.0 | 61 | user1@localdomain
-4.0 | 2 | user2@localdomain
-
-$ condor_submit /tmp/user2.jsub
-Submitting job(s).
-1 job(s) submitted to cluster 5.
-
-$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
-3.0 | 91 | user1@localdomain
-4.0 | 32 | user2@localdomain
-5.0 | 3 | user2@localdomain
-</code></pre>
-
-<p>Now we change LIFO to FIFO and demonstrate.  Switch the sign of <code>TotalJobRunTime</code>:</p>
-
-<pre><code># Now I am FIFO!
-PREEMPTION_RANK = -TotalJobRunTime
-</code></pre>
-
-<p>And restart the negotiator, and check on our currently running jobs:</p>
-
-<pre><code>$ condor_restart -negotiator
-
-$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
-3.0 | 151 | user1@localdomain
-4.0 | 92 | user2@localdomain
-5.0 | 49 | user2@localdomain
-</code></pre>
-
-<p>Now, set up &#8216;user2&#8217; for easy preemption like user1:</p>
-
-<pre><code>$ condor_userprio -setprio user2@localdomain 10
-</code></pre>
-
-<p>And submit some jobs for user3.  Since we reconfigured for FIFO preemption, we should now see the <em>most recent</em> job preempted each time (in this case, these should both be the &#8216;user2&#8217; jobs):</p>
-
-<pre><code>$ condor_submit /tmp/user3.jsub
-Submitting job(s).
-1 job(s) submitted to cluster 6.
-
-$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
-3.0 | 241 | user1@localdomain
-4.0 | 182 | user2@localdomain
-6.0 | 15 | user3@localdomain
-
-$ condor_submit /tmp/user3.jsub
-Submitting job(s).
-1 job(s) submitted to cluster 7.
-
-$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
-3.0 | 301 | user1@localdomain
-6.0 | 75 | user3@localdomain
-7.0 | 17 | user3@localdomain
 </code></pre>
 ]]></content>
   </entry>
