@@ -41,7 +41,7 @@ But... does linear sampling truly require us to invoke our RNG on every element?
 
     (skip) (skip) (sample) (skip) (sample) (skip) (sample) (sample) (skip) (skip) (sample) ...
 
-The number of consecutive (skip) events between each (sample) -- the *sampling gap* -- can itself be modeled as a random variable.  Each (skip)/(sample) choice is an independent Bernoulli trial, where the probability of (skip) is (1-p).   The PMF of the sampling gap for gap of {0, 1, 2, ...} is therefore the geometric distribution parameterized by (p):  P(k) = p(1-p)^k
+The number of consecutive (skip) events between each (sample) -- the *sampling gap* -- can itself be modeled as a random variable.  Each (skip)/(sample) choice is an independent Bernoulli trial, where the probability of (skip) is (1-p).   The PMF of the sampling gap for gap of {0, 1, 2, ...} is therefore a geometric distribution: P(k) = p(1-p)^k
 
 This suggests an alternative algorithm for sampling, where we only need to randomly choose sample gaps instead of randomly choosing whether we sample each individual element:
 
