@@ -4,7 +4,7 @@
   <title><![CDATA[Category: sampling | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/sampling/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2014-09-11T15:06:48-07:00</updated>
+  <updated>2014-09-12T18:50:01-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -97,14 +97,16 @@ text-align: center;
 
 <table>
 <tr> <th>Type</th> <th>p</th> <th>linear</th> <th>gap</th> </tr>
-<tr> <td>Array</td> <td>0.001</td> <td>2784</td> <td>8</td> </tr>
-<tr> <td>Array</td> <td>0.01</td> <td>2817</td> <td>77</td> </tr>
-<tr> <td>Array</td> <td>0.1</td> <td>3075</td> <td>686</td> </tr>
-<tr> <td>Array</td> <td>0.5</td> <td>4221</td> <td>3756</td> </tr>
-<tr> <td>List</td> <td>0.001</td> <td>2662</td> <td>238</td> </tr>
-<tr> <td>List</td> <td>0.01</td> <td>2662</td> <td>298</td> </tr>
-<tr> <td>List</td> <td>0.1</td> <td>2936</td> <td>301</td> </tr>
-<tr> <td>List</td> <td>0.5</td> <td>3995</td> <td>305</td> </tr>
+<tr> <td>Array</td> <td>0.001</td> <td>2833</td> <td>29</td> </tr>
+<tr> <td>Array</td> <td>0.01</td> <td>2825</td> <td>76</td> </tr>
+<tr> <td>Array</td> <td>0.1</td> <td>2985</td> <td>787</td> </tr>
+<tr> <td>Array</td> <td>0.5</td> <td>3526</td> <td>3478</td> </tr>
+<tr> <td>Array</td> <td>0.9</td> <td>3023</td> <td>6081</td> </tr>
+<tr> <td>List</td> <td>0.001</td> <td>2213</td> <td>230</td> </tr>
+<tr> <td>List</td> <td>0.01</td> <td>2220</td> <td>265</td> </tr>
+<tr> <td>List</td> <td>0.1</td> <td>2337</td> <td>796</td> </tr>
+<tr> <td>List</td> <td>0.5</td> <td>2794</td> <td>3151</td> </tr>
+<tr> <td>List</td> <td>0.9</td> <td>2513</td> <td>4849</td> </tr>
 </table>
 
 
@@ -113,9 +115,11 @@ text-align: center;
 <br>
 
 
-<p>In the results above, we see that for the Array data the gap sampling times are linear in (p) -- Arrays are random access, and the operation of skipping sample-gaps is constant time.   Gap sampling on random access data allows marked improvement with small sampling probabities, where there are large sampling gaps that can be skipped in constant time.  The List data timings reflect that the sampling traverses all elements in either case.  The time savings here is due to reduced calls to the RNG.</p>
+<p>In the results above, we see that the gap sampling times are essentially linear in (p), as expected.  In the case of the linear-access List type, there is a higher baseline time (230 vs 29) due to the constant cost of actual data traversal.  Efficiency improvements are substantial at small sampling probabilities.</p>
 
-<p>Note that while the gap sampling numbers for Array are better than linear sampling, they show signs of gaining on the linear sampling times.  I will touch on this again at the end of the post.</p>
+<p>We can also see that the cost of gap sampling begins to meet and then exceed the cost of traditinal linear sampling, in the vicinnity (p) = 0.5.  This is due to the fact that the gap sampling logic is about twice the cost of simply calling the RNG once.  For example, the gap sampling invokes a call to the numeric logarithm code that isn't required in traditional sampling.  And so at (p) = 0.5 the time spent doing the gap sampling approximates the time spent invoking the RNG once per sample, and at higher values of (p) the cost is greater.</p>
+
+<p>This suggests that one should in fact fall back to traditional linear sampling when the samplig probability (p) >= some threshold.  That threshold appears to be about 0.5 or 0.6 in my testing rig, but is likely to depend on underlying numeric libraries, the particular RNG being used, etc, and so I would expect it to benefit from customized tuning on a per-environment basis.</p>
 
 <p>The gap-sampling algorithm described above is for sampling <em>without</em> replacement.   However, the same approach can be modified to generate sampling <em>with</em> replacement.</p>
 
@@ -163,14 +167,16 @@ sample(data: sequence, p: real) {
 
 <table>
 <tr> <th>Type</th> <th>p</th> <th>linear</th> <th>gap</th> </tr>
-<tr> <td>Array</td> <td>0.001</td> <td>1635</td> <td>12</td> </tr>
-<tr> <td>Array</td> <td>0.01</td> <td>1807</td> <td>130</td> </tr>
-<tr> <td>Array</td> <td>0.1</td> <td>2087</td> <td>1101</td> </tr>
-<tr> <td>Array</td> <td>0.5</td> <td>3258</td> <td>4733</td> </tr>
-<tr> <td>List</td> <td>0.001</td> <td>1341</td> <td>233</td> </tr>
-<tr> <td>List</td> <td>0.01</td> <td>1400</td> <td>411</td> </tr>
-<tr> <td>List</td> <td>0.1</td> <td>1729</td> <td>472</td> </tr>
-<tr> <td>List</td> <td>0.5</td> <td>3342</td> <td>361</td> </tr>
+<tr> <td>Array</td> <td>0.001</td> <td>2604</td> <td>45</td> </tr>
+<tr> <td>Array</td> <td>0.01</td> <td>3442</td> <td>117</td> </tr>
+<tr> <td>Array</td> <td>0.1</td> <td>3653</td> <td>1044</td> </tr>
+<tr> <td>Array</td> <td>0.5</td> <td>5643</td> <td>5073</td> </tr>
+<tr> <td>Array</td> <td>0.9</td> <td>7668</td> <td>8388</td> </tr>
+<tr> <td>List</td> <td>0.001</td> <td>2431</td> <td>233</td> </tr>
+<tr> <td>List</td> <td>0.01</td> <td>2450</td> <td>299</td> </tr>
+<tr> <td>List</td> <td>0.1</td> <td>2984</td> <td>1330</td> </tr>
+<tr> <td>List</td> <td>0.5</td> <td>5331</td> <td>4752</td> </tr>
+<tr> <td>List</td> <td>0.9</td> <td>6744</td> <td>7811</td> </tr>
 </table>
 
 
@@ -179,7 +185,7 @@ sample(data: sequence, p: real) {
 <br>
 
 
-<p>The table above shows that there is a crossover point in the Array timings where gap sampling costs more time than linear sampling.  Although the random access in Scala Array allows for increasing improvements as sampling probability grows small, there appears to be an increased cost factor that allows for the crossover point.  This is a subject for further investigation, but may have to do with allocation cost of Array iterator data structures in Scala.</p>
+<p>As with the results for sampling without replacement, we see that gap sampling cost is linear with (p), which yields large cost savings at small sampling, but begins to exceed traditional linear sampling at higher sampling probabilities.</p>
 ]]></content>
   </entry>
   
