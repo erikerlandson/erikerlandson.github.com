@@ -4,7 +4,7 @@
   <title><![CDATA[Category: random sampling | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/random-sampling/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2014-09-13T07:47:18-07:00</updated>
+  <updated>2014-09-13T08:10:09-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -48,7 +48,7 @@
 <pre><code>sample(data: sequence, p: real) {
     while not end(data) {
         v = next(data)
-        if p &lt; random(0.0, 1.0) then emit v to output
+        if random(0.0, 1.0) &lt; p then emit v to output
     }
 }
 </code></pre>
