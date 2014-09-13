@@ -31,7 +31,7 @@ In cases such as this, there is another common sampling algorithm:
     sample(data: sequence, p: real) {
         while not end(data) {
             v = next(data)
-            if p < random(0.0, 1.0) then emit v to output
+            if random(0.0, 1.0) < p then emit v to output
         }
     }
 
