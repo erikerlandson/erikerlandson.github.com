@@ -92,13 +92,24 @@ text-align: center;
 <br>
 In the results above, we see that the gap sampling times are essentially linear in (p), as expected.  In the case of the linear-access List type, there is a higher baseline time (230 vs 29) due to the constant cost of actual data traversal.  Efficiency improvements are substantial at small sampling probabilities.
 
-We can also see that the cost of gap sampling begins to meet and then exceed the cost of traditinal linear sampling, in the vicinnity (p) = 0.5.  This is due to the fact that the gap sampling logic is about twice the cost of simply calling the RNG once.  For example, the gap sampling invokes a call to the numeric logarithm code that isn't required in traditional sampling.  And so at (p) = 0.5 the time spent doing the gap sampling approximates the time spent invoking the RNG once per sample, and at higher values of (p) the cost is greater.
+We can also see that the cost of gap sampling begins to meet and then exceed the cost of traditinal linear sampling, in the vicinnity (p) = 0.5.  This is due to the fact that the gap sampling logic is about twice the cost (in my test environment) of simply calling the RNG once.  For example, the gap sampling invokes a call to the numeric logarithm code that isn't required in traditional sampling.  And so at (p) = 0.5 the time spent doing the gap sampling approximates the time spent invoking the RNG once per sample, and at higher values of (p) the cost is greater.
 
-This suggests that one should in fact fall back to traditional linear sampling when the samplig probability (p) >= some threshold.  That threshold appears to be about 0.5 or 0.6 in my testing rig, but is likely to depend on underlying numeric libraries, the particular RNG being used, etc, and so I would expect it to benefit from customized tuning on a per-environment basis.
+This suggests that one should in fact fall back to traditional linear sampling when the sampling probability (p) >= some threshold.  That threshold appears to be about 0.5 or 0.6 in my testing rig, but is likely to depend on underlying numeric libraries, the particular RNG being used, etc, and so I would expect it to benefit from customized tuning on a per-environment basis.  With this in mind, a sample algorithm as deployed would look like this:
+
+    // threshold is a tuning parameter
+    threshold = 0.5
+
+    sample(data: sequence, p: real) {
+        if (p < threshold) {
+            gap_sample(data, p)
+        } else {
+            traditional_linear_sample(data, p)
+        }
+    }
 
 The gap-sampling algorithm described above is for sampling *without* replacement.   However, the same approach can be modified to generate sampling *with* replacement.   
 
-When sampling with replacement, it is useful to consider the *replication factor* of each element (where a replication factor of zero means the element wasn't sampled).  Pretend for the moment that the actual data size (n) is known.  The sample size (m) = (n)(p).  The probability that each element gets sampled, per trial, is 1/n, with (m) independent trials, and so the replication factor (r) for each element obeys a binomial distribution: Binomial(m, 1/n).  If we substitute (n)(p) for (m), we have Binomial(np, 1/n).  As the (n) grows, the Binomial is [well approximated by a Poisson distribution](http://en.wikipedia.org/wiki/Binomial_distribution#Poisson_approximation) Poisson(L), where (L) = (np)(1/n) = (p).  And so for our purposes we may sample from Poisson(p), where P(r) = (p^k / k!)e^(-p), for our sampling replication factors.  Note that we have now discarded any dependence on sample size (n), as we desire.
+When sampling with replacement, it is useful to consider the *replication factor* of each element (where a replication factor of zero means the element wasn't sampled).  Pretend for the moment that the actual data size (n) is known.  The sample size (m) = (n)(p).  The probability that each element gets sampled, per trial, is 1/n, with (m) independent trials, and so the replication factor (r) for each element obeys a binomial distribution: Binomial(m, 1/n).  If we substitute (n)(p) for (m), we have Binomial(np, 1/n).  As the (n) grows, the Binomial is [well approximated by a Poisson distribution](http://en.wikipedia.org/wiki/Binomial_distribution#Poisson_approximation) Poisson(L), where (L) = (np)(1/n) = (p).  And so for our purposes we may sample from Poisson(p), where P(r) = (p^r / r!)e^(-p), for our sampling replication factors.  Note that we have now discarded any dependence on sample size (n), as we desire.
 
 In our gap-sampling context, the sampling gaps are now elements whose replication factor is zero, which occurs with probability P(0) = e^(-p).  And so our sampling gaps are now drawn from geometric distribution P(k) = (1-q)(q)^k, where q = e^(-p).   When we *do* sample an element, its replication factor is drawn from Poisson(p), however *conditioned such that the value is >= 1.*  It is straightforward to adapt a [standard Poisson generator](http://en.wikipedia.org/wiki/Poisson_distribution#Generating_Poisson-distributed_random_variables), as shown below.
 
