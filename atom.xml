@@ -4,7 +4,7 @@
   <title><![CDATA[tool monkey]]></title>
   <link href="http://erikerlandson.github.com/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2014-09-13T09:31:13-07:00</updated>
+  <updated>2015-01-24T11:58:16-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,150 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Monadic 'break' and 'continue' for Scala Sequence Comprehensions]]></title>
+    <link href="http://erikerlandson.github.com/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions/"/>
+    <updated>2015-01-24T11:54:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions</id>
+    <content type="html"><![CDATA[<p>Scala <a href="http://docs.scala-lang.org/tutorials/tour/sequence-comprehensions.html">sequence comprehensions</a> are an excellent functional programming idiom for looping in Scala.  However, sequence comprehensions encompass much more than just looping &#8211; they represent a powerful syntax for manipulating <em>all</em> monadic structures[1].</p>
+
+<p>The <code>break</code> and <code>continue</code> looping constructs are a popular framework for cleanly representing multiple loop halting and continuation conditions at differing stages in the execution flow.  Although there is no native support for <code>break</code> or <code>continue</code> in Scala control constructs, it is possible to implement them in a clean and idiomatic way for sequence comprehensions.</p>
+
+<p>In this post I will describe a lightweight and easy-to-use implementation of <code>break</code> and <code>continue</code> for use in Scala sequence comprehensions (aka <code>for</code> statements).  The entire implementation is as follows:</p>
+
+<pre><code>object Breakable {
+  // An iterator that can be halted via its 'break' method
+  class BreakableIterator[+A](itr: Iterator[A]) extends Iterator[A] {
+    var broken = false
+    def break { broken = true }
+
+    def hasNext = !broken &amp;&amp; itr.hasNext
+    def next = itr.next
+  }
+
+  // Continue to next iteration of enclosing loop if 'cond' evaluates to true
+  def continue(cond: =&gt; Boolean): Boolean = !cond
+
+  // Break one or more BreakableIterators, if the given condition 'cond'
+  // evaluates to true
+  def break(b: BreakableIterator[_], bRest: BreakableIterator[_]*)
+      (cond: =&gt; Boolean): Boolean = {
+    val br = cond
+    if (br) {
+      b.break
+      for (x &lt;- bRest) { x.break }
+    }
+    !br
+  }
+
+  // Factory that creates new BreakableIterator from any traversable object,
+  // e.g. sequence, iterator, range, etc
+  def apply[A](t1: TraversableOnce[A]): Iterator[BreakableIterator[A]] =
+    List(new BreakableIterator(t1.toIterator)).iterator
+}
+</code></pre>
+
+<p>The approach is based on a simple subclass of <code>Iterator</code> &#8211; <code>BreakableIterator</code> &#8211; that can be halted by &#8216;breaking&#8217; it.  The function <code>break</code> accepts one or more instances of <code>BreakableIterator</code>, followed by a code block evaluating to a conditional.  If it evaluates to <code>true</code>, the loops embodied by the given iterators are immediately halted via the associated <code>if</code> guard, and the iterators are halted via their <code>break</code> method.  The <code>continue</code> function is mostly syntactic sugar for a standard <code>if</code> guard, simply with the condition inverted.</p>
+
+<p>The factory <code>Breakable(&lt;traversable-object&gt;)</code> returns an Iterator over a single <code>BreakableIterator</code> object.  Iterators are proper monadic structures, and so its output can be used with <code>&lt;-</code> at the start of a <code>for</code> construct in the usual way.  Note that this means the result of the <code>for</code> statement will also be an Iterator.</p>
+
+<p>Here is a simple example of <code>break</code> and <code>continue</code> in use:</p>
+
+<pre><code>object Main {
+  import Breakable._
+
+  def main(args: Array[String]) {
+
+    val r = for (
+      // generate a breakable sequence from some sequential input
+      loop &lt;- Breakable(1 to 1000);
+      // iterate over the breakable sequence
+      j &lt;- loop;
+      // print out at each iteration
+      _ = { println(s"iteration j= $j") };
+      // continue to next iteration when 'j' is even
+      if continue { j % 2 == 0 };
+      // break out of the loop when 'j' exceeds 5
+      if break(loop) { j &gt; 5 }
+    ) yield {
+      j
+    }
+    println(s"result= ${r.toList}")
+  }
+}
+</code></pre>
+
+<p>Notice that <code>break</code> and <code>continue</code> are applied via <code>if</code> guards.  That is how the code following those statements is skipped when their conditions become true.  The statement <code>if break(loop) {condition}</code> could be read as: &#8220;if {condition} then break(loop)&#8221;.</p>
+
+<p>We can see from the resulting output that <code>break</code> and <code>continue</code> function in the usual way.  The <code>continue</code> clause ignores all subsequent code when <code>j</code> is even.  The <code>break</code> clause halts the loop when it sees its first value > 5, which is 7.  Only odd values &lt;= 5 are output from the <code>yield</code> statement:</p>
+
+<pre><code>$ scalac -d /home/eje/class monadic_break.scala
+$ scala -classpath /home/eje/class Main
+iteration j= 1
+iteration j= 2
+iteration j= 3
+iteration j= 4
+iteration j= 5
+iteration j= 6
+iteration j= 7
+result= List(1, 3, 5)
+</code></pre>
+
+<p>Breakable iterators can be nested in the way one would expect.  The following example shows an inner breakable loop nested inside an outer one:</p>
+
+<pre><code>object Main {
+  import Breakable._
+
+  def main(args: Array[String]) {
+    val r = for (
+      outer &lt;- Breakable(1 to 7);
+      j &lt;- outer;
+      _ = { println(s"outer  j= $j") };
+      if continue { j % 2 == 0 };
+      inner &lt;- Breakable(List("a", "b", "c", "d", "e"));
+      k &lt;- inner;
+      _ = { println(s"    inner  j= $j  k= $k") };
+      if break(inner) { k == "d" };
+      if break(inner, outer) { j == 5  &amp;&amp;  k == "c" }
+    ) yield {
+      (j, k)
+    }
+    println(s"result= ${r.toList}")
+  }
+}
+</code></pre>
+
+<p>The output demonstrates that the inner loop breaks whenever <code>k=="d"</code>, and so <code>"e"</code> is never present in the <code>yield</code> result.  When <code>j==5</code> and <code>k=="c"</code>, both the inner and outer loops are broken, and so we see that there is no <code>(5,"c")</code> pair in the result, nor does the outer loop ever iterate over 6 or 7:</p>
+
+<pre><code>$ scalac -d /home/eje/class monadic_break.scala
+$ scala -classpath /home/eje/class Main
+outer  j= 1
+    inner  j= 1  k= a
+    inner  j= 1  k= b
+    inner  j= 1  k= c
+    inner  j= 1  k= d
+outer  j= 2
+outer  j= 3
+    inner  j= 3  k= a
+    inner  j= 3  k= b
+    inner  j= 3  k= c
+    inner  j= 3  k= d
+outer  j= 4
+outer  j= 5
+    inner  j= 5  k= a
+    inner  j= 5  k= b
+    inner  j= 5  k= c
+result= List((1,a), (1,b), (1,c), (3,a), (3,b), (3,c), (5,a), (5,b))
+</code></pre>
+
+<p>Using <code>break</code> and <code>continue</code> with <code>BreakableIterator</code> for sequence comprehensions is that easy.  Enjoy!</p>
+
+<h5>References</h5>
+
+<p>[1] <em><a href="http://www.manning.com/bjarnason/">Functional Programming in Scala</a></em>, Paul Chiusano and Runar Bjarnason, (section 6.6)</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Faster Random Samples With Gap Sampling]]></title>
@@ -2111,88 +2255,6 @@ NEGOTIATOR.CLASSAD_LOG_STRICT_PARSING = False
 <p>Similarly, ClassAd attribute names are by nature arbitrary, and so corruptions to a name can go undetected:</p>
 
 <pre><code>103 1.0 LastOopsie 0   &lt;- LastOopsie is a valid attribute name
-</code></pre>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Driving a Condor Job Renice Policy with Accounting Groups]]></title>
-    <link href="http://erikerlandson.github.com/blog/2012/07/27/driving-a-condor-job-renice-policy-with-accounting-groups/"/>
-    <updated>2012-07-27T13:50:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2012/07/27/driving-a-condor-job-renice-policy-with-accounting-groups</id>
-    <content type="html"><![CDATA[<p>Condor can run its jobs with a renice priority level specified by <code>JOB_RENICE_INCREMENT</code>, which defaults simply to 10, but can in fact be any ClassAd expression, and is evaluated in the context of the job ad corresponding to the job being run.</p>
-
-<p>This opens up an opportunity to create a renice <em>policy</em>, driven by accounting groups.  Consider a <a href="http://erikerlandson.github.com/blog/2012/07/10/configuring-minimum-and-maximum-resources-for-mission-critical-jobs-in-a-condor-pool/">scenario I discussed previously</a>, where a condor pool caters to mission critical (MC) jobs and regular (R) jobs.</p>
-
-<p>An additional configuration trick we could apply is to add a renice policy that gives a higher renice value (that is, a lower priority) to any jobs that aren&#8217;t run under the mission-critical (MC) rubric, as in this example configuration:</p>
-
-<pre><code># A convenience expression that extracts group, e.g. "mc.user@domain.com" --&gt; "mc"
-SUBMIT_EXPRS = AcctGroupName
-AcctGroupName = ifThenElse(my.AccountingGroup =!= undefined, \
-                           regexps("^([^@]+)\.[^.]+", my.AccountingGroup, "\1"), "&lt;none&gt;")
-
-NUM_CPUS = 3
-
-# Groups representing mission critical and regular jobs:
-GROUP_NAMES = MC, R
-GROUP_QUOTA_MC = 2
-GROUP_QUOTA_R = 1
-
-# Any group not MC gets a renice increment of 10:
-JOB_RENICE_INCREMENT = 10 * (AcctGroupName =!= "MC")
-</code></pre>
-
-<p>To demonstrate this policy in action, I wrote a little shell script I called <code>burn</code>, whose only function is to burn cycles for a given number of seconds:</p>
-
-<pre><code>#!/bin/sh
-
-# usage: burn [n]
-# where n is number of seconds to burn cycles
-s="$1"
-if [ -z "$s" ]; then s=60; fi
-
-t0=`date +%s`
-while [ 1 ]; do
-    x=0
-    # burn some cycles:
-    while [ $x -lt 10000 ]; do let x=$x+1; done
-    t=`date +%s`
-    let e=$t-$t0
-    # halt when the requested time is up:
-    if [ $e -gt $s ]; then exit ; fi
-done
-</code></pre>
-
-<p>Begin by standing up a condor pool including the configuration above.   Make sure the <code>burn</code> script is readable.  Also, it is preferable to make sure your system is unloaded (load average should be as close to zero as reasonably possible).  Then submit the following, which instantiates two <code>burn</code> jobs running under accounting group <code>MC</code> and a third under group <code>R</code>:</p>
-
-<pre><code>universe = vanilla
-cmd = /path/to/burn
-args = 600
-should_transfer_files = if_needed
-when_to_transfer_output = on_exit
-+AccountingGroup = "MC.user"
-queue 2
-+AccountingGroup = "R.user"
-queue 1
-</code></pre>
-
-<p>Allow the jobs to negotiate and then run for a couple minutes.  You should then see something similar to the following load-average information from the slot ads:</p>
-
-<pre><code>$ condor_status -format "%s" SlotID -format " | %.2f" LoadAvg -format " | %.2f" CondorLoadAvg -format " | %.2f" TotalLoadAvg -format " | %.2f" TotalCondorLoadAvg -format " | %s\n" AccountingGroup | sort
-1 | 1.33 | 1.33 | 2.75 | 2.70 | MC.user@localdomain
-2 | 1.28 | 1.24 | 2.75 | 2.70 | MC.user@localdomain
-3 | 0.13 | 0.13 | 2.77 | 2.72 | R.user@localdomain
-</code></pre>
-
-<p>Note, which particular <code>SlotID</code> runs which job may vary.  However, we expect to see that the load averages for the slot running group <code>R</code> are much lower than the load averages for slots running jobs under group <code>MC</code>, as seen above.</p>
-
-<p>We can explicitly verify the renice numbers from our policy to see that our one <code>R</code> job has a nice value of 10 (and is using only a fraction of the cpu):</p>
-
-<pre><code># tell 'ps' to give us (pid, %cpu, nice, cmd+args):
-$ ps -eo "%p %C %n %a" | grep 'burn 600'
-22403 10.2  10 /bin/sh /home/eje/bin/burn 600
-22406 93.2   0 /bin/sh /home/eje/bin/burn 600
-22411 90.6   0 /bin/sh /home/eje/bin/burn 600
 </code></pre>
 ]]></content>
   </entry>

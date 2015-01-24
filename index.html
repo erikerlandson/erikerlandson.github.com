@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="Generating a random sample of a collection is, logically, a O(np) operation, where (n) is the sample size and (p) is the sampling probability. For &hellip;">
+  <meta name="description" content="Scala sequence comprehensions are an excellent functional programming idiom for looping in Scala. However, sequence comprehensions encompass much &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,180 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions/">Monadic &#8216;break&#8217; and &#8216;continue&#8217; for Scala Sequence Comprehensions</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2015-01-24T11:54:00-07:00" pubdate data-updated="true">Jan 24<span>th</span>, 2015</time>
+        
+        
+         | <a href="/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions/#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Scala <a href="http://docs.scala-lang.org/tutorials/tour/sequence-comprehensions.html">sequence comprehensions</a> are an excellent functional programming idiom for looping in Scala.  However, sequence comprehensions encompass much more than just looping &#8211; they represent a powerful syntax for manipulating <em>all</em> monadic structures[1].</p>
+
+<p>The <code>break</code> and <code>continue</code> looping constructs are a popular framework for cleanly representing multiple loop halting and continuation conditions at differing stages in the execution flow.  Although there is no native support for <code>break</code> or <code>continue</code> in Scala control constructs, it is possible to implement them in a clean and idiomatic way for sequence comprehensions.</p>
+
+<p>In this post I will describe a lightweight and easy-to-use implementation of <code>break</code> and <code>continue</code> for use in Scala sequence comprehensions (aka <code>for</code> statements).  The entire implementation is as follows:</p>
+
+<pre><code>object Breakable {
+  // An iterator that can be halted via its 'break' method
+  class BreakableIterator[+A](itr: Iterator[A]) extends Iterator[A] {
+    var broken = false
+    def break { broken = true }
+
+    def hasNext = !broken &amp;&amp; itr.hasNext
+    def next = itr.next
+  }
+
+  // Continue to next iteration of enclosing loop if 'cond' evaluates to true
+  def continue(cond: =&gt; Boolean): Boolean = !cond
+
+  // Break one or more BreakableIterators, if the given condition 'cond'
+  // evaluates to true
+  def break(b: BreakableIterator[_], bRest: BreakableIterator[_]*)
+      (cond: =&gt; Boolean): Boolean = {
+    val br = cond
+    if (br) {
+      b.break
+      for (x &lt;- bRest) { x.break }
+    }
+    !br
+  }
+
+  // Factory that creates new BreakableIterator from any traversable object,
+  // e.g. sequence, iterator, range, etc
+  def apply[A](t1: TraversableOnce[A]): Iterator[BreakableIterator[A]] =
+    List(new BreakableIterator(t1.toIterator)).iterator
+}
+</code></pre>
+
+<p>The approach is based on a simple subclass of <code>Iterator</code> &#8211; <code>BreakableIterator</code> &#8211; that can be halted by &#8216;breaking&#8217; it.  The function <code>break</code> accepts one or more instances of <code>BreakableIterator</code>, followed by a code block evaluating to a conditional.  If it evaluates to <code>true</code>, the loops embodied by the given iterators are immediately halted via the associated <code>if</code> guard, and the iterators are halted via their <code>break</code> method.  The <code>continue</code> function is mostly syntactic sugar for a standard <code>if</code> guard, simply with the condition inverted.</p>
+
+<p>The factory <code>Breakable(&lt;traversable-object&gt;)</code> returns an Iterator over a single <code>BreakableIterator</code> object.  Iterators are proper monadic structures, and so its output can be used with <code>&lt;-</code> at the start of a <code>for</code> construct in the usual way.  Note that this means the result of the <code>for</code> statement will also be an Iterator.</p>
+
+<p>Here is a simple example of <code>break</code> and <code>continue</code> in use:</p>
+
+<pre><code>object Main {
+  import Breakable._
+
+  def main(args: Array[String]) {
+
+    val r = for (
+      // generate a breakable sequence from some sequential input
+      loop &lt;- Breakable(1 to 1000);
+      // iterate over the breakable sequence
+      j &lt;- loop;
+      // print out at each iteration
+      _ = { println(s"iteration j= $j") };
+      // continue to next iteration when 'j' is even
+      if continue { j % 2 == 0 };
+      // break out of the loop when 'j' exceeds 5
+      if break(loop) { j &gt; 5 }
+    ) yield {
+      j
+    }
+    println(s"result= ${r.toList}")
+  }
+}
+</code></pre>
+
+<p>Notice that <code>break</code> and <code>continue</code> are applied via <code>if</code> guards.  That is how the code following those statements is skipped when their conditions become true.  The statement <code>if break(loop) {condition}</code> could be read as: &#8220;if {condition} then break(loop)&#8221;.</p>
+
+<p>We can see from the resulting output that <code>break</code> and <code>continue</code> function in the usual way.  The <code>continue</code> clause ignores all subsequent code when <code>j</code> is even.  The <code>break</code> clause halts the loop when it sees its first value > 5, which is 7.  Only odd values &lt;= 5 are output from the <code>yield</code> statement:</p>
+
+<pre><code>$ scalac -d /home/eje/class monadic_break.scala
+$ scala -classpath /home/eje/class Main
+iteration j= 1
+iteration j= 2
+iteration j= 3
+iteration j= 4
+iteration j= 5
+iteration j= 6
+iteration j= 7
+result= List(1, 3, 5)
+</code></pre>
+
+<p>Breakable iterators can be nested in the way one would expect.  The following example shows an inner breakable loop nested inside an outer one:</p>
+
+<pre><code>object Main {
+  import Breakable._
+
+  def main(args: Array[String]) {
+    val r = for (
+      outer &lt;- Breakable(1 to 7);
+      j &lt;- outer;
+      _ = { println(s"outer  j= $j") };
+      if continue { j % 2 == 0 };
+      inner &lt;- Breakable(List("a", "b", "c", "d", "e"));
+      k &lt;- inner;
+      _ = { println(s"    inner  j= $j  k= $k") };
+      if break(inner) { k == "d" };
+      if break(inner, outer) { j == 5  &amp;&amp;  k == "c" }
+    ) yield {
+      (j, k)
+    }
+    println(s"result= ${r.toList}")
+  }
+}
+</code></pre>
+
+<p>The output demonstrates that the inner loop breaks whenever <code>k=="d"</code>, and so <code>"e"</code> is never present in the <code>yield</code> result.  When <code>j==5</code> and <code>k=="c"</code>, both the inner and outer loops are broken, and so we see that there is no <code>(5,"c")</code> pair in the result, nor does the outer loop ever iterate over 6 or 7:</p>
+
+<pre><code>$ scalac -d /home/eje/class monadic_break.scala
+$ scala -classpath /home/eje/class Main
+outer  j= 1
+    inner  j= 1  k= a
+    inner  j= 1  k= b
+    inner  j= 1  k= c
+    inner  j= 1  k= d
+outer  j= 2
+outer  j= 3
+    inner  j= 3  k= a
+    inner  j= 3  k= b
+    inner  j= 3  k= c
+    inner  j= 3  k= d
+outer  j= 4
+outer  j= 5
+    inner  j= 5  k= a
+    inner  j= 5  k= b
+    inner  j= 5  k= c
+result= List((1,a), (1,b), (1,c), (3,a), (3,b), (3,c), (5,a), (5,b))
+</code></pre>
+
+<p>Using <code>break</code> and <code>continue</code> with <code>BreakableIterator</code> for sequence comprehensions is that easy.  Enjoy!</p>
+
+<h5>References</h5>
+
+<p>[1] <em><a href="http://www.manning.com/bjarnason/">Functional Programming in Scala</a></em>, Paul Chiusano and Runar Bjarnason, (section 6.6)</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1506,224 +1680,6 @@ m_{n-1}
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2013/03/15/examining-the-modulus-of-random-variables/">Examining the Modulus of Random Variables</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2013-03-15T12:03:00-07:00" pubdate data-updated="true">Mar 15<span>th</span>, 2013</time>
-        
-        
-         | <a href="/blog/2013/03/15/examining-the-modulus-of-random-variables/#feedback">Feedback</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><h3>Motivation</h3>
-
-<p>The original motivation for these experiments was consideration of the impact of negotiator cycle cadence (i.e. the time between the start of one cycle and the start of the next) on HTCondor pool loading.  Specifically, any HTCondor job that completes and vacates its resource may leave that resource unloaded until it can be re-matched on the next cycle.  Therefore, the duration of resource vacancies (and hence, pool loading) can be thought of as a function of job durations <em>modulo</em> the cadence of the negotiator cycle.  In general, the aggregate behavior of job durations on a pool is useful to model as a random variable.  And so, it seemed worthwhile to build up a little intuition about the behavior of a random variable when you take its modulus.</p>
-
-<h3>Methodology</h3>
-
-<p>I took a Monte Carlo approach to this study because a tractable theoretical framework eluded me, and you do not have to dive very deep to show that <a href="http://erikerlandson.github.com/blog/2013/01/02/the-mean-of-the-modulus-does-not-equal-the-modulus-of-the-mean/">even trivial random variable behavior under a modulus is dependent on the distribution</a>.   A Monte Carlo framework for the study also allows for other underlying distributions to be easily studied, by altering the random variable being sampled.   In the interest of getting right into results, I&#8217;ll briefly discuss the tools I used at the end of this post.</p>
-
-<h3>Modulus and Variance</h3>
-
-<p>Consider what happens to a random variable&#8217;s modulus as its variance increases.  This sequence of plots shows that the modulus of a normal distribution tends toward a uniform distribution over the modulus interval, as the underlying variance increases:</p>
-
-<table>
-<thead>
-<tr>
-<th></th>
-<th align="center">  </th>
-<th align="center">  </th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td></td>
-<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.20.png" width="375" height="375">  </td>
-<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.30.png" width="375" height="375">  |</td>
-</tr>
-<tr>
-<td></td>
-<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.40.png" width="375" height="375">  </td>
-<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.50.png" width="375" height="375">  |</td>
-</tr>
-</tbody>
-</table>
-
-
-<br>
-
-
-<p>From the above plots, we can see that in the case of a normal distribution, its modulus tends toward uniform rather quickly - by the time the underlying variance is half of the modulus interval.</p>
-
-<p>The following plots demonstrate the same effect with a one-tailed distribution (the exponential) &#8211; it requires a larger variance for the effect to manifest.</p>
-
-<table>
-<thead>
-<tr>
-<th></th>
-<th align="center">  </th>
-<th align="center">  </th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td></td>
-<td align="center">  <img src="/assets/images/rv_mod_study/exponential_01.png" width="375" height="375">  </td>
-<td align="center">  <img src="/assets/images/rv_mod_study/exponential_04.png" width="375" height="375">  |</td>
-</tr>
-<tr>
-<td></td>
-<td align="center">  <img src="/assets/images/rv_mod_study/exponential_10.png" width="375" height="375">  </td>
-<td align="center">  <img src="/assets/images/rv_mod_study/exponential_20.png" width="375" height="375">  |</td>
-</tr>
-</tbody>
-</table>
-
-
-<br>
-
-
-<p>A third example, using a log-normal distribution.   The variance of the log-normal increases as a function of both \( \mu \) and \( \sigma \).  In this example \( \mu \) is increased systematically, holding \( \sigma \) constant at 1:</p>
-
-<table>
-<thead>
-<tr>
-<th></th>
-<th align="center">  </th>
-<th align="center">  </th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td></td>
-<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_1.0.png" width="375" height="375">  </td>
-<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.5_1.0.png" width="375" height="375">  |</td>
-</tr>
-<tr>
-<td></td>
-<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_1.0_1.0.png" width="375" height="375">  </td>
-<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_2.0_1.0.png" width="375" height="375">  |</td>
-</tr>
-</tbody>
-</table>
-
-
-<br>
-
-
-<p>For a final examination of variance, I will again use log-normals and this time vary \( \sigma \), while holding \( \mu \) constant at 0.  Here we see that the effect of increasing the log-normal variance via \( \sigma \) does <em>not</em> follow the pattern in previous examples &#8211; the distribution does not &#8216;spread&#8217; and its modulus does not evolve toward a uniform distribution!</p>
-
-<table>
-<thead>
-<tr>
-<th></th>
-<th align="center">  </th>
-<th align="center">  </th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td></td>
-<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_0.5.png" width="375" height="375">  </td>
-<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_1.0.png" width="375" height="375">  |</td>
-</tr>
-<tr>
-<td></td>
-<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_1.5.png" width="375" height="375">  </td>
-<td align="center">  <img src="/assets/images/rv_mod_study/lognormal_0.0_2.0.png" width="375" height="375">  |</td>
-</tr>
-</tbody>
-</table>
-
-
-<br>
-
-
-<h3>Modulus and Mean</h3>
-
-<p>The following table of plots demonstrates the decreasing effect that a distribution&#8217;s location (mean) has, as its spread increases and its modulus approaches uniformity.   In fact, we see that <em>any</em> distribution in the &#8216;uniform modulus&#8217; parameter region is indistinguishable from any other, with respect to its modulus &#8211; all changes to mean or variance <em>within</em> this region have no affect on the distribution&#8217;s modulus!</p>
-
-<table>
-<thead>
-<tr>
-<th></th>
-<th align="center">  </th>
-<th align="center">  </th>
-<th align="center">  </th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td></td>
-<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.0_0.3.png" width="260" height="260">  </td>
-<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.5_0.3.png" width="260" height="260">  </td>
-<td align="center">  <img src="/assets/images/rv_mod_study/normal_1.0_0.3.png" width="260" height="260">  |</td>
-</tr>
-<tr>
-<td></td>
-<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.0_0.4.png" width="260" height="260">  </td>
-<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.5_0.4.png" width="260" height="260">  </td>
-<td align="center">  <img src="/assets/images/rv_mod_study/normal_1.0_0.4.png" width="260" height="260">  |</td>
-</tr>
-<tr>
-<td></td>
-<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.0_0.5.png" width="260" height="260">  </td>
-<td align="center">  <img src="/assets/images/rv_mod_study/normal_0.5_0.5.png" width="260" height="260">  </td>
-<td align="center">  <img src="/assets/images/rv_mod_study/normal_1.0_0.5.png" width="260" height="260">  |</td>
-</tr>
-</tbody>
-</table>
-
-
-<br>
-
-
-<h3>Conclusions</h3>
-
-<p>Generally, as the spread of a distribution increases, its modulus tends toward a uniform distribution on the modulus interval.   Although it was tempting to state this in terms of increasing variance, we see from the 2nd log-normal experiment that variance can increase without increasing &#8216;spread&#8217; in a way that causes the trend toward uniform modulus.   Currently, I&#8217;m not sure what the true invariant is, that properly distinguishes the 2nd log-normal scenario from the others.</p>
-
-<p>For any distribution that <em>does</em> reside in the &#8216;uniform-modulus&#8217; parameter space, we see that neither changes to location nor spread (nor even category of distribution) can be distinguished by the distribution modulus.</p>
-
-<h3>Tools</h3>
-
-<p>I used the following software widgets:</p>
-
-<ul>
-<li><a href="https://github.com/erikerlandson/condor_tools/blob/cad8773da36fa7f3c60c93895a428d6f1fae6752/bin/rv_modulus_study">rv_modulus_study</a> &#8211; the jig for Monte Carlo sampling of underlying distributions and their corresponding modulus</li>
-<li><a href="https://github.com/erikerlandson/dtools/wiki/dplot">dplot</a> &#8211; a simple cli wrapper around <code>matplotlib.pyplot</code> functionality</li>
-<li><a href="https://github.com/willb/capricious/">Capricious</a> &#8211; a library for random sampling of various distribution types</li>
-<li><a href="https://github.com/erikerlandson/capricious/blob/c8ec13f1f49880bb3573034de59971f84d15f7c1/lib/capricious/spline_distribution.rb">Capricious::SplineDistribution</a> &#8211; a ruby class for estimating PDF and CDF of a distribution from sampled data, using cubic Hermite splines (note, at the time of this writing, I&#8217;m using an experimental variation on my personal repo fork, at the link)</li>
-</ul>
-
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/2/">&larr; Older</a>
@@ -1743,6 +1699,10 @@ m_{n-1}
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions/">Monadic &#8216;break&#8217; and &#8216;continue&#8217; for Scala Sequence Comprehensions</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/09/11/faster-random-samples-with-gap-sampling/">Faster Random Samples With Gap Sampling</a>
       </li>
     
@@ -1756,10 +1716,6 @@ m_{n-1}
     
       <li class="post">
         <a href="/blog/2014/08/09/implementing-an-rdd-scanleft-transform-with-cascade-rdds/">Implementing an RDD scanLeft Transform With Cascade RDDs</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/07/29/deferring-spark-actions-to-lazy-transforms-with-the-promise-rdd/">Deferring Spark Actions to Lazy Transforms With the Promise RDD</a>
       </li>
     
   </ul>
@@ -1821,7 +1777,7 @@ m_{n-1}
     </div>
   </div>
   <footer role="contentinfo"><p>
-  Copyright &copy; 2014 - Erik Erlandson -
+  Copyright &copy; 2015 - Erik Erlandson -
   <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
 </p>
 

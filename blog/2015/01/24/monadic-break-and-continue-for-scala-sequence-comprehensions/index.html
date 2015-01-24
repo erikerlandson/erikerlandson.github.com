@@ -1,0 +1,417 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Monadic 'break' and 'continue' for Scala Sequence Comprehensions - tool monkey</title>
+  <meta name="author" content="Erik Erlandson">
+
+  
+  <meta name="description" content="Scala sequence comprehensions are an excellent functional programming idiom for looping in Scala. However, sequence comprehensions encompass much &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://erikerlandson.github.com/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="tool monkey" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+
+  <!-- enables inclusion of MathJax LaTeX: http://greglus.com/blog/2011/11/29/integrate-MathJax-LaTeX-and-MathML-Markup-in-Octopress/ -->
+  <script type="text/javascript"
+    src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">tool monkey</a></h1>
+  
+    <h2>a many-angled blog</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:erikerlandson.github.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Monadic 'break' and 'continue' for Scala Sequence Comprehensions</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2015-01-24T11:54:00-07:00" pubdate data-updated="true">Jan 24<span>th</span>, 2015</time>
+        
+        
+         | <a href="#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>Scala <a href="http://docs.scala-lang.org/tutorials/tour/sequence-comprehensions.html">sequence comprehensions</a> are an excellent functional programming idiom for looping in Scala.  However, sequence comprehensions encompass much more than just looping &#8211; they represent a powerful syntax for manipulating <em>all</em> monadic structures[1].</p>
+
+<p>The <code>break</code> and <code>continue</code> looping constructs are a popular framework for cleanly representing multiple loop halting and continuation conditions at differing stages in the execution flow.  Although there is no native support for <code>break</code> or <code>continue</code> in Scala control constructs, it is possible to implement them in a clean and idiomatic way for sequence comprehensions.</p>
+
+<p>In this post I will describe a lightweight and easy-to-use implementation of <code>break</code> and <code>continue</code> for use in Scala sequence comprehensions (aka <code>for</code> statements).  The entire implementation is as follows:</p>
+
+<pre><code>object Breakable {
+  // An iterator that can be halted via its 'break' method
+  class BreakableIterator[+A](itr: Iterator[A]) extends Iterator[A] {
+    var broken = false
+    def break { broken = true }
+
+    def hasNext = !broken &amp;&amp; itr.hasNext
+    def next = itr.next
+  }
+
+  // Continue to next iteration of enclosing loop if 'cond' evaluates to true
+  def continue(cond: =&gt; Boolean): Boolean = !cond
+
+  // Break one or more BreakableIterators, if the given condition 'cond'
+  // evaluates to true
+  def break(b: BreakableIterator[_], bRest: BreakableIterator[_]*)
+      (cond: =&gt; Boolean): Boolean = {
+    val br = cond
+    if (br) {
+      b.break
+      for (x &lt;- bRest) { x.break }
+    }
+    !br
+  }
+
+  // Factory that creates new BreakableIterator from any traversable object,
+  // e.g. sequence, iterator, range, etc
+  def apply[A](t1: TraversableOnce[A]): Iterator[BreakableIterator[A]] =
+    List(new BreakableIterator(t1.toIterator)).iterator
+}
+</code></pre>
+
+<p>The approach is based on a simple subclass of <code>Iterator</code> &#8211; <code>BreakableIterator</code> &#8211; that can be halted by &#8216;breaking&#8217; it.  The function <code>break</code> accepts one or more instances of <code>BreakableIterator</code>, followed by a code block evaluating to a conditional.  If it evaluates to <code>true</code>, the loops embodied by the given iterators are immediately halted via the associated <code>if</code> guard, and the iterators are halted via their <code>break</code> method.  The <code>continue</code> function is mostly syntactic sugar for a standard <code>if</code> guard, simply with the condition inverted.</p>
+
+<p>The factory <code>Breakable(&lt;traversable-object&gt;)</code> returns an Iterator over a single <code>BreakableIterator</code> object.  Iterators are proper monadic structures, and so its output can be used with <code>&lt;-</code> at the start of a <code>for</code> construct in the usual way.  Note that this means the result of the <code>for</code> statement will also be an Iterator.</p>
+
+<p>Here is a simple example of <code>break</code> and <code>continue</code> in use:</p>
+
+<pre><code>object Main {
+  import Breakable._
+
+  def main(args: Array[String]) {
+
+    val r = for (
+      // generate a breakable sequence from some sequential input
+      loop &lt;- Breakable(1 to 1000);
+      // iterate over the breakable sequence
+      j &lt;- loop;
+      // print out at each iteration
+      _ = { println(s"iteration j= $j") };
+      // continue to next iteration when 'j' is even
+      if continue { j % 2 == 0 };
+      // break out of the loop when 'j' exceeds 5
+      if break(loop) { j &gt; 5 }
+    ) yield {
+      j
+    }
+    println(s"result= ${r.toList}")
+  }
+}
+</code></pre>
+
+<p>Notice that <code>break</code> and <code>continue</code> are applied via <code>if</code> guards.  That is how the code following those statements is skipped when their conditions become true.  The statement <code>if break(loop) {condition}</code> could be read as: &#8220;if {condition} then break(loop)&#8221;.</p>
+
+<p>We can see from the resulting output that <code>break</code> and <code>continue</code> function in the usual way.  The <code>continue</code> clause ignores all subsequent code when <code>j</code> is even.  The <code>break</code> clause halts the loop when it sees its first value > 5, which is 7.  Only odd values &lt;= 5 are output from the <code>yield</code> statement:</p>
+
+<pre><code>$ scalac -d /home/eje/class monadic_break.scala
+$ scala -classpath /home/eje/class Main
+iteration j= 1
+iteration j= 2
+iteration j= 3
+iteration j= 4
+iteration j= 5
+iteration j= 6
+iteration j= 7
+result= List(1, 3, 5)
+</code></pre>
+
+<p>Breakable iterators can be nested in the way one would expect.  The following example shows an inner breakable loop nested inside an outer one:</p>
+
+<pre><code>object Main {
+  import Breakable._
+
+  def main(args: Array[String]) {
+    val r = for (
+      outer &lt;- Breakable(1 to 7);
+      j &lt;- outer;
+      _ = { println(s"outer  j= $j") };
+      if continue { j % 2 == 0 };
+      inner &lt;- Breakable(List("a", "b", "c", "d", "e"));
+      k &lt;- inner;
+      _ = { println(s"    inner  j= $j  k= $k") };
+      if break(inner) { k == "d" };
+      if break(inner, outer) { j == 5  &amp;&amp;  k == "c" }
+    ) yield {
+      (j, k)
+    }
+    println(s"result= ${r.toList}")
+  }
+}
+</code></pre>
+
+<p>The output demonstrates that the inner loop breaks whenever <code>k=="d"</code>, and so <code>"e"</code> is never present in the <code>yield</code> result.  When <code>j==5</code> and <code>k=="c"</code>, both the inner and outer loops are broken, and so we see that there is no <code>(5,"c")</code> pair in the result, nor does the outer loop ever iterate over 6 or 7:</p>
+
+<pre><code>$ scalac -d /home/eje/class monadic_break.scala
+$ scala -classpath /home/eje/class Main
+outer  j= 1
+    inner  j= 1  k= a
+    inner  j= 1  k= b
+    inner  j= 1  k= c
+    inner  j= 1  k= d
+outer  j= 2
+outer  j= 3
+    inner  j= 3  k= a
+    inner  j= 3  k= b
+    inner  j= 3  k= c
+    inner  j= 3  k= d
+outer  j= 4
+outer  j= 5
+    inner  j= 5  k= a
+    inner  j= 5  k= b
+    inner  j= 5  k= c
+result= List((1,a), (1,b), (1,c), (3,a), (3,b), (3,c), (5,a), (5,b))
+</code></pre>
+
+<p>Using <code>break</code> and <code>continue</code> with <code>BreakableIterator</code> for sequence comprehensions is that easy.  Enjoy!</p>
+
+<h5>References</h5>
+
+<p>[1] <em><a href="http://www.manning.com/bjarnason/">Functional Programming in Scala</a></em>, Paul Chiusano and Runar Bjarnason, (section 6.6)</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Erik Erlandson</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2015-01-24T11:54:00-07:00" pubdate data-updated="true">Jan 24<span>th</span>, 2015</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/break/'>break</a>, <a class='category' href='/blog/categories/computing/'>computing</a>, <a class='category' href='/blog/categories/continue/'>continue</a>, <a class='category' href='/blog/categories/monads/'>monads</a>, <a class='category' href='/blog/categories/scala/'>scala</a>
+  
+</span>
+
+
+      <br>
+<a id="feedback"></a>Feedback • 
+ 
+    <script type="text/javascript" src="//platform.twitter.com/widgets.js"></script>
+    
+  <a href="https://twitter.com/intent/tweet?text=@manyangled%20re:%20http://erikerlandson.github.com/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions/">Reply to this post on Twitter</a> • 
+ 
+<a href="mailto:erikerlandson@yahoo.com">Email the author</a>
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://erikerlandson.github.com/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions/" data-via="manyangled" data-counturl="http://erikerlandson.github.com/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions/" >Tweet</a>
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2014/09/11/faster-random-samples-with-gap-sampling/" title="Previous Post: Faster Random Samples With Gap Sampling">&laquo; Faster Random Samples With Gap Sampling</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>About The Author</h1>
+  <p>Erik is a senior software engineer on the <a href="http://www.redhat.com">Red Hat</a> Big Data Group.</p>
+</section>
+<section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions/">Monadic 'break' and 'continue' for Scala Sequence Comprehensions</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/09/11/faster-random-samples-with-gap-sampling/">Faster Random Samples With Gap Sampling</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/09/03/matryoshka-class-construction-from-the-scala-iterator-drop-method/">The Scala Iterator 'drop' Method Generates a Matryoshka Class Nesting</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/08/12/implementing-parallel-prefix-scan-as-a-spark-rdd-transform/">Implementing Parallel Prefix Scan as a Spark RDD Transform</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/08/09/implementing-an-rdd-scanleft-transform-with-cascade-rdds/">Implementing an RDD scanLeft Transform With Cascade RDDs</a>
+      </li>
+    
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/erikerlandson">@erikerlandson</a> on GitHub
+  
+  <script type="text/javascript">
+    $.domReady(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'erikerlandson',
+            count: 0,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+
+<section>
+  <h1>Latest Tweets</h1>
+  <ul id="tweets">
+    <li class="loading">Status updating...</li>
+  </ul>
+  <script type="text/javascript">
+    $.domReady(function(){
+      getTwitterFeed("manyangled", 4, true);
+    });
+  </script>
+  <script src="/javascripts/twitter.js" type="text/javascript"> </script>
+  
+    <a href="http://twitter.com/manyangled" class="twitter-follow-button" data-show-count="false">Follow @manyangled</a>
+  
+</section>
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2015 - Erik Erlandson -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+
+
+
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>
