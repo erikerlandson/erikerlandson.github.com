@@ -17,9 +17,12 @@ In this post I will describe a lightweight and easy-to-use implementation of `br
     object Breakable {
       // An iterator that can be halted via its 'break' method
       class BreakableIterator[+A](itr: Iterator[A]) extends Iterator[A] {
-        var broken = false
-        def break { broken = true }
+        // These are not intended to be called directly
+        // (see 'break' and 'continue' functions below)
+        private var broken = false
+        private[Breakable] def break { broken = true }
 
+        // Define the required abstract methods for Iterator
         def hasNext = !broken && itr.hasNext
         def next = itr.next
       }
