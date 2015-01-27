@@ -4,7 +4,7 @@
   <title><![CDATA[Category: continue | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/continue/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-01-24T12:08:21-07:00</updated>
+  <updated>2015-01-27T15:11:35-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -18,7 +18,9 @@
     <link href="http://erikerlandson.github.com/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions/"/>
     <updated>2015-01-24T11:54:00-07:00</updated>
     <id>http://erikerlandson.github.com/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions</id>
-    <content type="html"><![CDATA[<p>Scala <a href="http://docs.scala-lang.org/tutorials/tour/sequence-comprehensions.html">sequence comprehensions</a> are an excellent functional programming idiom for looping in Scala.  However, sequence comprehensions encompass much more than just looping -- they represent a powerful syntax for manipulating <em>all</em> monadic structures[1].</p>
+    <content type="html"><![CDATA[<p>Author's note: I've since received some excellent feedback from the Scala community, which I included in some <a href="#notes">end notes</a>.</p>
+
+<p>Scala <a href="http://docs.scala-lang.org/tutorials/tour/sequence-comprehensions.html">sequence comprehensions</a> are an excellent functional programming idiom for looping in Scala.  However, sequence comprehensions encompass much more than just looping -- they represent a powerful syntax for manipulating <em>all</em> monadic structures<a href="#ref1">[1]</a>.</p>
 
 <p>The <code>break</code> and <code>continue</code> looping constructs are a popular framework for cleanly representing multiple loop halting and continuation conditions at differing stages in the execution flow.  Although there is no native support for <code>break</code> or <code>continue</code> in Scala control constructs, it is possible to implement them in a clean and idiomatic way for sequence comprehensions.</p>
 
@@ -27,9 +29,12 @@
 <pre><code>object Breakable {
   // An iterator that can be halted via its 'break' method
   class BreakableIterator[+A](itr: Iterator[A]) extends Iterator[A] {
-    var broken = false
-    def break { broken = true }
+    // These are not intended to be called directly
+    // (see 'break' and 'continue' functions below)
+    private var broken = false
+    private[Breakable] def break { broken = true }
 
+    // Define the required abstract methods for Iterator
     def hasNext = !broken &amp;&amp; itr.hasNext
     def next = itr.next
   }
@@ -151,9 +156,19 @@ result= List((1,a), (1,b), (1,c), (3,a), (3,b), (3,c), (5,a), (5,b))
 
 <p>Using <code>break</code> and <code>continue</code> with <code>BreakableIterator</code> for sequence comprehensions is that easy.  Enjoy!</p>
 
+<p><a name="notesname" id="notes"></a></p>
+
+<h5>Notes</h5>
+
+<p>The helpful community on freenode #scala made some excellent observations:</p>
+
+<p>1: Iterators in Scala are not strictly monadic -- it would be more accurate to say they're "things with a flatMap and map method, also they can use filter or withFilter sometimes."  However, I personally still prefer to think of them as "monadic in spirit if not law."</p>
+
+<p>2: The <code>break</code> function, as described in this post, is not truly functional in the sense of referential transparency, as the invocation <code>if break(loop) { condition }</code> involves a side-effect on the variable <code>loop</code>.  I would say that it does maintain "scoped functionality."  That is, the break in non-referential transparency is scoped by the variables in question.  The <code>for</code> statement containing them is referentially transparent with respect to its inputs (provided no other code is breaking referential transparency, of course).</p>
+
 <h5>References</h5>
 
-<p>[1] <em><a href="http://www.manning.com/bjarnason/">Functional Programming in Scala</a></em>, Paul Chiusano and Runar Bjarnason, (section 6.6)</p>
+<p><a name="ref1name" id="ref1">[1] </a><em><a href="http://www.manning.com/bjarnason/">Functional Programming in Scala</a></em>, Paul Chiusano and Runar Bjarnason, (section 6.6)</p>
 ]]></content>
   </entry>
   
