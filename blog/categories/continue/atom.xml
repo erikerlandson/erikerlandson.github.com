@@ -4,7 +4,7 @@
   <title><![CDATA[Category: continue | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/continue/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-01-27T15:11:35-07:00</updated>
+  <updated>2015-01-29T17:30:55-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -20,69 +20,80 @@
     <id>http://erikerlandson.github.com/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions</id>
     <content type="html"><![CDATA[<p>Author's note: I've since received some excellent feedback from the Scala community, which I included in some <a href="#notes">end notes</a>.</p>
 
+<p>Author's note the 2nd: I later realized I could apply an implicit conversion and mediator class to preserve the traditional ordering: the code has been updated with that approach.</p>
+
+<p>Author's note the 3rd: This concept has been submitted to the Scala project as JIRA <a href="https://issues.scala-lang.org/browse/SI-9120">SI-9120</a> (PR <a href="https://github.com/scala/scala/pull/4275">#4275</a>)</p>
+
 <p>Scala <a href="http://docs.scala-lang.org/tutorials/tour/sequence-comprehensions.html">sequence comprehensions</a> are an excellent functional programming idiom for looping in Scala.  However, sequence comprehensions encompass much more than just looping -- they represent a powerful syntax for manipulating <em>all</em> monadic structures<a href="#ref1">[1]</a>.</p>
 
 <p>The <code>break</code> and <code>continue</code> looping constructs are a popular framework for cleanly representing multiple loop halting and continuation conditions at differing stages in the execution flow.  Although there is no native support for <code>break</code> or <code>continue</code> in Scala control constructs, it is possible to implement them in a clean and idiomatic way for sequence comprehensions.</p>
 
 <p>In this post I will describe a lightweight and easy-to-use implementation of <code>break</code> and <code>continue</code> for use in Scala sequence comprehensions (aka <code>for</code> statements).  The entire implementation is as follows:</p>
 
-<pre><code>object Breakable {
-  // An iterator that can be halted via its 'break' method
-  class BreakableIterator[+A](itr: Iterator[A]) extends Iterator[A] {
-    // These are not intended to be called directly
-    // (see 'break' and 'continue' functions below)
-    private var broken = false
-    private[Breakable] def break { broken = true }
+<pre><code>object BreakableGenerators {
+  import scala.language.implicitConversions
 
-    // Define the required abstract methods for Iterator
+  type Generator[+A] = Iterator[A]
+  type BreakableGenerator[+A] = BreakableIterator[A]
+
+  // Generates a new breakable generator from any traversable object.
+  def breakable[A](t1: TraversableOnce[A]): Generator[BreakableGenerator[A]] =
+    List(new BreakableIterator(t1.toIterator)).iterator
+
+  // Mediates boolean expression with 'break' and 'continue' invocations
+  case class BreakableGuardCondition(cond: Boolean) {
+    // Break the looping over one or more breakable generators, if 'cond' 
+    // evaluates to true.
+    def break(b: BreakableGenerator[_], bRest: BreakableGenerator[_]*): Boolean = {
+      if (cond) {
+        b.break
+        for (x &lt;- bRest) { x.break }
+      }
+      !cond
+    }
+
+    // Continue to next iteration of enclosing generator if 'cond' 
+    // evaluates to true.
+    def continue: Boolean = !cond
+  }
+
+  // implicit conversion of boolean values to breakable guard condition mediary
+  implicit def toBreakableGuardCondition(cond: Boolean) =
+    BreakableGuardCondition(cond)
+
+  // An iterator that can be halted via its 'break' method.  Not invoked directly
+  class BreakableIterator[+A](itr: Iterator[A]) extends Iterator[A] {
+    private var broken = false
+    private[BreakableGenerators] def break { broken = true }
+
     def hasNext = !broken &amp;&amp; itr.hasNext
     def next = itr.next
   }
-
-  // Continue to next iteration of enclosing loop if 'cond' evaluates to true
-  def continue(cond: =&gt; Boolean): Boolean = !cond
-
-  // Break one or more BreakableIterators, if the given condition 'cond'
-  // evaluates to true
-  def break(b: BreakableIterator[_], bRest: BreakableIterator[_]*)
-      (cond: =&gt; Boolean): Boolean = {
-    val br = cond
-    if (br) {
-      b.break
-      for (x &lt;- bRest) { x.break }
-    }
-    !br
-  }
-
-  // Factory that creates new BreakableIterator from any traversable object,
-  // e.g. sequence, iterator, range, etc
-  def apply[A](t1: TraversableOnce[A]): Iterator[BreakableIterator[A]] =
-    List(new BreakableIterator(t1.toIterator)).iterator
 }
 </code></pre>
 
-<p>The approach is based on a simple subclass of <code>Iterator</code> -- <code>BreakableIterator</code> -- that can be halted by 'breaking' it.  The function <code>break</code> accepts one or more instances of <code>BreakableIterator</code>, followed by a code block evaluating to a conditional.  If it evaluates to <code>true</code>, the loops embodied by the given iterators are immediately halted via the associated <code>if</code> guard, and the iterators are halted via their <code>break</code> method.  The <code>continue</code> function is mostly syntactic sugar for a standard <code>if</code> guard, simply with the condition inverted.</p>
+<p>The approach is based on a simple subclass of <code>Iterator</code> -- <code>BreakableIterator</code> -- that can be halted by 'breaking' it.  The function <code>breakable(&lt;traversable-object&gt;)</code> returns an Iterator over a single <code>BreakableIterator</code> object.  Iterators are monad-like structures in that they implement <code>map</code> and <code>flatMap</code>, and so its output can be used with <code>&lt;-</code> at the start of a <code>for</code> construct in the usual way.  Note that this means the result of the <code>for</code> statement will also be an Iterator.</p>
 
-<p>The factory <code>Breakable(&lt;traversable-object&gt;)</code> returns an Iterator over a single <code>BreakableIterator</code> object.  Iterators are proper monadic structures, and so its output can be used with <code>&lt;-</code> at the start of a <code>for</code> construct in the usual way.  Note that this means the result of the <code>for</code> statement will also be an Iterator.</p>
+<p>Whenever the boolean expression for an <code>if</code> guard is followed by either <code>break</code> or <code>continue</code>, it is implicitly converted to a "breakable guard condition" that supports those methods.  The function <code>break</code> accepts one or more instances of <code>BreakableIterator</code>.  If it evaluates to <code>true</code>, the loops embodied by the given iterators are immediately halted via the associated <code>if</code> guard, and the iterators are halted via their <code>break</code> method.  The <code>continue</code> function is mostly syntactic sugar for a standard <code>if</code> guard, simply with the condition inverted.</p>
 
 <p>Here is a simple example of <code>break</code> and <code>continue</code> in use:</p>
 
 <pre><code>object Main {
-  import Breakable._
+  import BreakableGenerators._
 
   def main(args: Array[String]) {
 
     val r = for (
       // generate a breakable sequence from some sequential input
-      loop &lt;- Breakable(1 to 1000);
+      loop &lt;- breakable(1 to 1000);
       // iterate over the breakable sequence
       j &lt;- loop;
       // print out at each iteration
       _ = { println(s"iteration j= $j") };
       // continue to next iteration when 'j' is even
-      if continue { j % 2 == 0 };
+      if { j % 2 == 0 } continue;
       // break out of the loop when 'j' exceeds 5
-      if break(loop) { j &gt; 5 }
+      if { j &gt; 5 } break(loop)
     ) yield {
       j
     }
@@ -90,8 +101,6 @@
   }
 }
 </code></pre>
-
-<p>Notice that <code>break</code> and <code>continue</code> are applied via <code>if</code> guards.  That is how the code following those statements is skipped when their conditions become true.  The statement <code>if break(loop) {condition}</code> could be read as: "if {condition} then break(loop)".</p>
 
 <p>We can see from the resulting output that <code>break</code> and <code>continue</code> function in the usual way.  The <code>continue</code> clause ignores all subsequent code when <code>j</code> is even.  The <code>break</code> clause halts the loop when it sees its first value > 5, which is 7.  Only odd values &lt;= 5 are output from the <code>yield</code> statement:</p>
 
@@ -110,19 +119,19 @@ result= List(1, 3, 5)
 <p>Breakable iterators can be nested in the way one would expect.  The following example shows an inner breakable loop nested inside an outer one:</p>
 
 <pre><code>object Main {
-  import Breakable._
+  import BreakableGenerators._
 
   def main(args: Array[String]) {
     val r = for (
-      outer &lt;- Breakable(1 to 7);
+      outer &lt;- breakable(1 to 7);
       j &lt;- outer;
       _ = { println(s"outer  j= $j") };
-      if continue { j % 2 == 0 };
-      inner &lt;- Breakable(List("a", "b", "c", "d", "e"));
+      if { j % 2 == 0 } continue;
+      inner &lt;- breakable(List("a", "b", "c", "d", "e"));
       k &lt;- inner;
       _ = { println(s"    inner  j= $j  k= $k") };
-      if break(inner) { k == "d" };
-      if break(inner, outer) { j == 5  &amp;&amp;  k == "c" }
+      if { k == "d" } break(inner);
+      if { j == 5  &amp;&amp;  k == "c" } break(inner, outer)
     ) yield {
       (j, k)
     }
