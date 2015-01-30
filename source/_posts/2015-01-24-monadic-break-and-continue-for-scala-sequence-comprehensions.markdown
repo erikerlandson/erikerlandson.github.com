@@ -8,76 +8,86 @@ categories: [ computing, scala, monads, break, continue ]
 
 Author's note: I've since received some excellent feedback from the Scala community, which I included in some [end notes](#notes).
 
+Author's note the 2nd: I later realized I could apply an implicit conversion and mediator class to preserve the traditional ordering: the code has been updated with that approach.
+
+Author's note the 3rd: This concept has been submitted to the Scala project as JIRA [SI-9120](https://issues.scala-lang.org/browse/SI-9120) (PR [#4275](https://github.com/scala/scala/pull/4275))
+
 Scala [sequence comprehensions](http://docs.scala-lang.org/tutorials/tour/sequence-comprehensions.html) are an excellent functional programming idiom for looping in Scala.  However, sequence comprehensions encompass much more than just looping -- they represent a powerful syntax for manipulating _all_ monadic structures[[1]](#ref1).
 
 The `break` and `continue` looping constructs are a popular framework for cleanly representing multiple loop halting and continuation conditions at differing stages in the execution flow.  Although there is no native support for `break` or `continue` in Scala control constructs, it is possible to implement them in a clean and idiomatic way for sequence comprehensions.
 
 In this post I will describe a lightweight and easy-to-use implementation of `break` and `continue` for use in Scala sequence comprehensions (aka `for` statements).  The entire implementation is as follows:
 
-    object Breakable {
-      // An iterator that can be halted via its 'break' method
-      class BreakableIterator[+A](itr: Iterator[A]) extends Iterator[A] {
-        // These are not intended to be called directly
-        // (see 'break' and 'continue' functions below)
-        private var broken = false
-        private[Breakable] def break { broken = true }
+    object BreakableGenerators {
+      import scala.language.implicitConversions
 
-        // Define the required abstract methods for Iterator
+      type Generator[+A] = Iterator[A]
+      type BreakableGenerator[+A] = BreakableIterator[A]
+
+      // Generates a new breakable generator from any traversable object.
+      def breakable[A](t1: TraversableOnce[A]): Generator[BreakableGenerator[A]] =
+        List(new BreakableIterator(t1.toIterator)).iterator
+
+      // Mediates boolean expression with 'break' and 'continue' invocations
+      case class BreakableGuardCondition(cond: Boolean) {
+        // Break the looping over one or more breakable generators, if 'cond' 
+        // evaluates to true.
+        def break(b: BreakableGenerator[_], bRest: BreakableGenerator[_]*): Boolean = {
+          if (cond) {
+            b.break
+            for (x <- bRest) { x.break }
+          }
+          !cond
+        }
+
+        // Continue to next iteration of enclosing generator if 'cond' 
+        // evaluates to true.
+        def continue: Boolean = !cond
+      }
+
+      // implicit conversion of boolean values to breakable guard condition mediary
+      implicit def toBreakableGuardCondition(cond: Boolean) =
+        BreakableGuardCondition(cond)
+
+      // An iterator that can be halted via its 'break' method.  Not invoked directly
+      class BreakableIterator[+A](itr: Iterator[A]) extends Iterator[A] {
+        private var broken = false
+        private[BreakableGenerators] def break { broken = true }
+
         def hasNext = !broken && itr.hasNext
         def next = itr.next
       }
-
-      // Continue to next iteration of enclosing loop if 'cond' evaluates to true
-      def continue(cond: => Boolean): Boolean = !cond
-
-      // Break one or more BreakableIterators, if the given condition 'cond'
-      // evaluates to true
-      def break(b: BreakableIterator[_], bRest: BreakableIterator[_]*)
-          (cond: => Boolean): Boolean = {
-        val br = cond
-        if (br) {
-          b.break
-          for (x <- bRest) { x.break }
-        }
-        !br
-      }
-
-      // Factory that creates new BreakableIterator from any traversable object,
-      // e.g. sequence, iterator, range, etc
-      def apply[A](t1: TraversableOnce[A]): Iterator[BreakableIterator[A]] =
-        List(new BreakableIterator(t1.toIterator)).iterator
     }
 
-The approach is based on a simple subclass of `Iterator` -- `BreakableIterator` -- that can be halted by 'breaking' it.  The function `break` accepts one or more instances of `BreakableIterator`, followed by a code block evaluating to a conditional.  If it evaluates to `true`, the loops embodied by the given iterators are immediately halted via the associated `if` guard, and the iterators are halted via their `break` method.  The `continue` function is mostly syntactic sugar for a standard `if` guard, simply with the condition inverted.
+The approach is based on a simple subclass of `Iterator` -- `BreakableIterator` -- that can be halted by 'breaking' it.  The function `breakable(<traversable-object>)` returns an Iterator over a single `BreakableIterator` object.  Iterators are monad-like structures in that they implement `map` and `flatMap`, and so its output can be used with `<-` at the start of a `for` construct in the usual way.  Note that this means the result of the `for` statement will also be an Iterator.
 
-The factory `Breakable(<traversable-object>)` returns an Iterator over a single `BreakableIterator` object.  Iterators are proper monadic structures, and so its output can be used with `<-` at the start of a `for` construct in the usual way.  Note that this means the result of the `for` statement will also be an Iterator.
+Whenever the boolean expression for an `if` guard is followed by either `break` or `continue`, it is implicitly converted to a "breakable guard condition" that supports those methods.  The function `break` accepts one or more instances of `BreakableIterator`.  If it evaluates to `true`, the loops embodied by the given iterators are immediately halted via the associated `if` guard, and the iterators are halted via their `break` method.  The `continue` function is mostly syntactic sugar for a standard `if` guard, simply with the condition inverted.
+
 
 Here is a simple example of `break` and `continue` in use:
 
     object Main {
-      import Breakable._
+      import BreakableGenerators._
 
       def main(args: Array[String]) {
 
         val r = for (
           // generate a breakable sequence from some sequential input
-          loop <- Breakable(1 to 1000);
+          loop <- breakable(1 to 1000);
           // iterate over the breakable sequence
           j <- loop;
           // print out at each iteration
           _ = { println(s"iteration j= $j") };
           // continue to next iteration when 'j' is even
-          if continue { j % 2 == 0 };
+          if { j % 2 == 0 } continue;
           // break out of the loop when 'j' exceeds 5
-          if break(loop) { j > 5 }
+          if { j > 5 } break(loop)
         ) yield {
           j
         }
         println(s"result= ${r.toList}")
       }
     }
-
-Notice that `break` and `continue` are applied via `if` guards.  That is how the code following those statements is skipped when their conditions become true.  The statement `if break(loop) {condition}` could be read as: "if {condition} then break(loop)".
 
 We can see from the resulting output that `break` and `continue` function in the usual way.  The `continue` clause ignores all subsequent code when `j` is even.  The `break` clause halts the loop when it sees its first value > 5, which is 7.  Only odd values <= 5 are output from the `yield` statement:
 
@@ -95,19 +105,19 @@ We can see from the resulting output that `break` and `continue` function in the
 Breakable iterators can be nested in the way one would expect.  The following example shows an inner breakable loop nested inside an outer one:
 
     object Main {
-      import Breakable._
+      import BreakableGenerators._
 
       def main(args: Array[String]) {
         val r = for (
-          outer <- Breakable(1 to 7);
+          outer <- breakable(1 to 7);
           j <- outer;
           _ = { println(s"outer  j= $j") };
-          if continue { j % 2 == 0 };
-          inner <- Breakable(List("a", "b", "c", "d", "e"));
+          if { j % 2 == 0 } continue;
+          inner <- breakable(List("a", "b", "c", "d", "e"));
           k <- inner;
           _ = { println(s"    inner  j= $j  k= $k") };
-          if break(inner) { k == "d" };
-          if break(inner, outer) { j == 5  &&  k == "c" }
+          if { k == "d" } break(inner);
+          if { j == 5  &&  k == "c" } break(inner, outer)
         ) yield {
           (j, k)
         }
