@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="Condor can run its jobs with a renice priority level specified by JOB_RENICE_INCREMENT, which defaults simply to 10, but can in fact be any ClassAd &hellip;">
+  <meta name="description" content="Condor maintains certain key transactional information using the ClassAd Log system. For example, both the negotiator&#8217;s accountant log (&#8220; &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,141 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2012/09/26/improved-parse-checking-for-classad-log-files-in-condor/">Improved Parse Checking for ClassAd Log Files in Condor</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-09-26T10:06:00-07:00" pubdate data-updated="true">Sep 26<span>th</span>, 2012</time>
+        
+        
+         | <a href="/blog/2012/09/26/improved-parse-checking-for-classad-log-files-in-condor/#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Condor maintains certain key transactional information using the ClassAd Log system.  For example, both the negotiator&#8217;s accountant log (&#8220;Accountantnew.log&#8221;) and the scheduler&#8217;s job queue log (&#8220;job_queue.log&#8221;) are maintained in ClassAd Log format.</p>
+
+<p>As of <a href="http://www.redhat.com/products/mrg/grid/">Red Hat Grid 2.2</a> (upstream: <a href="http://research.cs.wisc.edu/condor/">condor 7.9.0</a>), the ClassAd Log system provides significantly improved parse checking.  This upgraded format checking allows a much wider variety of log corruptions to be detected, and also provides detailed information on the location of corruptions encountered.</p>
+
+<h3>ClassAd Log Format</h3>
+
+<p>A bit of familiarity with ClassAd Log format will aid in understanding subsequent discussion.  The ClassAd Log system serializes a ClassAd collection history as a sequence of tuples:  <code>opcode, [key, [args]]</code>.  For example, here is an annotated ClassAd log excerpt (NOTE: annotations or comments are illegal in an actual file):</p>
+
+<pre><code>105                               &lt;- open a transaction
+103 1.0 LastSuspensionTime 0      &lt;- for classad '1.0', set LastSuspentionTime to 0
+103 1.0 CurrentHosts 1            &lt;- for classad '1.0', set CurrentHosts to 1
+106                               &lt;- close the transaction
+</code></pre>
+
+<p>ClassAd Log parse checking works by detecting any occurrence of an invalid op-code, or any invalid ClassAd expression in the RHS of an attribute update operation (opcode 103, as in the example above)</p>
+
+<h3>Examples of Parse Failure Detection</h3>
+
+<p>Consider a ClassAd Log with a corrupted op-code &#8216;ZMG&#8217; (in this case, not even a proper integer):</p>
+
+<pre><code>107 1 CreationTimestamp 1334245749
+101 0.0 Job Machine
+103 0.0 NextClusterNum 1
+105
+ZMG 1.0 JobStatus 2                        &lt;- Oh no, a bad opcode!
+103 1.0 EnteredCurrentStatus 1334245771
+103 1.0 LastSuspensionTime 0
+103 1.0 CurrentHosts 1
+106
+105
+103 1.1 LastJobStatus 1
+103 1.1 JobStatus 2
+</code></pre>
+
+<p>Parse checking will result in the following log message in the scheduler, which provides its assessment of what operation line/tuple it found the corruption, and the following 3 lines for additional context:</p>
+
+<pre><code>09/12/12 15:30:35 WARNING: Encountered corrupt log record 5 (byte offset 89)
+09/12/12 15:30:35 Lines following corrupt log record 5 (up to 3):
+09/12/12 15:30:35     103 1.0 EnteredCurrentStatus 1334245771
+09/12/12 15:30:35     103 1.0 LastSuspensionTime 0
+09/12/12 15:30:35     103 1.0 CurrentHosts 1
+09/12/12 15:30:35 ERROR "Error: corrupt log record 5 (byte offset 89) occurred inside closed transaction, recovery failed" at line 1136 in file /home/eje/git/grid/src/condor_utils/classad_log.cpp
+</code></pre>
+
+<p>Note that here the scheduler halted with an exception, as strict parsing was enabled, and the error was inside a completed transaction.</p>
+
+<p>Here is a second example that contains a badly-formed ClassAd expression:</p>
+
+<pre><code>107 1 CreationTimestamp 1334245749
+101 0.0 Job Machine
+103 0.0 NextClusterNum 1
+105
+103 1.0 JobStatus 2
+103 1.0 EnteredCurrentStatus 1334245749
+103 1.0 LastSuspensionTime 0
+103 1.0 CurrentHosts 1
+106
+105
+103 1.1 LastJobStatus 1 + eek!             &lt;- bad ClassAd expr!
+103 1.1 JobStatus 2
+</code></pre>
+
+<p>Note that parse errors detected in unterminated transactions (the last transaction in a file may be uncompleted) are considered non-fatal:</p>
+
+<pre><code>09/12/12 15:43:29 WARNING: Encountered corrupt log record 11 (byte offset 211)
+09/12/12 15:43:29 Lines following corrupt log record 11 (up to 3):
+09/12/12 15:43:29     103 1.1 JobStatus 2
+09/12/12 15:43:29 Detected unterminated log entry in ClassAd Log /home/eje/condor/local/spool/job_queue.log. Forcing rotation.
+</code></pre>
+
+<h3>Disabling Strict Parse Checking</h3>
+
+<p>Strict parse checking means that detected errors are fatal (unless in an unterminated transaction).  One consequence of the former lax error checking for Classad Log files is that some log file output was generated that was not properly formed.  Most such instances have been identified and corrected.  However, in order to accomodate legacy ClassAd Log files and any hidden bugs in log output generation, a condor configuration variable has been provided to disable strict checking:</p>
+
+<pre><code># Disable strict parsing: parse errors will not be fatal
+CLASSAD_LOG_STRICT_PARSING = False
+</code></pre>
+
+<p>In Red Hat Grid 2.2, <code>CLASSAD_LOG_STRICT_PARSING</code> defaults to <code>False</code>.  In the upstream condor repository, the default value has been set to <code>True</code>, in order to allow strict parsing failures to capture any remaining infrequent bugs in ClassAd log generation.</p>
+
+<p>Note that strict checking can also be disabled or enabled <em>selectively</em>.  For example, this configuration disables strict checking only on the negotiator:</p>
+
+<pre><code>CLASSAD_LOG_STRICT_PARSING = True
+NEGOTIATOR.CLASSAD_LOG_STRICT_PARSING = False
+</code></pre>
+
+<h3>Categories of Undetectable Corruption</h3>
+
+<p>In the ClassAd Log format, the key is considered an arbitrary string.  Therefore, any corruption that alters a key value is not detectable:</p>
+
+<pre><code>103 1.rats! LastSuspensionTime 0   &lt;- weird key '1.rats!' will go undetected
+</code></pre>
+
+<p>Similarly, ClassAd attribute names are by nature arbitrary, and so corruptions to a name can go undetected:</p>
+
+<pre><code>103 1.0 LastOopsie 0   &lt;- LastOopsie is a valid attribute name
+</code></pre>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1400,46 +1535,9 @@ $ callgrind_annotate --inclusive=yes --tree=calling callgrind.out.2671 &gt; mktp
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/03/19/dont-try-to-stop-me/">Don&#8217;t try to stop me. I&#8217;m on a rampage.</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-03-19T12:08:00-07:00" pubdate data-updated="true">Mar 19<span>th</span>, 2012</time>
-        
-        
-         | <a href="/blog/2012/03/19/dont-try-to-stop-me/#feedback">Feedback</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>In which I join the 21st century, kicking and screaming.</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
+    
+      <a class="prev" href="/blog/page/4/">&larr; Older</a>
     
     <a href="/blog/archives">Blog Archives</a>
     
@@ -1458,6 +1556,10 @@ $ callgrind_annotate --inclusive=yes --tree=calling callgrind.out.2671 &gt; mktp
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2015/03/31/hygienic-closures-for-scala-function-serialization/">Hygienic Closures for Scala Function Serialization</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions/">Monadic &#8216;break&#8217; and &#8216;continue&#8217; for Scala Sequence Comprehensions</a>
       </li>
     
@@ -1471,10 +1573,6 @@ $ callgrind_annotate --inclusive=yes --tree=calling callgrind.out.2671 &gt; mktp
     
       <li class="post">
         <a href="/blog/2014/08/12/implementing-parallel-prefix-scan-as-a-spark-rdd-transform/">Implementing Parallel Prefix Scan as a Spark RDD Transform</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/08/09/implementing-an-rdd-scanleft-transform-with-cascade-rdds/">Implementing an RDD scanLeft Transform With Cascade RDDs</a>
       </li>
     
   </ul>

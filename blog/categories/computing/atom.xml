@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-01-29T17:30:55-07:00</updated>
+  <updated>2015-03-31T06:10:33-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,142 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Hygienic Closures for Scala Function Serialization]]></title>
+    <link href="http://erikerlandson.github.com/blog/2015/03/31/hygienic-closures-for-scala-function-serialization/"/>
+    <updated>2015-03-31T06:06:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2015/03/31/hygienic-closures-for-scala-function-serialization</id>
+    <content type="html"><![CDATA[<p>In most use cases of Scala closures, what you see is what you get, but there are exceptions where looks can be deceiving and this can have a big impact on closure serialization.  Closure serialization is of more than academic interest.  Tools such Apache Spark cannot operate without serializing functions over the network.  In this post I'll describe some scenarios where closures include more than what is evident in the code, and then a technique for preventing unwanted inclusions.</p>
+
+<p>To establish a bit of context, consider this simple example that obtains a function and serializes it to disk, and which <em>does</em> behave as expected:</p>
+
+<pre><code>object Demo extends App {
+  def write[A](obj: A, fname: String) {
+    import java.io._
+    new ObjectOutputStream(new FileOutputStream(fname)).writeObject(obj)
+  }
+
+  object foo {
+    val v = 42
+    // The returned function includes 'v' in its closure
+    def f() = (x: Int) =&gt; v * x
+  }
+
+  // The function 'f' will serialize as expected
+  val f = foo.f
+  write(f, "/tmp/demo.f")
+}
+</code></pre>
+
+<p>When this app is compiled and run, it will serialize <code>f</code> to "/tmp/demo.f1", which of course includes the value of <code>v</code> as part of the closure for <code>f</code>.</p>
+
+<pre><code>$ scalac -d /tmp closures.scala
+$ scala -cp /tmp Demo
+$ ls /tmp/demo*
+/tmp/demo.f
+</code></pre>
+
+<p>Now, imagine you wanted to make a straightforward change, where <code>object foo</code> becomes <code>class foo</code>:</p>
+
+<pre><code>object Demo extends App {
+  def write[A](obj: A, fname: String) {
+    import java.io._
+    new ObjectOutputStream(new FileOutputStream(fname)).writeObject(obj)
+  }
+
+  // foo is a class instead of an object
+  class foo() {
+    val v = 42
+    // The returned function includes 'v' in its closure, but also a secret surprise
+    def f() = (x: Int) =&gt; v * x
+  }
+
+  // This will throw an exception!
+  val f = new foo().f
+  write(f, "/tmp/demo.f")
+}
+</code></pre>
+
+<p>It would be reasonable to expect that this minor variation behaves exactly as the previous one, but instead it throws an exception!</p>
+
+<pre><code>$ scalac -d /tmp closures.scala
+$ scala -cp /tmp Demo
+java.io.NotSerializableException: Demo$foo
+</code></pre>
+
+<p>If we look at the exception message, we see that it's complaining about not knowing how to serialize objects of class <code>foo</code>.  But we weren't including any values of <code>foo</code> in the closure for <code>f</code>, only a particular member 'v'!  What gives?  Scala is not very helpful with diagnosing this problem, but when a class member value shows up in an enclosure that is defined <em>inside</em> the class body, the <em>entire instance</em>, including any and all other member values, is included in the enclosure.  Presumably this is because a class may have any number of instances, and the compiler is including the entire instance in the closure to properly resolve the correct member value.</p>
+
+<p>One straightforward way to fix this is to simply make class <code>foo</code> serializable:</p>
+
+<pre><code>class foo() extends Serializable {
+  // ...
+}
+</code></pre>
+
+<p>If you make this change to the above code, the example with <code>class foo</code> now works correctly, but it is working by serializing the entire <code>foo</code> instance, not just the value of <code>v</code>.</p>
+
+<p>In many cases, this is not a problem and will work fine.  Serializing a few additional members may be inexpensive.  In other cases, however, it can be an impractical or impossible option.  For example, <code>foo</code> might include other very large members, which will be expensive or outright impossible to serialize:</p>
+
+<pre><code>class foo() extends Serializable {
+  val v = 42    // easy to serialize
+  val w = 4.5   // easy to serialize
+  val data = (1 to 1000000000).toList  // serialization landmine hiding in your closure
+
+  // The returned function includes all of 'foo' instance in its closure
+  def f() = (x: Int) =&gt; v * x
+}
+</code></pre>
+
+<p>A variation on the above problem is class members that are small or moderate in size, but serialized many times.  In this case, the serialization cost can become intractable via repetition of unwanted inclusions.</p>
+
+<p>Another potential problem is class members that are not serializable, and perhaps not under your control:</p>
+
+<pre><code>class foo() extends Serializable {
+  import some.class.NotSerializable
+
+  val v = 42                      // easy to serialize
+  val x = new NotSerializable     // I'll hide in your closure and fail to serialize
+
+  // The returned function includes all of 'foo' instance in its closure
+  def f() = (x: Int) =&gt; v * x
+}
+</code></pre>
+
+<p>There is a relatively painless way to decouple values from their parent instance, so that only desired values are included in a closure.  Passing desired values as parameters to a shim function whose job is to assemble the enclosure will prevent the parent instance from being pulled into the closure.  In the following example, a shim function named <code>closureFunction</code> is defined for this purpose:</p>
+
+<pre><code>object Demo extends App {
+  def write[A](obj: A, fname: String) {
+    import java.io._
+    new ObjectOutputStream(new FileOutputStream(fname)).writeObject(obj)
+  }
+
+  // apply a generator to create a function with safe decoupled enclosures
+  def closureFunction[E,D,R](enclosed: E)(gen: E =&gt; (D =&gt; R)) = gen(enclosed)
+
+  class NotSerializable {}
+
+  class foo() {
+    val v1 = 42
+    val v2 = 73
+    val n = new NotSerializable
+
+    // use shim function to enclose *only* the values of 'v1' and 'v2'
+    def f() = closureFunction((v1, v2)) { enclosed =&gt;
+      val (v1, v2) = enclosed
+      (x: Int) =&gt; (v1 + v2) * x   // Desired function, with 'v1' and 'v2' enclosed
+    }
+  }
+
+  // This will work!
+  val f = new foo().f
+  write(f, "/tmp/demo.f")
+}
+</code></pre>
+
+<p>Being aware of the scenarios where parent instances are pulled into enclosures, and how to keep your enclosures clean, can save some frustration and wasted time.  Happy programming!</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Monadic 'break' and 'continue' for Scala Sequence Comprehensions]]></title>
@@ -564,47 +700,6 @@ java.lang.StackOverflowError
 <p>The code implementing the logic above can be <a href="https://github.com/erikerlandson/spark/blob/rdd_scan_blog/core/src/main/scala/org/apache/spark/rdd/ScanRDDFunctions.scala#L161">viewed here.</a></p>
 
 <p>I will conclude by noting that there is an alternative to this highly distributed computation of <code>{z1, z2, ...}</code>, which is to collect the last-values in the per-partition intermediate scan ouputs into a single array, and run <code>scan</code> directly on that array.   This has the advantage of avoiding the construction of log(n) intermediate RDDs.   It does, however, require a monolithic 'fan-in' of data into a single RDD to receive the collection of values.  That is followed by a fan-out of the array, where each output partition picks its single z-value from the array.  It is for this reason I suspect this alternative incurs substantially more transfer overhead across worker processes.  However, one might also partition the resulting z-values in some optimal way, so that each final output partition needs to request only the partition that contains its z-value.  Future experimentation might show that this can out-perform the current fully-distributed implementation.</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Implementing an RDD scanLeft Transform With Cascade RDDs]]></title>
-    <link href="http://erikerlandson.github.com/blog/2014/08/09/implementing-an-rdd-scanleft-transform-with-cascade-rdds/"/>
-    <updated>2014-08-09T09:10:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2014/08/09/implementing-an-rdd-scanleft-transform-with-cascade-rdds</id>
-    <content type="html"><![CDATA[<p>In Scala, sequence (and iterator) data types support the <code>scanLeft</code> method for computing a sequential prefix scan on sequence elements:</p>
-
-<pre><code>// Use scanLeft to compute the cumulative sum of some integers
-scala&gt; List(1, 2, 3).scanLeft(0)(_ + _)
-res0: List[Int] = List(0, 1, 3, 6)
-</code></pre>
-
-<p>Spark RDDs are logically a sequence of row objects, and so <code>scanLeft</code> is in principle well defined on RDDs.  In this post I will describe how to cleanly implement a <code>scanLeft</code> RDD transform by applying an RDD variation called Cascade RDDs.</p>
-
-<p>A Cascade RDD is an RDD having one partition which is a function of an input RDD partition and an optional predecessor Cascade RDD partition.  You can see that this definition is somewhat recursive, where the basis case is a Cascade RDD having no precedessor.  The following diagram illustrates both cases of Cascade RDD:</p>
-
-<p><img src="/assets/images/rdd_scanleft/rdd_scan_1.png" alt="image" /></p>
-
-<p>As implied by the above diagram, a series of Cascade RDDs falling out of an input RDD will have as many Cascade RDDs as there are input partitions.  This situation begs for an abstraction to re-assemble the cascade back into a single output RDD, and so the method <code>cascadePartitions</code> is defined, as illustrated:</p>
-
-<p><img src="/assets/images/rdd_scanleft/rdd_scan_3.png" alt="image" /></p>
-
-<p>The <code>cascadePartitions</code> method takes a function argument <code>f</code>, with the signature:</p>
-
-<pre><code>f(input: Iterator[T], cascade: Option[Iterator[U]]): Iterator[U]
-</code></pre>
-
-<p>in a manner somewhat analogous to <code>mapPartitions</code>.  The function <code>f</code> must address the fact that <code>cascade</code> is optional and will be <code>None</code> in case where there is no predecessor Cascade RDD.  The interested reader can examine the details of how the <code>CascadeRDD</code> class and its companion method <code>cascadePartitions</code> are <a href="https://github.com/erikerlandson/spark/blob/rdd_scan_blog/core/src/main/scala/org/apache/spark/rdd/CascadeRDDFunctions.scala">implemented here.</a></p>
-
-<p>With Cascade RDDs it is now straightforward to define a <code>scanLeft</code> transform for RDDs.  We wish to run <code>scanLeft</code> on each input partition, with the condition that we want to start where the previous input partition left off.  The Scala <code>scanLeft</code> function makes this easy, as the starting point is its first parameter (z): <code>scanLeft(z)(f)</code>.  The following figure illustrates what this looks like:</p>
-
-<p><img src="/assets/images/rdd_scanleft/rdd_scan_2.png" alt="image" /></p>
-
-<p>As the above schematic demonstrates, almost all the work is accomplished with a single call to <code>cascadePartitions</code>, using a thin wrapper around <code>f</code> which determines where to start the next invocation of Scala <code>scanLeft</code> -- either the input parameter <code>z</code>, or the last output element of the previous cascade.   One final transform must be applied to remove the initial element that Scala <code>scanLeft</code> inserts into its output, excepting the first output partition, where it is kept to be consistent with the <code>scanLeft</code> definition.</p>
-
-<p>All computation is accomplished in the standard RDD formalism, and so <code>scanLeft</code> is a proper lazy RDD transform.</p>
-
-<p>The actual implementation is as compact as the above description implies, and you can see the <a href="https://github.com/erikerlandson/spark/blob/rdd_scan_blog/core/src/main/scala/org/apache/spark/rdd/ScanRDDFunctions.scala#L144">code here.</a></p>
 ]]></content>
   </entry>
   

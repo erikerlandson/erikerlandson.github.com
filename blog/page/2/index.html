@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="Motivation The original motivation for these experiments was consideration of the impact of negotiator cycle cadence (i.e. the time between the start &hellip;">
+  <meta name="description" content="One of the advantages of cubic Hermite splines is that their interval interpolation formula is an explicit function of gradients \( m_0, m_1, &#8230 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,318 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2013/03/16/smooth-gradients-for-cubic-hermite-splines/">Smooth Gradients for Cubic Hermite Splines</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2013-03-16T07:39:00-07:00" pubdate data-updated="true">Mar 16<span>th</span>, 2013</time>
+        
+        
+         | <a href="/blog/2013/03/16/smooth-gradients-for-cubic-hermite-splines/#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>One of the advantages of cubic Hermite splines is that their interval interpolation formula is an explicit function of gradients \( m_0, m_1, &#8230; m_{n-1} \) at knot-points:</p>
+
+<div markdown="0">
+&#92;[
+y(t) = h_{00}(t) y_j + h_{10}(t) m_j + h_{01}(t) y_{j+1} + h_{11}(t) m_{j+1} &#92;&#92;
+&#92;]
+</div>
+
+
+<p>where the Hermite bases are:</p>
+
+<div markdown="0">
+&#92;[
+h_{00} = 2t^3 - 3t^2 + 1 &#92;&#92;
+h_{10} = t^3 - 2t^2 + t &#92;&#92;
+h_{01} = -2t^3 + 3t^2 &#92;&#92;
+h_{11} = t^3 - t^2 &#92;&#92;
+&#92;]
+</div>
+
+
+<p>(For now, I will be using the unit-interval form of the interpolation, where t runs from 0 to 1 on each interval.  I will also discuss the non-uniform interval equations below)</p>
+
+<p>This formulation allows one to explicitly specify the interpolation gradient at each knot point, and to choose from various gradient assignment policies, for example <a href="http://en.wikipedia.org/wiki/Cubic_Hermite_spline#Interpolating_a_data_set">those listed here</a>, even supporting policies for <a href="http://en.wikipedia.org/wiki/Monotone_cubic_interpolation">enforcing monotonic interpolations</a>.</p>
+
+<p>One important caveat with cubic Hermite splines is that although the gradient \( y&#8217;(t) \) is guaranteed to be continuous, it is <em>not</em> guaranteed to be smooth (that is, differentiable) <em>across</em> the knots (it is of course smooth <em>inside</em> each interval). Therefore, another useful category of gradient policy is to obtain gradients \( m_0, m_1, &#8230; m_{n-1} \) such that \( y&#8217;(t) \) is also smooth across knots.</p>
+
+<p>(I feel sure that what follows was long since derived elsewhere, but my attempts to dig the formulation up on the internet failed, and so I decided the derivation might make a useful blog post)</p>
+
+<p>To ensure smooth gradient across knot points, we want the 2nd derivative \( y&#8221;(t) \) to be equal at the boundaries of adjacent intervals:</p>
+
+<div markdown="0">
+&#92;[
+h_{00}^&#8221;(t) y_{j-1} + h_{10}^&#8221;(t) m_{j-1} + h_{01}^&#8221;(t) y_j + h_{11}^&#8221;(t) m_j &#92;&#92;
+= &#92;&#92;
+h_{00}^&#8221;(t) y_j + h_{10}^&#8221;(t) m_j + h_{01}^&#8221;(t) y_{j+1} + h_{11}^&#8221;(t) m_{j+1}
+&#92;]
+</div>
+
+
+<p>or substituting the 2nd derivative of the basis definitions above:</p>
+
+<div markdown="0">
+&#92;[
+&#92;left( 12 t - 6 &#92;right) y_{j-1} + &#92;left( 6 t - 4 &#92;right) m_{j-1}  + &#92;left( 6 - 12 t &#92;right) y_j + &#92;left( 6 t - 2 &#92;right) m_j &#92;&#92;
+= &#92;&#92;
+&#92;left( 12 t - 6 &#92;right) y_{j} + &#92;left( 6 t - 4 &#92;right) m_{j}  + &#92;left( 6 - 12 t &#92;right) y_{j+1} + &#92;left( 6 t - 2 &#92;right) m_{j+1}
+&#92;]
+</div>
+
+
+<p>Observe that t = 1 on the left hand side of this equation, and t = 0 on the right side, and so we have:</p>
+
+<div markdown="0">
+&#92;[
+6 y_{j-1} + 2 m_{j-1} - 6 y_j + 4 m_j
+=
+-6 y_j - 4 m_j + 6 y_{j+1} - 2 m_{j+1}
+&#92;]
+</div>
+
+
+<p>which we can rearrange as:</p>
+
+<div markdown="0">
+&#92;[
+2 m_{j-1} + 8 m_j + 2 m_{j+1}
+=
+6 &#92;left( y_{j+1} - y_{j-1} &#92;right)
+&#92;]
+</div>
+
+
+<p>Given n knot points, the above equation holds for j = 1 to n-2 (using zero-based indexing, as nature intended).  Once we define equations for j = 0 and j = n-1, we will have a system of equations to solve.  There are two likely choices.  The first is to simply specify the endpoint gradients \( m_0 = G \) and \( m_{n-1} = H \) directly, which yields the following <a href="http://en.wikipedia.org/wiki/Tridiagonal_matrix_algorithm">tri-diagonal matrix equation:</a></p>
+
+<div markdown="0">
+&#92;[
+&#92;left( &#92;begin{array} {ccccc}
+1 &   &   &   &   &#92;&#92;
+2 & 8 & 2 &   &   &#92;&#92;
+  & 2 & 8 & 2 &   &#92;&#92;
+  &   & &#92;vdots &   &   &#92;&#92;
+  &   & 2 & 8 & 2 &#92;&#92; 
+  &   &   &   & 1 &#92;&#92;
+&#92;end{array} &#92;right)
+
+&#92;left( &#92;begin{array} {c}
+m_0 &#92;&#92;
+m_1 &#92;&#92;
+ &#92;&#92;
+&#92;vdots &#92;&#92;
+ &#92;&#92;
+m_{n-1}
+&#92;end{array} &#92;right)
+=
+&#92;left( &#92;begin{array} {c}
+G &#92;&#92;
+6 &#92;left( y_2 - y_0 &#92;right) &#92;&#92;
+6 &#92;left( y_3 - y_1 &#92;right) &#92;&#92;
+&#92;vdots &#92;&#92;
+6 &#92;left( y_{n-1} - y_{n-3} &#92;right) &#92;&#92;
+H &#92;&#92;
+&#92;end{array} &#92;right)
+&#92;]
+</div>
+
+
+<p>The second common endpoint policy is to set the 2nd derivative equal to zero &#8211; the &#8220;natural spline.&#8221;   Setting the 2nd derivative to zero at the left-end knot (and t = 0) gives us:</p>
+
+<div markdown="0">
+&#92;[
+4 m_0 + 2 m_1   =   6 &#92;left( y_1 - y_0 &#92;right)
+&#92;]
+</div>
+
+
+<p>Similarly, at the right-end knot (t = 1), we have:</p>
+
+<div markdown="0">
+&#92;[
+2 m_0 + 4 m_1   =   6 &#92;left( y_{n-1} - y_{n-2} &#92;right)
+&#92;]
+</div>
+
+
+<p>And so for a natural spline endpoint policy the matrix equation looks like this:</p>
+
+<div markdown="0">
+&#92;[
+&#92;left( &#92;begin{array} {ccccc}
+4 & 2 &   &   &   &#92;&#92;
+2 & 8 & 2 &   &   &#92;&#92;
+  & 2 & 8 & 2 &   &#92;&#92;
+  &   & &#92;vdots &   &   &#92;&#92;
+  &   & 2 & 8 & 2 &#92;&#92; 
+  &   &   & 2 & 4 &#92;&#92;
+&#92;end{array} &#92;right)
+
+&#92;left( &#92;begin{array} {c}
+m_0 &#92;&#92;
+m_1 &#92;&#92;
+ &#92;&#92;
+&#92;vdots &#92;&#92;
+ &#92;&#92;
+m_{n-1}
+&#92;end{array} &#92;right)
+=
+&#92;left( &#92;begin{array} {c}
+6 &#92;left( y_1 - y_0 &#92;right) &#92;&#92;
+6 &#92;left( y_2 - y_0 &#92;right) &#92;&#92;
+6 &#92;left( y_3 - y_1 &#92;right) &#92;&#92;
+&#92;vdots &#92;&#92;
+6 &#92;left( y_{n-1} - y_{n-3} &#92;right) &#92;&#92;
+6 &#92;left( y_{n-1} - y_{n-2} &#92;right) &#92;&#92;
+&#92;end{array} &#92;right)
+&#92;]
+</div>
+
+
+<p>The derivation above is for uniform (and unit) intervals, where t runs from 0 to 1 on each knot interval.  I&#8217;ll now discuss the variation where knot intervals are non-uniform.   The non-uniform form of the interpolation equation is:</p>
+
+<div markdown="0">
+&#92;[
+y(x) = h_{00}(t) y_j + h_{10}(t) d_j m_j + h_{01}(t) y_{j+1} + h_{11}(t) d_j m_{j+1} &#92;&#92;
+&#92;text{ } &#92;&#92;
+&#92;text{where:} &#92;&#92;
+&#92;text{ }  &#92;&#92;
+d_j = x_{j+1} - x_j &#92;text{  for  } j = 0, 1, &#8230; n-2 &#92;&#92;
+t = (x - x_j) / d_j
+&#92;]
+</div>
+
+
+<p>Taking \( t = t(x) \) and applying the chain rule, we see that 2nd derivative equation now looks like:</p>
+
+<div markdown="0">
+&#92;[
+y&#8221;(x) = &#92;frac { &#92;left( 12 t - 6 &#92;right) y_{j} + &#92;left( 6 t - 4 &#92;right) d_j m_{j}  + &#92;left( 6 - 12 t &#92;right) y_{j+1} + &#92;left( 6 t - 2 &#92;right) d_j m_{j+1} } { d_j^2 }
+&#92;]
+</div>
+
+
+<p>Applying a derivation similar to the above, we find that our (interior) equations look like this:</p>
+
+<div markdown="0">
+&#92;[
+&#92;frac {2} { d_{j-1} }  m_{j-1} + &#92;left( &#92;frac {4} { d_{j-1} } + &#92;frac {4} { d_j } &#92;right) m_j + &#92;frac {2} {d_j} m_{j+1}
+=
+&#92;frac { 6 &#92;left( y_{j+1} - y_{j} &#92;right) } { d_j^2 } + &#92;frac { 6 &#92;left( y_{j} - y_{j-1} &#92;right) } { d_{j-1}^2 }
+&#92;]
+</div>
+
+
+<p>and natural spline endpoint equations are:</p>
+
+<div markdown="0">
+&#92;[
+&#92;text{left:  } &#92;frac {4} {d_0} m_0 + &#92;frac {2} {d_0} m_1   =   &#92;frac {6 &#92;left( y_1 - y_0 &#92;right)} {d_0^2} &#92;&#92;
+&#92;text{right: } &#92;frac {2} {d_{n-2}} m_0 + &#92;frac {4} {d_{n-2}} m_1   =   &#92;frac {6 &#92;left( y_{n-1} - y_{n-2} &#92;right)} {d_{n-2}^2}
+&#92;]
+</div>
+
+
+<p>And so the matrix equation for specified endpoint gradients is:</p>
+
+<div markdown="0">
+&#92;[
+&#92;scriptsize
+&#92;left( &#92;begin{array} {ccccc}
+&#92;normalsize 1 &#92;scriptsize &   &   &   &   &#92;&#92;
+&#92;frac{2}{d_0} & &#92;frac{4}{d_0} {+} &#92;frac{4}{d_1} & &#92;frac{2}{d_1} &   &   &#92;&#92;
+  & &#92;frac{2}{d_1} & &#92;frac{4}{d_1} {+} &#92;frac{4}{d_2} & &#92;frac{2}{d_2} &   &#92;&#92;
+  &   & &#92;vdots &   &   &#92;&#92;
+  &   & &#92;frac{2}{d_{n-3}} & &#92;frac{4}{d_{n-3}} {+} &#92;frac{4}{d_{n-2}} & &#92;frac{2}{d_{n-2}} &#92;&#92; 
+  &   &   &   & &#92;normalsize 1 &#92;scriptsize &#92;&#92;
+&#92;end{array} &#92;right)
+
+&#92;left( &#92;begin{array} {c}
+m_0 &#92;&#92;
+m_1 &#92;&#92;
+ &#92;&#92;
+&#92;vdots &#92;&#92;
+ &#92;&#92;
+m_{n-1}
+&#92;end{array} &#92;right)
+=
+&#92;left( &#92;begin{array} {c}
+G &#92;&#92;
+6 &#92;left( &#92;frac{y_2 {-} y_1}{d_1^2} {+} &#92;frac{y_1 {-} y_0}{d_0^2} &#92;right) &#92;&#92;
+6 &#92;left( &#92;frac{y_3 {-} y_2}{d_2^2} {+} &#92;frac{y_2 {-} y_1}{d_1^2} &#92;right)  &#92;&#92;
+&#92;vdots &#92;&#92;
+6 &#92;left( &#92;frac{y_{n-1} {-} y_{n-2}}{d_{n-2}^2} {+} &#92;frac{y_{n-2} {-} y_{n-3}}{d_{n-3}^2} &#92;right) &#92;&#92;
+H &#92;&#92;
+&#92;end{array} &#92;right)
+&#92;normalsize
+&#92;]
+</div>
+
+
+<p>And the equation for natural spline endpoints is:</p>
+
+<div markdown="0">
+&#92;[
+&#92;scriptsize
+&#92;left( &#92;begin{array} {ccccc}
+&#92;frac{4}{d_0} & &#92;frac{2}{d_0}  &   &   &   &#92;&#92;
+&#92;frac {2} {d_0} & &#92;frac {4} {d_0} {+} &#92;frac {4} {d_1} & &#92;frac{2}{d_1} &   &   &#92;&#92;
+  & &#92;frac{2}{d_1} & &#92;frac{4}{d_1} {+} &#92;frac{4}{d_2} & &#92;frac{2}{d_2} &   &#92;&#92;
+  &   & &#92;vdots &   &   &#92;&#92;
+  &   & &#92;frac{2}{d_{n-3}} & &#92;frac{4}{d_{n-3}} {+} &#92;frac{4}{d_{n-2}} & &#92;frac{2}{d_{n-2}} &#92;&#92; 
+  &   &   & &#92;frac{2}{d_{n-2}} & &#92;frac{4}{d_{n-2}} &#92;&#92;
+&#92;end{array} &#92;right)
+
+&#92;left( &#92;begin{array} {c}
+m_0 &#92;&#92;
+m_1 &#92;&#92;
+ &#92;&#92;
+&#92;vdots &#92;&#92;
+ &#92;&#92;
+m_{n-1}
+&#92;end{array} &#92;right)
+=
+&#92;left( &#92;begin{array} {c}
+&#92;frac{6 &#92;left( y_1 {-} y_0 &#92;right)}{d_0^2} &#92;&#92;
+6 &#92;left( &#92;frac{y_2 {-} y_1}{d_1^2}  {+}  &#92;frac{y_1 {-} y_0}{d_0^2} &#92;right) &#92;&#92;
+6 &#92;left( &#92;frac{y_3 {-} y_2}{d_2^2}  {+}  &#92;frac{y_2 {-} y_1}{d_1^2} &#92;right)  &#92;&#92;
+&#92;vdots &#92;&#92;
+6 &#92;left( &#92;frac{y_{n-1} {-} y_{n-2}}{d_{n-2}^2}  {+}  &#92;frac{y_{n-2} {-} y_{n-3}}{d_{n-3}^2} &#92;right) &#92;&#92;
+&#92;frac{6 &#92;left( y_{n-1} {-} y_{n-2} &#92;right)}{d_{n-2}^2} &#92;&#92;
+&#92;end{array} &#92;right)
+&#92;normalsize
+&#92;]
+</div>
+
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1169,141 +1481,6 @@ meta_feed:
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/09/26/improved-parse-checking-for-classad-log-files-in-condor/">Improved Parse Checking for ClassAd Log Files in Condor</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-09-26T10:06:00-07:00" pubdate data-updated="true">Sep 26<span>th</span>, 2012</time>
-        
-        
-         | <a href="/blog/2012/09/26/improved-parse-checking-for-classad-log-files-in-condor/#feedback">Feedback</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Condor maintains certain key transactional information using the ClassAd Log system.  For example, both the negotiator&#8217;s accountant log (&#8220;Accountantnew.log&#8221;) and the scheduler&#8217;s job queue log (&#8220;job_queue.log&#8221;) are maintained in ClassAd Log format.</p>
-
-<p>As of <a href="http://www.redhat.com/products/mrg/grid/">Red Hat Grid 2.2</a> (upstream: <a href="http://research.cs.wisc.edu/condor/">condor 7.9.0</a>), the ClassAd Log system provides significantly improved parse checking.  This upgraded format checking allows a much wider variety of log corruptions to be detected, and also provides detailed information on the location of corruptions encountered.</p>
-
-<h3>ClassAd Log Format</h3>
-
-<p>A bit of familiarity with ClassAd Log format will aid in understanding subsequent discussion.  The ClassAd Log system serializes a ClassAd collection history as a sequence of tuples:  <code>opcode, [key, [args]]</code>.  For example, here is an annotated ClassAd log excerpt (NOTE: annotations or comments are illegal in an actual file):</p>
-
-<pre><code>105                               &lt;- open a transaction
-103 1.0 LastSuspensionTime 0      &lt;- for classad '1.0', set LastSuspentionTime to 0
-103 1.0 CurrentHosts 1            &lt;- for classad '1.0', set CurrentHosts to 1
-106                               &lt;- close the transaction
-</code></pre>
-
-<p>ClassAd Log parse checking works by detecting any occurrence of an invalid op-code, or any invalid ClassAd expression in the RHS of an attribute update operation (opcode 103, as in the example above)</p>
-
-<h3>Examples of Parse Failure Detection</h3>
-
-<p>Consider a ClassAd Log with a corrupted op-code &#8216;ZMG&#8217; (in this case, not even a proper integer):</p>
-
-<pre><code>107 1 CreationTimestamp 1334245749
-101 0.0 Job Machine
-103 0.0 NextClusterNum 1
-105
-ZMG 1.0 JobStatus 2                        &lt;- Oh no, a bad opcode!
-103 1.0 EnteredCurrentStatus 1334245771
-103 1.0 LastSuspensionTime 0
-103 1.0 CurrentHosts 1
-106
-105
-103 1.1 LastJobStatus 1
-103 1.1 JobStatus 2
-</code></pre>
-
-<p>Parse checking will result in the following log message in the scheduler, which provides its assessment of what operation line/tuple it found the corruption, and the following 3 lines for additional context:</p>
-
-<pre><code>09/12/12 15:30:35 WARNING: Encountered corrupt log record 5 (byte offset 89)
-09/12/12 15:30:35 Lines following corrupt log record 5 (up to 3):
-09/12/12 15:30:35     103 1.0 EnteredCurrentStatus 1334245771
-09/12/12 15:30:35     103 1.0 LastSuspensionTime 0
-09/12/12 15:30:35     103 1.0 CurrentHosts 1
-09/12/12 15:30:35 ERROR "Error: corrupt log record 5 (byte offset 89) occurred inside closed transaction, recovery failed" at line 1136 in file /home/eje/git/grid/src/condor_utils/classad_log.cpp
-</code></pre>
-
-<p>Note that here the scheduler halted with an exception, as strict parsing was enabled, and the error was inside a completed transaction.</p>
-
-<p>Here is a second example that contains a badly-formed ClassAd expression:</p>
-
-<pre><code>107 1 CreationTimestamp 1334245749
-101 0.0 Job Machine
-103 0.0 NextClusterNum 1
-105
-103 1.0 JobStatus 2
-103 1.0 EnteredCurrentStatus 1334245749
-103 1.0 LastSuspensionTime 0
-103 1.0 CurrentHosts 1
-106
-105
-103 1.1 LastJobStatus 1 + eek!             &lt;- bad ClassAd expr!
-103 1.1 JobStatus 2
-</code></pre>
-
-<p>Note that parse errors detected in unterminated transactions (the last transaction in a file may be uncompleted) are considered non-fatal:</p>
-
-<pre><code>09/12/12 15:43:29 WARNING: Encountered corrupt log record 11 (byte offset 211)
-09/12/12 15:43:29 Lines following corrupt log record 11 (up to 3):
-09/12/12 15:43:29     103 1.1 JobStatus 2
-09/12/12 15:43:29 Detected unterminated log entry in ClassAd Log /home/eje/condor/local/spool/job_queue.log. Forcing rotation.
-</code></pre>
-
-<h3>Disabling Strict Parse Checking</h3>
-
-<p>Strict parse checking means that detected errors are fatal (unless in an unterminated transaction).  One consequence of the former lax error checking for Classad Log files is that some log file output was generated that was not properly formed.  Most such instances have been identified and corrected.  However, in order to accomodate legacy ClassAd Log files and any hidden bugs in log output generation, a condor configuration variable has been provided to disable strict checking:</p>
-
-<pre><code># Disable strict parsing: parse errors will not be fatal
-CLASSAD_LOG_STRICT_PARSING = False
-</code></pre>
-
-<p>In Red Hat Grid 2.2, <code>CLASSAD_LOG_STRICT_PARSING</code> defaults to <code>False</code>.  In the upstream condor repository, the default value has been set to <code>True</code>, in order to allow strict parsing failures to capture any remaining infrequent bugs in ClassAd log generation.</p>
-
-<p>Note that strict checking can also be disabled or enabled <em>selectively</em>.  For example, this configuration disables strict checking only on the negotiator:</p>
-
-<pre><code>CLASSAD_LOG_STRICT_PARSING = True
-NEGOTIATOR.CLASSAD_LOG_STRICT_PARSING = False
-</code></pre>
-
-<h3>Categories of Undetectable Corruption</h3>
-
-<p>In the ClassAd Log format, the key is considered an arbitrary string.  Therefore, any corruption that alters a key value is not detectable:</p>
-
-<pre><code>103 1.rats! LastSuspensionTime 0   &lt;- weird key '1.rats!' will go undetected
-</code></pre>
-
-<p>Similarly, ClassAd attribute names are by nature arbitrary, and so corruptions to a name can go undetected:</p>
-
-<pre><code>103 1.0 LastOopsie 0   &lt;- LastOopsie is a valid attribute name
-</code></pre>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/3/">&larr; Older</a>
@@ -1325,6 +1502,10 @@ NEGOTIATOR.CLASSAD_LOG_STRICT_PARSING = False
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2015/03/31/hygienic-closures-for-scala-function-serialization/">Hygienic Closures for Scala Function Serialization</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions/">Monadic &#8216;break&#8217; and &#8216;continue&#8217; for Scala Sequence Comprehensions</a>
       </li>
     
@@ -1338,10 +1519,6 @@ NEGOTIATOR.CLASSAD_LOG_STRICT_PARSING = False
     
       <li class="post">
         <a href="/blog/2014/08/12/implementing-parallel-prefix-scan-as-a-spark-rdd-transform/">Implementing Parallel Prefix Scan as a Spark RDD Transform</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/08/09/implementing-an-rdd-scanleft-transform-with-cascade-rdds/">Implementing an RDD scanLeft Transform With Cascade RDDs</a>
       </li>
     
   </ul>

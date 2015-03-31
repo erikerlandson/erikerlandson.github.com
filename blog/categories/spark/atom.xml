@@ -4,7 +4,7 @@
   <title><![CDATA[Category: spark | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/spark/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-01-29T17:30:55-07:00</updated>
+  <updated>2015-03-31T06:10:33-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,142 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Hygienic Closures for Scala Function Serialization]]></title>
+    <link href="http://erikerlandson.github.com/blog/2015/03/31/hygienic-closures-for-scala-function-serialization/"/>
+    <updated>2015-03-31T06:06:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2015/03/31/hygienic-closures-for-scala-function-serialization</id>
+    <content type="html"><![CDATA[<p>In most use cases of Scala closures, what you see is what you get, but there are exceptions where looks can be deceiving and this can have a big impact on closure serialization.  Closure serialization is of more than academic interest.  Tools such Apache Spark cannot operate without serializing functions over the network.  In this post I'll describe some scenarios where closures include more than what is evident in the code, and then a technique for preventing unwanted inclusions.</p>
+
+<p>To establish a bit of context, consider this simple example that obtains a function and serializes it to disk, and which <em>does</em> behave as expected:</p>
+
+<pre><code>object Demo extends App {
+  def write[A](obj: A, fname: String) {
+    import java.io._
+    new ObjectOutputStream(new FileOutputStream(fname)).writeObject(obj)
+  }
+
+  object foo {
+    val v = 42
+    // The returned function includes 'v' in its closure
+    def f() = (x: Int) =&gt; v * x
+  }
+
+  // The function 'f' will serialize as expected
+  val f = foo.f
+  write(f, "/tmp/demo.f")
+}
+</code></pre>
+
+<p>When this app is compiled and run, it will serialize <code>f</code> to "/tmp/demo.f1", which of course includes the value of <code>v</code> as part of the closure for <code>f</code>.</p>
+
+<pre><code>$ scalac -d /tmp closures.scala
+$ scala -cp /tmp Demo
+$ ls /tmp/demo*
+/tmp/demo.f
+</code></pre>
+
+<p>Now, imagine you wanted to make a straightforward change, where <code>object foo</code> becomes <code>class foo</code>:</p>
+
+<pre><code>object Demo extends App {
+  def write[A](obj: A, fname: String) {
+    import java.io._
+    new ObjectOutputStream(new FileOutputStream(fname)).writeObject(obj)
+  }
+
+  // foo is a class instead of an object
+  class foo() {
+    val v = 42
+    // The returned function includes 'v' in its closure, but also a secret surprise
+    def f() = (x: Int) =&gt; v * x
+  }
+
+  // This will throw an exception!
+  val f = new foo().f
+  write(f, "/tmp/demo.f")
+}
+</code></pre>
+
+<p>It would be reasonable to expect that this minor variation behaves exactly as the previous one, but instead it throws an exception!</p>
+
+<pre><code>$ scalac -d /tmp closures.scala
+$ scala -cp /tmp Demo
+java.io.NotSerializableException: Demo$foo
+</code></pre>
+
+<p>If we look at the exception message, we see that it's complaining about not knowing how to serialize objects of class <code>foo</code>.  But we weren't including any values of <code>foo</code> in the closure for <code>f</code>, only a particular member 'v'!  What gives?  Scala is not very helpful with diagnosing this problem, but when a class member value shows up in an enclosure that is defined <em>inside</em> the class body, the <em>entire instance</em>, including any and all other member values, is included in the enclosure.  Presumably this is because a class may have any number of instances, and the compiler is including the entire instance in the closure to properly resolve the correct member value.</p>
+
+<p>One straightforward way to fix this is to simply make class <code>foo</code> serializable:</p>
+
+<pre><code>class foo() extends Serializable {
+  // ...
+}
+</code></pre>
+
+<p>If you make this change to the above code, the example with <code>class foo</code> now works correctly, but it is working by serializing the entire <code>foo</code> instance, not just the value of <code>v</code>.</p>
+
+<p>In many cases, this is not a problem and will work fine.  Serializing a few additional members may be inexpensive.  In other cases, however, it can be an impractical or impossible option.  For example, <code>foo</code> might include other very large members, which will be expensive or outright impossible to serialize:</p>
+
+<pre><code>class foo() extends Serializable {
+  val v = 42    // easy to serialize
+  val w = 4.5   // easy to serialize
+  val data = (1 to 1000000000).toList  // serialization landmine hiding in your closure
+
+  // The returned function includes all of 'foo' instance in its closure
+  def f() = (x: Int) =&gt; v * x
+}
+</code></pre>
+
+<p>A variation on the above problem is class members that are small or moderate in size, but serialized many times.  In this case, the serialization cost can become intractable via repetition of unwanted inclusions.</p>
+
+<p>Another potential problem is class members that are not serializable, and perhaps not under your control:</p>
+
+<pre><code>class foo() extends Serializable {
+  import some.class.NotSerializable
+
+  val v = 42                      // easy to serialize
+  val x = new NotSerializable     // I'll hide in your closure and fail to serialize
+
+  // The returned function includes all of 'foo' instance in its closure
+  def f() = (x: Int) =&gt; v * x
+}
+</code></pre>
+
+<p>There is a relatively painless way to decouple values from their parent instance, so that only desired values are included in a closure.  Passing desired values as parameters to a shim function whose job is to assemble the enclosure will prevent the parent instance from being pulled into the closure.  In the following example, a shim function named <code>closureFunction</code> is defined for this purpose:</p>
+
+<pre><code>object Demo extends App {
+  def write[A](obj: A, fname: String) {
+    import java.io._
+    new ObjectOutputStream(new FileOutputStream(fname)).writeObject(obj)
+  }
+
+  // apply a generator to create a function with safe decoupled enclosures
+  def closureFunction[E,D,R](enclosed: E)(gen: E =&gt; (D =&gt; R)) = gen(enclosed)
+
+  class NotSerializable {}
+
+  class foo() {
+    val v1 = 42
+    val v2 = 73
+    val n = new NotSerializable
+
+    // use shim function to enclose *only* the values of 'v1' and 'v2'
+    def f() = closureFunction((v1, v2)) { enclosed =&gt;
+      val (v1, v2) = enclosed
+      (x: Int) =&gt; (v1 + v2) * x   // Desired function, with 'v1' and 'v2' enclosed
+    }
+  }
+
+  // This will work!
+  val f = new foo().f
+  write(f, "/tmp/demo.f")
+}
+</code></pre>
+
+<p>Being aware of the scenarios where parent instances are pulled into enclosures, and how to keep your enclosures clean, can save some frustration and wasted time.  Happy programming!</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Faster Random Samples With Gap Sampling]]></title>
@@ -334,53 +470,6 @@ scala&gt;
 </code></pre>
 
 <p>In this post, I have described the Promise RDD, an RDD subclass that can be used to encapsulate computations in the lazy transform formalism that would otherwise require non-lazy actions.  As an example, I have outlined a lazy transform implementation of <code>drop</code> that uses PromiseRDD.</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Some Implications of Supporting the Scala drop Method for Spark RDDs]]></title>
-    <link href="http://erikerlandson.github.com/blog/2014/07/27/some-implications-of-supporting-the-scala-drop-method-for-spark-rdds/"/>
-    <updated>2014-07-27T17:08:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2014/07/27/some-implications-of-supporting-the-scala-drop-method-for-spark-rdds</id>
-    <content type="html"><![CDATA[<p>In Scala, sequence data types support the <code>drop</code> method for skipping (aka "dropping") the first elements of the sequence:</p>
-
-<pre><code>// drop the first element of a list
-scala&gt; List(1, 2, 3).drop(1)
-res1: List[Int] = List(2, 3)
-</code></pre>
-
-<p>Spark RDDs also support various standard sequence methods, for example <code>filter</code>, as they are logically a sequence of row objects.  One might suppose that <code>drop</code> could be a useful sequence method for RDDs, as it would support useful idioms like:</p>
-
-<pre><code>// Use drop (hypothetically) to skip the header of a text file:
-val data = sparkContext.textFile("data.txt").drop(1)
-</code></pre>
-
-<p>Implementing <code>drop</code> for RDDs is possible, and in fact can be done with a <a href="https://github.com/erikerlandson/spark/compare/erikerlandson:rdd_drop_blogpost_base...rdd_drop_blogpost">small amount of code</a>, however it comes at the price of an impact to the RDD lazy computing model.</p>
-
-<p>To see why, recall that RDDs are composed of partitions, and so in order to drop the first (n) rows of an RDD, one must first identify the partition that contains the (n-1),(n) row boundary.  In the resulting RDD, this partition will be the first one to contain any data.  Identifying this "boundary" partition cannot have a closed-form solution, because partition sizes are not in general equal;  the partition interface does not even support the concept of a <code>count</code> method.  In order to obtain the size of a partition, one is forced to actually compute its contents.  The diagram below illustrates one example of why this is so -- the contents of the partitions in the filtered RDD on the right cannot be known without actually running the filter on the parent RDD:</p>
-
-<p><img src="/assets/images/rdd_drop/rdd-drop-1.png" alt="image" /></p>
-
-<p>Given all this, the structure of a <code>drop</code> implementation is to compute the first partition, find its length, and see if it contains the requested (n-1),(n) boundary.  If not, compute the next partition, and so on, until the boundary partition is identified.  All prior partitions are ignored in the result.  All subsequent partitions are passed on with no change.  The boundary partition is passed through its own <code>drop</code> to eliminate rows up to (n).</p>
-
-<p>The code implementing the concept described above can be viewed here:
-<a href="https://github.com/erikerlandson/spark/compare/erikerlandson:rdd_drop_blogpost_base...rdd_drop_blogpost">https://github.com/erikerlandson/spark/compare/erikerlandson:rdd_drop_blogpost_base...rdd_drop_blogpost</a></p>
-
-<p>The following diagram illustrates the relation between input and output partitions in a call to <code>drop</code>:</p>
-
-<p><img src="/assets/images/rdd_drop/rdd-drop-2.png" alt="image" /></p>
-
-<p>Arguably, this represents a potential subversion of the RDD lazy compute model, as it forces the computation of at least one (and possibly more) partitions.  It behaves like a "partial action", instead of a transform, but an action that returns another RDD.</p>
-
-<p>In many cases, the impact of this might be relatively small.  For example, dropping the first few rows in a text file is likely to only force computation of a single partition, and it is a partition that will eventually be computed anyway.  Furthermore, such a use case is generally not inside a tight loop.</p>
-
-<p>However, it is not hard to construct cases where computing even the first partition of one RDD recursively forces the computation of <em>all</em> the partitions in its parents, as in this example:</p>
-
-<p><img src="/assets/images/rdd_drop/rdd-drop-3.png" alt="image" /></p>
-
-<p>Whether the benefits of supporting <code>drop</code> for RDDs outweigh the costs is an open question.  It is likely to depend on whether or not the Spark community yields any compelling use cases for <code>drop</code>, and whether a transform that behaves like a "partial action" is considered an acceptable addition to the RDD formalism.</p>
-
-<p>RDD support for <code>drop</code> has been proposed as issue <a href="https://issues.apache.org/jira/browse/SPARK-2315">SPARK-2315</a>, with corresponding pull request <a href="https://github.com/apache/spark/pull/1254/">1254</a>.</p>
 ]]></content>
   </entry>
   

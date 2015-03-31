@@ -1,0 +1,409 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Hygienic Closures for Scala Function Serialization - tool monkey</title>
+  <meta name="author" content="Erik Erlandson">
+
+  
+  <meta name="description" content="In most use cases of Scala closures, what you see is what you get, but there are exceptions where looks can be deceiving and this can have a big &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://erikerlandson.github.com/blog/2015/03/31/hygienic-closures-for-scala-function-serialization/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="tool monkey" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+
+  <!-- enables inclusion of MathJax LaTeX: http://greglus.com/blog/2011/11/29/integrate-MathJax-LaTeX-and-MathML-Markup-in-Octopress/ -->
+  <script type="text/javascript"
+    src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">tool monkey</a></h1>
+  
+    <h2>a many-angled blog</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:erikerlandson.github.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Hygienic Closures for Scala Function Serialization</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2015-03-31T06:06:00-07:00" pubdate data-updated="true">Mar 31<span>st</span>, 2015</time>
+        
+        
+         | <a href="#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>In most use cases of Scala closures, what you see is what you get, but there are exceptions where looks can be deceiving and this can have a big impact on closure serialization.  Closure serialization is of more than academic interest.  Tools such Apache Spark cannot operate without serializing functions over the network.  In this post I&#8217;ll describe some scenarios where closures include more than what is evident in the code, and then a technique for preventing unwanted inclusions.</p>
+
+<p>To establish a bit of context, consider this simple example that obtains a function and serializes it to disk, and which <em>does</em> behave as expected:</p>
+
+<pre><code>object Demo extends App {
+  def write[A](obj: A, fname: String) {
+    import java.io._
+    new ObjectOutputStream(new FileOutputStream(fname)).writeObject(obj)
+  }
+
+  object foo {
+    val v = 42
+    // The returned function includes 'v' in its closure
+    def f() = (x: Int) =&gt; v * x
+  }
+
+  // The function 'f' will serialize as expected
+  val f = foo.f
+  write(f, "/tmp/demo.f")
+}
+</code></pre>
+
+<p>When this app is compiled and run, it will serialize <code>f</code> to &#8220;/tmp/demo.f1&#8221;, which of course includes the value of <code>v</code> as part of the closure for <code>f</code>.</p>
+
+<pre><code>$ scalac -d /tmp closures.scala
+$ scala -cp /tmp Demo
+$ ls /tmp/demo*
+/tmp/demo.f
+</code></pre>
+
+<p>Now, imagine you wanted to make a straightforward change, where <code>object foo</code> becomes <code>class foo</code>:</p>
+
+<pre><code>object Demo extends App {
+  def write[A](obj: A, fname: String) {
+    import java.io._
+    new ObjectOutputStream(new FileOutputStream(fname)).writeObject(obj)
+  }
+
+  // foo is a class instead of an object
+  class foo() {
+    val v = 42
+    // The returned function includes 'v' in its closure, but also a secret surprise
+    def f() = (x: Int) =&gt; v * x
+  }
+
+  // This will throw an exception!
+  val f = new foo().f
+  write(f, "/tmp/demo.f")
+}
+</code></pre>
+
+<p>It would be reasonable to expect that this minor variation behaves exactly as the previous one, but instead it throws an exception!</p>
+
+<pre><code>$ scalac -d /tmp closures.scala
+$ scala -cp /tmp Demo
+java.io.NotSerializableException: Demo$foo
+</code></pre>
+
+<p>If we look at the exception message, we see that it&#8217;s complaining about not knowing how to serialize objects of class <code>foo</code>.  But we weren&#8217;t including any values of <code>foo</code> in the closure for <code>f</code>, only a particular member &#8216;v&#8217;!  What gives?  Scala is not very helpful with diagnosing this problem, but when a class member value shows up in an enclosure that is defined <em>inside</em> the class body, the <em>entire instance</em>, including any and all other member values, is included in the enclosure.  Presumably this is because a class may have any number of instances, and the compiler is including the entire instance in the closure to properly resolve the correct member value.</p>
+
+<p>One straightforward way to fix this is to simply make class <code>foo</code> serializable:</p>
+
+<pre><code>class foo() extends Serializable {
+  // ...
+}
+</code></pre>
+
+<p>If you make this change to the above code, the example with <code>class foo</code> now works correctly, but it is working by serializing the entire <code>foo</code> instance, not just the value of <code>v</code>.</p>
+
+<p>In many cases, this is not a problem and will work fine.  Serializing a few additional members may be inexpensive.  In other cases, however, it can be an impractical or impossible option.  For example, <code>foo</code> might include other very large members, which will be expensive or outright impossible to serialize:</p>
+
+<pre><code>class foo() extends Serializable {
+  val v = 42    // easy to serialize
+  val w = 4.5   // easy to serialize
+  val data = (1 to 1000000000).toList  // serialization landmine hiding in your closure
+
+  // The returned function includes all of 'foo' instance in its closure
+  def f() = (x: Int) =&gt; v * x
+}
+</code></pre>
+
+<p>A variation on the above problem is class members that are small or moderate in size, but serialized many times.  In this case, the serialization cost can become intractable via repetition of unwanted inclusions.</p>
+
+<p>Another potential problem is class members that are not serializable, and perhaps not under your control:</p>
+
+<pre><code>class foo() extends Serializable {
+  import some.class.NotSerializable
+
+  val v = 42                      // easy to serialize
+  val x = new NotSerializable     // I'll hide in your closure and fail to serialize
+
+  // The returned function includes all of 'foo' instance in its closure
+  def f() = (x: Int) =&gt; v * x
+}
+</code></pre>
+
+<p>There is a relatively painless way to decouple values from their parent instance, so that only desired values are included in a closure.  Passing desired values as parameters to a shim function whose job is to assemble the enclosure will prevent the parent instance from being pulled into the closure.  In the following example, a shim function named <code>closureFunction</code> is defined for this purpose:</p>
+
+<pre><code>object Demo extends App {
+  def write[A](obj: A, fname: String) {
+    import java.io._
+    new ObjectOutputStream(new FileOutputStream(fname)).writeObject(obj)
+  }
+
+  // apply a generator to create a function with safe decoupled enclosures
+  def closureFunction[E,D,R](enclosed: E)(gen: E =&gt; (D =&gt; R)) = gen(enclosed)
+
+  class NotSerializable {}
+
+  class foo() {
+    val v1 = 42
+    val v2 = 73
+    val n = new NotSerializable
+
+    // use shim function to enclose *only* the values of 'v1' and 'v2'
+    def f() = closureFunction((v1, v2)) { enclosed =&gt;
+      val (v1, v2) = enclosed
+      (x: Int) =&gt; (v1 + v2) * x   // Desired function, with 'v1' and 'v2' enclosed
+    }
+  }
+
+  // This will work!
+  val f = new foo().f
+  write(f, "/tmp/demo.f")
+}
+</code></pre>
+
+<p>Being aware of the scenarios where parent instances are pulled into enclosures, and how to keep your enclosures clean, can save some frustration and wasted time.  Happy programming!</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Erik Erlandson</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2015-03-31T06:06:00-07:00" pubdate data-updated="true">Mar 31<span>st</span>, 2015</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/closures/'>closures</a>, <a class='category' href='/blog/categories/computing/'>computing</a>, <a class='category' href='/blog/categories/functional-programming/'>functional programming</a>, <a class='category' href='/blog/categories/scala/'>scala</a>, <a class='category' href='/blog/categories/serialization/'>serialization</a>, <a class='category' href='/blog/categories/spark/'>spark</a>
+  
+</span>
+
+
+      <br>
+<a id="feedback"></a>Feedback • 
+ 
+    <script type="text/javascript" src="//platform.twitter.com/widgets.js"></script>
+    
+  <a href="https://twitter.com/intent/tweet?text=@manyangled%20re:%20http://erikerlandson.github.com/blog/2015/03/31/hygienic-closures-for-scala-function-serialization/">Reply to this post on Twitter</a> • 
+ 
+<a href="mailto:erikerlandson@yahoo.com">Email the author</a>
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://erikerlandson.github.com/blog/2015/03/31/hygienic-closures-for-scala-function-serialization/" data-via="manyangled" data-counturl="http://erikerlandson.github.com/blog/2015/03/31/hygienic-closures-for-scala-function-serialization/" >Tweet</a>
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions/" title="Previous Post: Monadic 'break' and 'continue' for Scala Sequence Comprehensions">&laquo; Monadic 'break' and 'continue' for Scala Sequence Comprehensions</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>About The Author</h1>
+  <p>Erik is a senior software engineer on the <a href="http://www.redhat.com">Red Hat</a> Emerging Technologies Group.</p>
+</section>
+<section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2015/03/31/hygienic-closures-for-scala-function-serialization/">Hygienic Closures for Scala Function Serialization</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions/">Monadic 'break' and 'continue' for Scala Sequence Comprehensions</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/09/11/faster-random-samples-with-gap-sampling/">Faster Random Samples With Gap Sampling</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/09/03/matryoshka-class-construction-from-the-scala-iterator-drop-method/">The Scala Iterator 'drop' Method Generates a Matryoshka Class Nesting</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/08/12/implementing-parallel-prefix-scan-as-a-spark-rdd-transform/">Implementing Parallel Prefix Scan as a Spark RDD Transform</a>
+      </li>
+    
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/erikerlandson">@erikerlandson</a> on GitHub
+  
+  <script type="text/javascript">
+    $.domReady(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'erikerlandson',
+            count: 0,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+
+<section>
+  <h1>Latest Tweets</h1>
+  <ul id="tweets">
+    <li class="loading">Status updating...</li>
+  </ul>
+  <script type="text/javascript">
+    $.domReady(function(){
+      getTwitterFeed("manyangled", 4, true);
+    });
+  </script>
+  <script src="/javascripts/twitter.js" type="text/javascript"> </script>
+  
+    <a href="http://twitter.com/manyangled" class="twitter-follow-button" data-show-count="false">Follow @manyangled</a>
+  
+</section>
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2015 - Erik Erlandson -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+
+
+
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>

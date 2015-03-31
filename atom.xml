@@ -4,7 +4,7 @@
   <title><![CDATA[tool monkey]]></title>
   <link href="http://erikerlandson.github.com/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-01-29T17:30:55-07:00</updated>
+  <updated>2015-03-31T06:10:33-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,142 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Hygienic Closures for Scala Function Serialization]]></title>
+    <link href="http://erikerlandson.github.com/blog/2015/03/31/hygienic-closures-for-scala-function-serialization/"/>
+    <updated>2015-03-31T06:06:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2015/03/31/hygienic-closures-for-scala-function-serialization</id>
+    <content type="html"><![CDATA[<p>In most use cases of Scala closures, what you see is what you get, but there are exceptions where looks can be deceiving and this can have a big impact on closure serialization.  Closure serialization is of more than academic interest.  Tools such Apache Spark cannot operate without serializing functions over the network.  In this post I&#8217;ll describe some scenarios where closures include more than what is evident in the code, and then a technique for preventing unwanted inclusions.</p>
+
+<p>To establish a bit of context, consider this simple example that obtains a function and serializes it to disk, and which <em>does</em> behave as expected:</p>
+
+<pre><code>object Demo extends App {
+  def write[A](obj: A, fname: String) {
+    import java.io._
+    new ObjectOutputStream(new FileOutputStream(fname)).writeObject(obj)
+  }
+
+  object foo {
+    val v = 42
+    // The returned function includes 'v' in its closure
+    def f() = (x: Int) =&gt; v * x
+  }
+
+  // The function 'f' will serialize as expected
+  val f = foo.f
+  write(f, "/tmp/demo.f")
+}
+</code></pre>
+
+<p>When this app is compiled and run, it will serialize <code>f</code> to &#8220;/tmp/demo.f1&#8221;, which of course includes the value of <code>v</code> as part of the closure for <code>f</code>.</p>
+
+<pre><code>$ scalac -d /tmp closures.scala
+$ scala -cp /tmp Demo
+$ ls /tmp/demo*
+/tmp/demo.f
+</code></pre>
+
+<p>Now, imagine you wanted to make a straightforward change, where <code>object foo</code> becomes <code>class foo</code>:</p>
+
+<pre><code>object Demo extends App {
+  def write[A](obj: A, fname: String) {
+    import java.io._
+    new ObjectOutputStream(new FileOutputStream(fname)).writeObject(obj)
+  }
+
+  // foo is a class instead of an object
+  class foo() {
+    val v = 42
+    // The returned function includes 'v' in its closure, but also a secret surprise
+    def f() = (x: Int) =&gt; v * x
+  }
+
+  // This will throw an exception!
+  val f = new foo().f
+  write(f, "/tmp/demo.f")
+}
+</code></pre>
+
+<p>It would be reasonable to expect that this minor variation behaves exactly as the previous one, but instead it throws an exception!</p>
+
+<pre><code>$ scalac -d /tmp closures.scala
+$ scala -cp /tmp Demo
+java.io.NotSerializableException: Demo$foo
+</code></pre>
+
+<p>If we look at the exception message, we see that it&#8217;s complaining about not knowing how to serialize objects of class <code>foo</code>.  But we weren&#8217;t including any values of <code>foo</code> in the closure for <code>f</code>, only a particular member &#8216;v&#8217;!  What gives?  Scala is not very helpful with diagnosing this problem, but when a class member value shows up in an enclosure that is defined <em>inside</em> the class body, the <em>entire instance</em>, including any and all other member values, is included in the enclosure.  Presumably this is because a class may have any number of instances, and the compiler is including the entire instance in the closure to properly resolve the correct member value.</p>
+
+<p>One straightforward way to fix this is to simply make class <code>foo</code> serializable:</p>
+
+<pre><code>class foo() extends Serializable {
+  // ...
+}
+</code></pre>
+
+<p>If you make this change to the above code, the example with <code>class foo</code> now works correctly, but it is working by serializing the entire <code>foo</code> instance, not just the value of <code>v</code>.</p>
+
+<p>In many cases, this is not a problem and will work fine.  Serializing a few additional members may be inexpensive.  In other cases, however, it can be an impractical or impossible option.  For example, <code>foo</code> might include other very large members, which will be expensive or outright impossible to serialize:</p>
+
+<pre><code>class foo() extends Serializable {
+  val v = 42    // easy to serialize
+  val w = 4.5   // easy to serialize
+  val data = (1 to 1000000000).toList  // serialization landmine hiding in your closure
+
+  // The returned function includes all of 'foo' instance in its closure
+  def f() = (x: Int) =&gt; v * x
+}
+</code></pre>
+
+<p>A variation on the above problem is class members that are small or moderate in size, but serialized many times.  In this case, the serialization cost can become intractable via repetition of unwanted inclusions.</p>
+
+<p>Another potential problem is class members that are not serializable, and perhaps not under your control:</p>
+
+<pre><code>class foo() extends Serializable {
+  import some.class.NotSerializable
+
+  val v = 42                      // easy to serialize
+  val x = new NotSerializable     // I'll hide in your closure and fail to serialize
+
+  // The returned function includes all of 'foo' instance in its closure
+  def f() = (x: Int) =&gt; v * x
+}
+</code></pre>
+
+<p>There is a relatively painless way to decouple values from their parent instance, so that only desired values are included in a closure.  Passing desired values as parameters to a shim function whose job is to assemble the enclosure will prevent the parent instance from being pulled into the closure.  In the following example, a shim function named <code>closureFunction</code> is defined for this purpose:</p>
+
+<pre><code>object Demo extends App {
+  def write[A](obj: A, fname: String) {
+    import java.io._
+    new ObjectOutputStream(new FileOutputStream(fname)).writeObject(obj)
+  }
+
+  // apply a generator to create a function with safe decoupled enclosures
+  def closureFunction[E,D,R](enclosed: E)(gen: E =&gt; (D =&gt; R)) = gen(enclosed)
+
+  class NotSerializable {}
+
+  class foo() {
+    val v1 = 42
+    val v2 = 73
+    val n = new NotSerializable
+
+    // use shim function to enclose *only* the values of 'v1' and 'v2'
+    def f() = closureFunction((v1, v2)) { enclosed =&gt;
+      val (v1, v2) = enclosed
+      (x: Int) =&gt; (v1 + v2) * x   // Desired function, with 'v1' and 'v2' enclosed
+    }
+  }
+
+  // This will work!
+  val f = new foo().f
+  write(f, "/tmp/demo.f")
+}
+</code></pre>
+
+<p>Being aware of the scenarios where parent instances are pulled into enclosures, and how to keep your enclosures clean, can save some frustration and wasted time.  Happy programming!</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Monadic 'break' and 'continue' for Scala Sequence Comprehensions]]></title>
@@ -2175,111 +2311,6 @@ meta_feed:
 <li>It might be nice to support the display of an avatar/icon for authors</li>
 </ul>
 
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Improved Parse Checking for ClassAd Log Files in Condor]]></title>
-    <link href="http://erikerlandson.github.com/blog/2012/09/26/improved-parse-checking-for-classad-log-files-in-condor/"/>
-    <updated>2012-09-26T10:06:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2012/09/26/improved-parse-checking-for-classad-log-files-in-condor</id>
-    <content type="html"><![CDATA[<p>Condor maintains certain key transactional information using the ClassAd Log system.  For example, both the negotiator&#8217;s accountant log (&#8220;Accountantnew.log&#8221;) and the scheduler&#8217;s job queue log (&#8220;job_queue.log&#8221;) are maintained in ClassAd Log format.</p>
-
-<p>As of <a href="http://www.redhat.com/products/mrg/grid/">Red Hat Grid 2.2</a> (upstream: <a href="http://research.cs.wisc.edu/condor/">condor 7.9.0</a>), the ClassAd Log system provides significantly improved parse checking.  This upgraded format checking allows a much wider variety of log corruptions to be detected, and also provides detailed information on the location of corruptions encountered.</p>
-
-<h3>ClassAd Log Format</h3>
-
-<p>A bit of familiarity with ClassAd Log format will aid in understanding subsequent discussion.  The ClassAd Log system serializes a ClassAd collection history as a sequence of tuples:  <code>opcode, [key, [args]]</code>.  For example, here is an annotated ClassAd log excerpt (NOTE: annotations or comments are illegal in an actual file):</p>
-
-<pre><code>105                               &lt;- open a transaction
-103 1.0 LastSuspensionTime 0      &lt;- for classad '1.0', set LastSuspentionTime to 0
-103 1.0 CurrentHosts 1            &lt;- for classad '1.0', set CurrentHosts to 1
-106                               &lt;- close the transaction
-</code></pre>
-
-<p>ClassAd Log parse checking works by detecting any occurrence of an invalid op-code, or any invalid ClassAd expression in the RHS of an attribute update operation (opcode 103, as in the example above)</p>
-
-<h3>Examples of Parse Failure Detection</h3>
-
-<p>Consider a ClassAd Log with a corrupted op-code &#8216;ZMG&#8217; (in this case, not even a proper integer):</p>
-
-<pre><code>107 1 CreationTimestamp 1334245749
-101 0.0 Job Machine
-103 0.0 NextClusterNum 1
-105
-ZMG 1.0 JobStatus 2                        &lt;- Oh no, a bad opcode!
-103 1.0 EnteredCurrentStatus 1334245771
-103 1.0 LastSuspensionTime 0
-103 1.0 CurrentHosts 1
-106
-105
-103 1.1 LastJobStatus 1
-103 1.1 JobStatus 2
-</code></pre>
-
-<p>Parse checking will result in the following log message in the scheduler, which provides its assessment of what operation line/tuple it found the corruption, and the following 3 lines for additional context:</p>
-
-<pre><code>09/12/12 15:30:35 WARNING: Encountered corrupt log record 5 (byte offset 89)
-09/12/12 15:30:35 Lines following corrupt log record 5 (up to 3):
-09/12/12 15:30:35     103 1.0 EnteredCurrentStatus 1334245771
-09/12/12 15:30:35     103 1.0 LastSuspensionTime 0
-09/12/12 15:30:35     103 1.0 CurrentHosts 1
-09/12/12 15:30:35 ERROR "Error: corrupt log record 5 (byte offset 89) occurred inside closed transaction, recovery failed" at line 1136 in file /home/eje/git/grid/src/condor_utils/classad_log.cpp
-</code></pre>
-
-<p>Note that here the scheduler halted with an exception, as strict parsing was enabled, and the error was inside a completed transaction.</p>
-
-<p>Here is a second example that contains a badly-formed ClassAd expression:</p>
-
-<pre><code>107 1 CreationTimestamp 1334245749
-101 0.0 Job Machine
-103 0.0 NextClusterNum 1
-105
-103 1.0 JobStatus 2
-103 1.0 EnteredCurrentStatus 1334245749
-103 1.0 LastSuspensionTime 0
-103 1.0 CurrentHosts 1
-106
-105
-103 1.1 LastJobStatus 1 + eek!             &lt;- bad ClassAd expr!
-103 1.1 JobStatus 2
-</code></pre>
-
-<p>Note that parse errors detected in unterminated transactions (the last transaction in a file may be uncompleted) are considered non-fatal:</p>
-
-<pre><code>09/12/12 15:43:29 WARNING: Encountered corrupt log record 11 (byte offset 211)
-09/12/12 15:43:29 Lines following corrupt log record 11 (up to 3):
-09/12/12 15:43:29     103 1.1 JobStatus 2
-09/12/12 15:43:29 Detected unterminated log entry in ClassAd Log /home/eje/condor/local/spool/job_queue.log. Forcing rotation.
-</code></pre>
-
-<h3>Disabling Strict Parse Checking</h3>
-
-<p>Strict parse checking means that detected errors are fatal (unless in an unterminated transaction).  One consequence of the former lax error checking for Classad Log files is that some log file output was generated that was not properly formed.  Most such instances have been identified and corrected.  However, in order to accomodate legacy ClassAd Log files and any hidden bugs in log output generation, a condor configuration variable has been provided to disable strict checking:</p>
-
-<pre><code># Disable strict parsing: parse errors will not be fatal
-CLASSAD_LOG_STRICT_PARSING = False
-</code></pre>
-
-<p>In Red Hat Grid 2.2, <code>CLASSAD_LOG_STRICT_PARSING</code> defaults to <code>False</code>.  In the upstream condor repository, the default value has been set to <code>True</code>, in order to allow strict parsing failures to capture any remaining infrequent bugs in ClassAd log generation.</p>
-
-<p>Note that strict checking can also be disabled or enabled <em>selectively</em>.  For example, this configuration disables strict checking only on the negotiator:</p>
-
-<pre><code>CLASSAD_LOG_STRICT_PARSING = True
-NEGOTIATOR.CLASSAD_LOG_STRICT_PARSING = False
-</code></pre>
-
-<h3>Categories of Undetectable Corruption</h3>
-
-<p>In the ClassAd Log format, the key is considered an arbitrary string.  Therefore, any corruption that alters a key value is not detectable:</p>
-
-<pre><code>103 1.rats! LastSuspensionTime 0   &lt;- weird key '1.rats!' will go undetected
-</code></pre>
-
-<p>Similarly, ClassAd attribute names are by nature arbitrary, and so corruptions to a name can go undetected:</p>
-
-<pre><code>103 1.0 LastOopsie 0   &lt;- LastOopsie is a valid attribute name
-</code></pre>
 ]]></content>
   </entry>
   
