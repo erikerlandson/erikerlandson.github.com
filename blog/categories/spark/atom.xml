@@ -4,7 +4,7 @@
   <title><![CDATA[Category: spark | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/spark/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-03-31T06:10:33-07:00</updated>
+  <updated>2015-03-31T07:11:56-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -18,7 +18,7 @@
     <link href="http://erikerlandson.github.com/blog/2015/03/31/hygienic-closures-for-scala-function-serialization/"/>
     <updated>2015-03-31T06:06:00-07:00</updated>
     <id>http://erikerlandson.github.com/blog/2015/03/31/hygienic-closures-for-scala-function-serialization</id>
-    <content type="html"><![CDATA[<p>In most use cases of Scala closures, what you see is what you get, but there are exceptions where looks can be deceiving and this can have a big impact on closure serialization.  Closure serialization is of more than academic interest.  Tools such Apache Spark cannot operate without serializing functions over the network.  In this post I'll describe some scenarios where closures include more than what is evident in the code, and then a technique for preventing unwanted inclusions.</p>
+    <content type="html"><![CDATA[<p>In most use cases of Scala closures, what you see is what you get, but there are exceptions where looks can be deceiving and this can have a big impact on closure serialization.  Closure serialization is of more than academic interest.  Tools like Apache Spark cannot operate without serializing functions over the network.  In this post I'll describe some scenarios where closures include more than what is evident in the code, and then a technique for preventing unwanted inclusions.</p>
 
 <p>To establish a bit of context, consider this simple example that obtains a function and serializes it to disk, and which <em>does</em> behave as expected:</p>
 

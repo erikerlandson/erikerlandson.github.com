@@ -97,7 +97,7 @@
   </header>
 
 
-<div class="entry-content"><p>In most use cases of Scala closures, what you see is what you get, but there are exceptions where looks can be deceiving and this can have a big impact on closure serialization.  Closure serialization is of more than academic interest.  Tools such Apache Spark cannot operate without serializing functions over the network.  In this post I&#8217;ll describe some scenarios where closures include more than what is evident in the code, and then a technique for preventing unwanted inclusions.</p>
+<div class="entry-content"><p>In most use cases of Scala closures, what you see is what you get, but there are exceptions where looks can be deceiving and this can have a big impact on closure serialization.  Closure serialization is of more than academic interest.  Tools like Apache Spark cannot operate without serializing functions over the network.  In this post I&#8217;ll describe some scenarios where closures include more than what is evident in the code, and then a technique for preventing unwanted inclusions.</p>
 
 <p>To establish a bit of context, consider this simple example that obtains a function and serializes it to disk, and which <em>does</em> behave as expected:</p>
 
