@@ -59,7 +59,7 @@ It would be reasonable to expect that this minor variation behaves exactly as th
     $ scala -cp /tmp Demo
     java.io.NotSerializableException: Demo$foo
 
-If we look at the exception message, we see that it's complaining about not knowing how to serialize objects of class `foo`.  But we weren't including any values of `foo` in the closure for `f`, only a particular member 'v'!  What gives?  Scala is not very helpful with diagnosing this problem, but when a class member value shows up in an enclosure that is defined _inside_ the class body, the _entire instance_, including any and all other member values, is included in the enclosure.  Presumably this is because a class may have any number of instances, and the compiler is including the entire instance in the closure to properly resolve the correct member value.
+If we look at the exception message, we see that it's complaining about not knowing how to serialize objects of class `foo`.  But we weren't including any values of `foo` in the closure for `f`, only a particular member 'v'!  What gives?  Scala is not very helpful with diagnosing this problem, but when a class member value shows up in a closure that is defined _inside_ the class body, the _entire instance_, including any and all other member values, is included in the closure.  Presumably this is because a class may have any number of instances, and the compiler is including the entire instance in the closure to properly resolve the correct member value.
 
 One straightforward way to fix this is to simply make class `foo` serializable:
 
@@ -94,7 +94,7 @@ Another potential problem is class members that are not serializable, and perhap
       def f() = (x: Int) => v * x
     }
 
-There is a relatively painless way to decouple values from their parent instance, so that only desired values are included in a closure.  Passing desired values as parameters to a shim function whose job is to assemble the enclosure will prevent the parent instance from being pulled into the closure.  In the following example, a shim function named `closureFunction` is defined for this purpose:
+There is a relatively painless way to decouple values from their parent instance, so that only desired values are included in a closure.  Passing desired values as parameters to a shim function whose job is to assemble the closure will prevent the parent instance from being pulled into the closure.  In the following example, a shim function named `closureFunction` is defined for this purpose:
 
     object Demo extends App {
       def write[A](obj: A, fname: String) {
@@ -102,7 +102,7 @@ There is a relatively painless way to decouple values from their parent instance
         new ObjectOutputStream(new FileOutputStream(fname)).writeObject(obj)
       }
 
-      // apply a generator to create a function with safe decoupled enclosures
+      // apply a generator to create a function with safe decoupled closures
       def closureFunction[E,D,R](enclosed: E)(gen: E => (D => R)) = gen(enclosed)
 
       class NotSerializable {}
@@ -124,4 +124,4 @@ There is a relatively painless way to decouple values from their parent instance
       write(f, "/tmp/demo.f")
     }
 
-Being aware of the scenarios where parent instances are pulled into enclosures, and how to keep your enclosures clean, can save some frustration and wasted time.  Happy programming!
+Being aware of the scenarios where parent instances are pulled into closures, and how to keep your closures clean, can save some frustration and wasted time.  Happy programming!
