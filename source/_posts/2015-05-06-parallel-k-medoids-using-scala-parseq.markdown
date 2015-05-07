@@ -110,7 +110,7 @@ In my case I also wish to exercise some control over the threading used by the p
 
 Minor grievance: it would be nice if Scala supported some 'in-line' methods, like `seq.par(n)...` and `seq.par(threadPool)...`, instead of requiring the programmer to break the flow of the code to invoke `tasksupport =`, which returns `Unit`.
 
-Now that we've parallelized our K-Medoids training, we should see how well it responds to additional threads.  I ran the above parallelized version using `{1, 2, 4, 8, 16, 32}` threads, on a machine with 40 cores, so that my benchmarking would not be impacted by attempting to run more threads than there are cores to support them.  I also ran two version of test data.  The first I generated with clusters of equal size (5 clusters of ~8000 elements), and the second with one cluster being twice as large (1 cluster of ~13300 and 4 clusters of ~6700).  Following is a plot of throughput (iterations / second) versus threads:
+Now that we've parallelized our K-Medoids training, we should see how well it responds to additional threads.  I ran the above parallelized version using `{1, 2, 4, 8, 16, 32}` threads, on a machine with 40 cores, so that my benchmarking would not be impacted by attempting to run more threads than there are cores to support them.  I also ran two versions of test data.  The first I generated with clusters of equal size (5 clusters of ~8000 elements), and the second with one cluster being twice as large (1 cluster of ~13300 and 4 clusters of ~6700).  Following is a plot of throughput (iterations / second) versus threads:
 
 {% img left /assets/images/parseq/by_cluster_1.png Throughput As A Function Of Threads %}
 
@@ -140,7 +140,7 @@ Fortunately it is not hard to improve on this situation.  If parallelizing by cl
   }
 {% endcodeblock %}
 
-Observe that we are applying the same thread pool we supplied to the ParSeq at the cluster level.  Scala's parallel logic can utilize the same thread pool at multiple granularities without blocking.  This makes it very clean to control the total number of threads used by some computation, by simply re-using the same threadpool across all points of parallelism.
+Note that I retained the previous parallelism at the cluster level, otherwise the algorithm would execute parallel medoids, but one cluster at a time.  Also observe that we are applying the same thread pool we supplied to the ParSeq at the cluster level.  Scala's parallel logic can utilize the same thread pool at multiple granularities without blocking.  This makes it very clean to control the total number of threads used by some computation, by simply re-using the same threadpool across all points of parallelism.
 
 Now, when we re-run our experiment, we see that our throughput continues to increase as we add threads.  The following plot illustrates the throughput increasing in comparison to the previous ceiling, and also that throughput is less sensitive to the cluster size, as threads can be allocated flexibly across clusters as they are available:
 
