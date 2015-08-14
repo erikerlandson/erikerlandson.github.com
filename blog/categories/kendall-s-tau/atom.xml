@@ -4,7 +4,7 @@
   <title><![CDATA[Category: kendall's tau | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/kendall-s-tau/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-08-14T14:53:21-07:00</updated>
+  <updated>2015-08-14T16:48:41-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -20,7 +20,7 @@
     <id>http://erikerlandson.github.com/blog/2015/08/14/generalizing-kendalls-tau</id>
     <content type="html"><![CDATA[<p>Recently I have been applying <a href="https://en.wikipedia.org/wiki/Kendall_rank_correlation_coefficient">Kendall's Tau</a> as an evaluation metric to assess how well a regression model ranks input samples, with respect to a known correct ranking.</p>
 
-<p>The process of implementing the Kendall's Tau statistic, with my software engineer's hat on, caused me to reflect a bit on how it could be generalized beyond the traditional application of ranking numeric pairs; what follows is a brief discussion of these reflections.</p>
+<p>The process of implementing the Kendall's Tau statistic, with my software engineer's hat on, caused me to reflect a bit on how it could be generalized beyond the traditional application of ranking numeric pairs.  In this post I'll discuss the generalization of Kendall's Tau to non-numeric data, and also generalizing from totally ordered data to partial orderings.</p>
 
 <h5>A Review of Kendall's Tau</h5>
 
