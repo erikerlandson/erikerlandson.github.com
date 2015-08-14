@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-05-07T13:31:40-07:00</updated>
+  <updated>2015-08-14T14:48:03-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,57 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Generalizing Kendall's Tau]]></title>
+    <link href="http://erikerlandson.github.com/blog/2015/08/14/generalizing-kendalls-tau/"/>
+    <updated>2015-08-14T14:35:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2015/08/14/generalizing-kendalls-tau</id>
+    <content type="html"><![CDATA[<p>Recently I have been applying <a href="https://en.wikipedia.org/wiki/Kendall_rank_correlation_coefficient">Kendall's Tau</a> as an evaluation metric to assess how well a regression model ranks input samples, with respect to a known correct ranking.</p>
+
+<p>The process of implementing the Kendall's Tau statistic, with my software engineer's hat on, caused me to reflect a bit on how it could be generalized beyond the traditional application of ranking numeric pairs; what follows is a brief discussion of these reflections.</p>
+
+<h5>A Review of Kendall's Tau</h5>
+
+<p>I'll start with a brief review of Kendall's Tau.  For more depth, a good place to start is the Wikipedia article at the link above.</p>
+
+<p>Consider a sequence of (n) observations where each observation is a pair (x,y), where we wish to measure how well a ranking by x-values agrees with a ranking by the y-values.  Informally, Kendall's Tau (aka the Kendall Rank Correlation Coefficient) is the difference between number of observation-pairs (pairs of pairs, if you will) whose ordering <em>agrees</em> ("concordant" pairs) and the number of such pairs whose ordering <em>disagrees</em> ("discordant" pairs).  This difference is divided by the total number of observation pairs.</p>
+
+<p>The commonly-used formulation of Kendall's Tau is the "Tau-B" statistic, which accounts for observed pairs having tied values in either x or y as being neither concordant nor discordant:</p>
+
+<h6>Figure 1: Kendall's Tau-B</h6>
+
+<p><img src="/assets/images/kendalls_tau/figure_1.png" title="Kendall's Tau" alt="Kendall's Tau" /></p>
+
+<p>The formulation above has quadratic complexity, with respect to data size (n).  It is possible to rearrange this computation in a way that can be computed in (n)log(n) time[1]:</p>
+
+<h6>Figure 2: An (n)log(n) formulation of Kendall's Tau-B</h6>
+
+<p><img src="/assets/images/kendalls_tau/figure_2.png" title="Kendall's Tau" alt="Kendall's Tau" /></p>
+
+<p>The details of performing this computation can be found at [1] or on the <a href="https://en.wikipedia.org/wiki/Kendall_rank_correlation_coefficient#Algorithms">Wikipedia entry</a>.  For my purposes, I'll note that it requires two (n)log(n) sorts of the data, which becomes relevant below.</p>
+
+<h5>Generalizing to Non-Numeric Values</h5>
+
+<p>Generalizing Kendall's Tau to non-numeric values is mostly just making the observation that the definition of "concordant" and "discordant" pairs is purely based on comparing x-values and y-values (and, in the (n)log(n) formulation, performing sorts on the data).  From the software engineer's perspective this means that the computations are well defined on any data type with an ordering relation, which includes numeric types but also chars, strings, sequences of any element supporting an ordering, etc.  Significantly, most programming languages support the concept of defining ordering relations on arbitrary data types, which means that <em><em>Kendall's Tau can, in principle, be computed on literally any kind of data structure</em></em>, provided you provide it with a well defined ordering.  Furthermore, an examination of the algorithms shows that values of x and y need not even be of the same type, nor do they require the same ordering.</p>
+
+<h5>Generalizing to Partial Orderings</h5>
+
+<p>When I brought this observation up, my colleague <a href="http://chapeau.freevariable.com/">Will Benton</a> asked the very interesting question of whether it's also possible to compute Kendall's Tau on objects that have only a <em>partial ordering</em>.  It turns out that you <em><em>can</em></em> define Kendall's Tau on partially ordered data, by defining the case of two non-comparable x-values, or y-values, as another kind of tie.</p>
+
+<p>The big caveat with this definition is that the (n)log(n) optimization does not apply.  Firstly, the optimized algorithm relies heavily on (n)log(n) sorting, and there is no unique full sorting of elements that are only partially ordered.  Secondly, the formula's definition of the quantities n1, n2 and n3 is founded on the assumption that element equality is transitive; this is why you can count a number of tied values, t, and use t(t-1)/2 as the corresponding number of tied pairs.  But in a partial ordering, this assumption is violated. Consider the case where (a) &lt; (b), but (a) is non-comparable to (c) and (b) is also non-comparable to (c).  By our definition, (a) is tied with (c), and (c) is tied with (b), but transitivity is violated, as (a) &lt; (b).</p>
+
+<p>So how <em>can</em> we compute Tau in this case?  Consider (n1) and (n2), in Figure-1.  These values represent the number of pairs that were tied wrt (x) and (y), respectively.  We can't use the shortcut formulas for (n1) and (n2), but we can count them directly, pair by pair, simply by conducting the traditional quadratic iteration over pairs, and incrementing (n1) whenever two x-values are noncomparable, and incrementing (n2) whenever two y-values are non-comparable, just as we increment (nc) and (nd) to count concordant and discordant pairs.  With this modification, we can apply the formula in Figure-1 as-is.</p>
+
+<h5>Conclusions</h5>
+
+<p>I made these observations without any particular application in mind. However, my instincts as a software engineer tell me that making generalizations in this way often paves the way for new ideas, once the generalized concept is made available.  With luck, it will inspire either me or somebody else to apply Kendall's Tau in interesting new ways.</p>
+
+<h5>References</h5>
+
+<p>[1] Knight, W. (1966). "A Computer Method for Calculating Kendall's Tau with Ungrouped Data". Journal of the American Statistical Association 61 (314): 436–439. doi:10.2307/2282833. JSTOR 2282833.</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Parallel K-Medoids Using Scala ParSeq]]></title>
@@ -773,179 +824,6 @@ sample(data: sequence, p: real) {
 
 
 <p>As with the results for sampling without replacement, we see that gap sampling cost is linear with (p), which yields large cost savings at small sampling, but begins to exceed traditional linear sampling at higher sampling probabilities.</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[The Scala Iterator 'drop' Method Generates a Matryoshka Class Nesting]]></title>
-    <link href="http://erikerlandson.github.com/blog/2014/09/03/matryoshka-class-construction-from-the-scala-iterator-drop-method/"/>
-    <updated>2014-09-03T17:23:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2014/09/03/matryoshka-class-construction-from-the-scala-iterator-drop-method</id>
-    <content type="html"><![CDATA[<p>The Scala Iterator <code>drop</code> method has a complexity bug that shows up when one calls <code>drop</code> repeatedly, for example when traversing over an iterator in a loop.</p>
-
-<p>The nature of the problem is that <code>drop</code>, under the hood, invokes <code>slice</code>, which returns a new anonymous subclass of <code>AbstractIterator</code> containing an instance of the input class, which can be seen in this <a href="https://github.com/erikerlandson/scala/blob/scala_drop_blog/src/library/scala/collection/Iterator.scala#L323">code excerpt from Iterator.scala</a>:</p>
-
-<pre><code>def drop(n: Int): Iterator[A] = slice(n, Int.MaxValue)
-
-// ... comments excised ...
-
-def slice(from: Int, until: Int): Iterator[A] = {
-  val lo = from max 0
-  var toDrop = lo
-  while (toDrop &gt; 0 &amp;&amp; self.hasNext) {
-    self.next()
-    toDrop -= 1
-  }
-
-  // I am a ticking quadratic time bomb:
-  new AbstractIterator[A] {
-    private var remaining = until - lo
-    def hasNext = remaining &gt; 0 &amp;&amp; self.hasNext
-    def next(): A =
-      if (remaining &gt; 0) {
-        remaining -= 1
-        self.next()
-      }
-      else empty.next()
-  }
-}
-</code></pre>
-
-<p>In the case where one is only calling <code>drop</code> once, this is not very consequential, but when the same method is used in a loop, the nesting is repeated, generating a nesting of anonymous classes that is ever-deeper -- rather like Matryoshka dolls:</p>
-
-<p><img src="/assets/images/matryoshka.jpg" width="400"></p>
-
-<p>This can be a substantial problem, as it generates quadratic complexity in what is logically a linear operation.  A simple example of looping code that can cause this nesting:</p>
-
-<pre><code>def process_nth_elements[T](itr: Iterator[T], n: Int = 1) {
-  var iter = itr
-  while (iter.hasNext) {
-    val nxt = iter.next
-    // ... process next element ...
-
-    // skip to next element
-    iter = iter.drop(n-1)
-    // this becomes more and more expensive as iterator classes
-    // become nested deeper
-  }
-}
-</code></pre>
-
-<p>A simple example program, which can be <a href="https://gist.github.com/erikerlandson/a310ccd3c58a85f031dc">found here</a>, demonstrates this nesting directly:</p>
-
-<pre><code>import java.io.{StringWriter, PrintWriter}
-import scala.reflect.ClassTag
-
-def tracehead(e: Exception, substr: String = "slice"): String = {
-  val sw = new StringWriter()
-  e.printStackTrace(new PrintWriter(sw))
-  sw.toString.split('\n').takeWhile((s:String)=&gt; !s.contains(substr)).drop(1).mkString("\n")  
-}
-
-class TestIterator[T: ClassTag](val iter: Iterator[T]) extends Iterator[T] {
-  override def hasNext = iter.hasNext
-  override def next = {
-    println(tracehead(new Exception))
-    iter.next
-  }
-}
-
-def drop_test[T](itr: Iterator[T]) {
-  var n = 0
-  var iter = itr
-  while (iter.hasNext) {
-    n += 1
-    println(s"\ndrop # $n")
-    iter = iter.drop(1)
-  }
-}
-</code></pre>
-
-<p>When the <code>drop_test</code> function is run on an instance of <code>TestIterator</code>, the stack trace output shows the Matryoshka nesting directly:</p>
-
-<pre><code>scala&gt; drop_test(new TestIterator(List(1,2,3,4,5).iterator))
-
-drop # 1
-    at $line18.$read$$iw$$iw$$iw$$iw$TestIterator.next(&lt;console&gt;:19)
-
-drop # 2
-    at $line18.$read$$iw$$iw$$iw$$iw$TestIterator.next(&lt;console&gt;:19)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-
-drop # 3
-    at $line18.$read$$iw$$iw$$iw$$iw$TestIterator.next(&lt;console&gt;:19)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-
-drop # 4
-    at $line18.$read$$iw$$iw$$iw$$iw$TestIterator.next(&lt;console&gt;:19)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-
-drop # 5
-    at $line18.$read$$iw$$iw$$iw$$iw$TestIterator.next(&lt;console&gt;:19)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-</code></pre>
-
-<p>One would expect this quadratic behavior to show up in benchmarking, and it does.  Consider this simple timing test:</p>
-
-<pre><code>def drop_time[T](itr: Iterator[T]) {
-  val t0 = System.currentTimeMillis()
-  var iter = itr
-  while (iter.hasNext) {
-    iter = iter.drop(1)
-  }
-  println(s"Time: ${System.currentTimeMillis() - t0}")
-}
-</code></pre>
-
-<p>One would expect this function to be linear in the length of the iterator, but we see the following behavior:</p>
-
-<pre><code>scala&gt; drop_time((1 to 5000 * 1).toList.iterator)
-Time: 106
-
-scala&gt; drop_time((1 to 5000 * 2).toList.iterator)
-Time: 475
-
-scala&gt; drop_time((1 to 5000 * 3).toList.iterator)
-Time: 1108
-
-scala&gt; drop_time((1 to 5000 * 4).toList.iterator)
-Time: 2037
-
-scala&gt; drop_time((1 to 5000 * 5).toList.iterator)
-Time: 3234
-
-scala&gt; drop_time((1 to 5000 * 6).toList.iterator)
-Time: 4717
-
-scala&gt; drop_time((1 to 5000 * 7).toList.iterator)
-Time: 6447
-
-scala&gt; drop_time((1 to 5000 * 8).toList.iterator)
-java.lang.StackOverflowError
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-</code></pre>
-
-<p>The corresponding plot shows the quadratic cost:</p>
-
-<p><img src="/assets/images/matryoshka_quadratic_plot.png" alt="&quot;image&quot;" /></p>
-
-<p>Given the official semantics of <code>drop</code>, which state that the method invalidates the iterator it was called on, this nesting problem should be avoidable by implementing the method more like this:</p>
-
-<pre><code>def drop(n: Int): Iterator[A] = {
-  var j = 0
-  while (j &lt; n) {
-    this.next
-    j += 1
-  }
-  this
-}
-</code></pre>
 ]]></content>
   </entry>
   
