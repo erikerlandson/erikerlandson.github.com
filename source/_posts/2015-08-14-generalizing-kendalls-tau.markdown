@@ -3,7 +3,7 @@ layout: post
 title: "Generalizing Kendall's Tau"
 date: 2015-08-14 14:35
 comments: true
-categories: [ computing, statistics, kendall's tau, math, ooo ]
+categories: [ computing, statistics, kendall's tau, math ]
 ---
 Recently I have been applying [Kendall's Tau](https://en.wikipedia.org/wiki/Kendall_rank_correlation_coefficient) as an evaluation metric to assess how well a regression model ranks input samples, with respect to a known correct ranking.
 
