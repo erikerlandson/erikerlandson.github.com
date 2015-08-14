@@ -7,7 +7,7 @@ categories: [ computing, statistics, kendall's tau, math ]
 ---
 Recently I have been applying [Kendall's Tau](https://en.wikipedia.org/wiki/Kendall_rank_correlation_coefficient) as an evaluation metric to assess how well a regression model ranks input samples, with respect to a known correct ranking.
 
-The process of implementing the Kendall's Tau statistic, with my software engineer's hat on, caused me to reflect a bit on how it could be generalized beyond the traditional application of ranking numeric pairs; what follows is a brief discussion of these reflections.
+The process of implementing the Kendall's Tau statistic, with my software engineer's hat on, caused me to reflect a bit on how it could be generalized beyond the traditional application of ranking numeric pairs.  In this post I'll discuss the generalization of Kendall's Tau to non-numeric data, and also generalizing from totally ordered data to partial orderings.
 
 ##### A Review of Kendall's Tau
 I'll start with a brief review of Kendall's Tau.  For more depth, a good place to start is the Wikipedia article at the link above.
