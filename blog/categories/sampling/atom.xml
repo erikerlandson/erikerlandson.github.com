@@ -4,7 +4,7 @@
   <title><![CDATA[Category: sampling | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/sampling/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-08-17T08:07:37-07:00</updated>
+  <updated>2015-08-17T08:33:39-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -34,10 +34,14 @@
 
 <h3>Conventions</h3>
 
-<p>In the derivations that follow, I will keep to some conventions:
-* R = the sampling reservoir size.  R > 0.
-* j = the index of a data element being considered for sampling.  j > R.
-* k = the size of a gap between samples.  k >= 0.</p>
+<p>In the derivations that follow, I will keep to some conventions:</p>
+
+<ul>
+<li>R = the sampling reservoir size.  R > 0.</li>
+<li>j = the index of a data element being considered for sampling.  j > R.</li>
+<li>k = the size of a gap between samples.  k >= 0.</li>
+</ul>
+
 
 <p>P(k) is the probability that the gap between one sample and the next is of size k.  The support for P(k) is over all k>=0.  I will generally assume that j>R, as the first R samples are always loaded into the reservoir and the actual random sampling logic starts at j=R+1.  The constraint j>R will also be relevant to many binomial coefficient expressions, where it ensures the coefficient is well defined.</p>
 
