@@ -4,7 +4,7 @@
   <title><![CDATA[Category: sampling | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/sampling/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-08-14T16:48:41-07:00</updated>
+  <updated>2015-08-17T08:07:37-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,86 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[The Reservoir Sampling Gap Distribution]]></title>
+    <link href="http://erikerlandson.github.com/blog/2015/08/17/the-reservoir-sampling-gap-distribution/"/>
+    <updated>2015-08-17T07:35:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2015/08/17/the-reservoir-sampling-gap-distribution</id>
+    <content type="html"><![CDATA[<p>In a <a href="http://erikerlandson.github.io/blog/2014/09/11/faster-random-samples-with-gap-sampling/">previous post</a>, I showed that random Bernoulli and Poisson sampling could be made much faster by modeling the <em>sampling gap distribution</em> - that is, directly drawing random samples from the distribution of how many elements would be skipped over between actual samples taken.</p>
+
+<p>Another popular sampling algorithm is <a href="https://en.wikipedia.org/wiki/Reservoir_sampling">Reservoir Sampling</a>.  Its sampling logic is a bit more complicated than Bernoulli or Poisson sampling, in the sense that the probability of sampling any given (jth) element <em>changes</em>. For a sampling reservoir of size R, and all j>R, the probability of choosing element (j) is R/j.  You can see that the potential payoff for gap-sampling is big, particularly as data size becomes large; as (j) approaches infinity, the probability R/j goes to zero, and the corresponding gaps between samples grow without bound.</p>
+
+<p>Modeling a sampling gap distribution is a powerful tool for optimizing a sampling algorithm, but it requires that (1) you actually <em>know</em> the sampling distribution, and (2) that you can effectively draw values from that distribution faster than just applying a random process to drawing each data element.</p>
+
+<p>With that goal in mind, I derived the probability mass function (pmf) and cumulative distribution function (cdf) for the sampling gap distribution of reservoir sampling.  In this post I will show the derivations.</p>
+
+<h3>The Sampling Gap Distribution</h3>
+
+<p>In the interest of making it easy to get at the actual answers, here are the pmf and cdf for the Reservoir Sampling Gap Distribution.  For a sampling reservoir of size (R), starting at data element (j), the probability distribution of the sampling gap is:</p>
+
+<p><img src="/assets/images/reservoir1/figure6.png" title="Figure 6" alt="Figure 6" /></p>
+
+<h3>Conventions</h3>
+
+<p>In the derivations that follow, I will keep to some conventions:
+* R = the sampling reservoir size.  R > 0.
+* j = the index of a data element being considered for sampling.  j > R.
+* k = the size of a gap between samples.  k >= 0.</p>
+
+<p>P(k) is the probability that the gap between one sample and the next is of size k.  The support for P(k) is over all k>=0.  I will generally assume that j>R, as the first R samples are always loaded into the reservoir and the actual random sampling logic starts at j=R+1.  The constraint j>R will also be relevant to many binomial coefficient expressions, where it ensures the coefficient is well defined.</p>
+
+<h3>Deriving the Probability Mass Function, P(k)</h3>
+
+<p>Suppose we just chose (randomly) to sample data element (j-1).  Now we are interested in the probability distribution of the next sampling gap.  That is, the probability P(k) that we will <em>not</em> sample the next (k) elements {j,j+1,...j+k-1}, and sample element (j+k):</p>
+
+<p><img src="/assets/images/reservoir1/figure1.png" title="Figure 1" alt="Figure 1" /></p>
+
+<p>By arranging the product terms in descending order as above, you can see that they can be written as factorial quotients:</p>
+
+<p><img src="/assets/images/reservoir1/figure2.png" title="Figure 2" alt="Figure 2" /></p>
+
+<p>Now we apply <a href="#LemmaA">Lemma A</a>.  The 2nd case (a&lt;=b) of the Lemma applies, since (j-1-R)&lt;=j, so we have:</p>
+
+<p><img src="/assets/images/reservoir1/figure3.png" title="Figure 3" alt="Figure 3" /></p>
+
+<p>And so we have now derived a compact, closed-form expression for P(k).</p>
+
+<h3>Deriving the Cumulative Distribution Function, F(k)</h3>
+
+<p>Now that we have a derivation for the pmf P(k), we can tackle a derivation for the cdf.  First I will make note of this <a href="https://en.wikipedia.org/wiki/Binomial_coefficient#Series_involving_binomial_coefficients">useful identity</a> that I scraped off of Wikipedia (I substituted (x) => (a) and (k) => (b)):</p>
+
+<p><img src="/assets/images/reservoir1/identity1.png" title="identity 1" alt="identity 1" /></p>
+
+<p>The cumulative distribution function for the sampling gap, F(k), is of course just the sum over P(t), for (t) from 0 up to (k):</p>
+
+<p><img src="/assets/images/reservoir1/figure4.png" title="Figure 4" alt="Figure 4" /></p>
+
+<p>This is a closed-form solution, but we can apply a bit more simplification:</p>
+
+<p><img src="/assets/images/reservoir1/figure5.png" title="Figure 5" alt="Figure 5" /></p>
+
+<h3>Conclusions</h3>
+
+<p>We have derived closed-form expressions for the pmf and cdf of the Reservoir Sampling gap distribution:</p>
+
+<p><img src="/assets/images/reservoir1/figure6.png" title="Figure 6" alt="Figure 6" /></p>
+
+<p>In order to apply these results to a practical gap-sampling implementation of Reservoir Sampling, we would next need a way to efficiently sample from P(k), to obtain gap sizes to skip over.  How to accomplish this is an open question, but knowing a formula for P(k) and F(k) is a start.</p>
+
+<h3>Acknowledgements</h3>
+
+<p>Many thanks to <a href="http://rnowling.github.io/">RJ Nowling</a> and <a href="http://chapeau.freevariable.com/">Will Benton</a> for proof reading and moral support!  Any remaining errors are my own fault.</p>
+
+<p><a name="LemmaA"></a></p>
+
+<h3>Lemma A, And Its Proof</h3>
+
+<p><img src="/assets/images/reservoir1/lemmaA.png" title="Lemma A" alt="Lemma A" /></p>
+
+<p><img src="/assets/images/reservoir1/lemmaAproof.png" title="Lemma A Proof" alt="Lemma A Proof" /></p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Faster Random Samples With Gap Sampling]]></title>

@@ -4,7 +4,7 @@
   <title><![CDATA[tool monkey]]></title>
   <link href="http://erikerlandson.github.com/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-08-14T16:48:41-07:00</updated>
+  <updated>2015-08-17T08:07:37-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,86 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[The Reservoir Sampling Gap Distribution]]></title>
+    <link href="http://erikerlandson.github.com/blog/2015/08/17/the-reservoir-sampling-gap-distribution/"/>
+    <updated>2015-08-17T07:35:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2015/08/17/the-reservoir-sampling-gap-distribution</id>
+    <content type="html"><![CDATA[<p>In a <a href="http://erikerlandson.github.io/blog/2014/09/11/faster-random-samples-with-gap-sampling/">previous post</a>, I showed that random Bernoulli and Poisson sampling could be made much faster by modeling the <em>sampling gap distribution</em> - that is, directly drawing random samples from the distribution of how many elements would be skipped over between actual samples taken.</p>
+
+<p>Another popular sampling algorithm is <a href="https://en.wikipedia.org/wiki/Reservoir_sampling">Reservoir Sampling</a>.  Its sampling logic is a bit more complicated than Bernoulli or Poisson sampling, in the sense that the probability of sampling any given (jth) element <em>changes</em>. For a sampling reservoir of size R, and all j>R, the probability of choosing element (j) is R/j.  You can see that the potential payoff for gap-sampling is big, particularly as data size becomes large; as (j) approaches infinity, the probability R/j goes to zero, and the corresponding gaps between samples grow without bound.</p>
+
+<p>Modeling a sampling gap distribution is a powerful tool for optimizing a sampling algorithm, but it requires that (1) you actually <em>know</em> the sampling distribution, and (2) that you can effectively draw values from that distribution faster than just applying a random process to drawing each data element.</p>
+
+<p>With that goal in mind, I derived the probability mass function (pmf) and cumulative distribution function (cdf) for the sampling gap distribution of reservoir sampling.  In this post I will show the derivations.</p>
+
+<h3>The Sampling Gap Distribution</h3>
+
+<p>In the interest of making it easy to get at the actual answers, here are the pmf and cdf for the Reservoir Sampling Gap Distribution.  For a sampling reservoir of size (R), starting at data element (j), the probability distribution of the sampling gap is:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/figure6.png" title="Figure 6" alt="Figure 6" /></p>
+
+<h3>Conventions</h3>
+
+<p>In the derivations that follow, I will keep to some conventions:
+* R = the sampling reservoir size.  R > 0.
+* j = the index of a data element being considered for sampling.  j > R.
+* k = the size of a gap between samples.  k >= 0.</p>
+
+<p>P(k) is the probability that the gap between one sample and the next is of size k.  The support for P(k) is over all k>=0.  I will generally assume that j>R, as the first R samples are always loaded into the reservoir and the actual random sampling logic starts at j=R+1.  The constraint j>R will also be relevant to many binomial coefficient expressions, where it ensures the coefficient is well defined.</p>
+
+<h3>Deriving the Probability Mass Function, P(k)</h3>
+
+<p>Suppose we just chose (randomly) to sample data element (j-1).  Now we are interested in the probability distribution of the next sampling gap.  That is, the probability P(k) that we will <em>not</em> sample the next (k) elements {j,j+1,&#8230;j+k-1}, and sample element (j+k):</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/figure1.png" title="Figure 1" alt="Figure 1" /></p>
+
+<p>By arranging the product terms in descending order as above, you can see that they can be written as factorial quotients:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/figure2.png" title="Figure 2" alt="Figure 2" /></p>
+
+<p>Now we apply <a href="#LemmaA">Lemma A</a>.  The 2nd case (a&lt;=b) of the Lemma applies, since (j-1-R)&lt;=j, so we have:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/figure3.png" title="Figure 3" alt="Figure 3" /></p>
+
+<p>And so we have now derived a compact, closed-form expression for P(k).</p>
+
+<h3>Deriving the Cumulative Distribution Function, F(k)</h3>
+
+<p>Now that we have a derivation for the pmf P(k), we can tackle a derivation for the cdf.  First I will make note of this <a href="https://en.wikipedia.org/wiki/Binomial_coefficient#Series_involving_binomial_coefficients">useful identity</a> that I scraped off of Wikipedia (I substituted (x) => (a) and (k) => (b)):</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/identity1.png" title="identity 1" alt="identity 1" /></p>
+
+<p>The cumulative distribution function for the sampling gap, F(k), is of course just the sum over P(t), for (t) from 0 up to (k):</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/figure4.png" title="Figure 4" alt="Figure 4" /></p>
+
+<p>This is a closed-form solution, but we can apply a bit more simplification:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/figure5.png" title="Figure 5" alt="Figure 5" /></p>
+
+<h3>Conclusions</h3>
+
+<p>We have derived closed-form expressions for the pmf and cdf of the Reservoir Sampling gap distribution:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/figure6.png" title="Figure 6" alt="Figure 6" /></p>
+
+<p>In order to apply these results to a practical gap-sampling implementation of Reservoir Sampling, we would next need a way to efficiently sample from P(k), to obtain gap sizes to skip over.  How to accomplish this is an open question, but knowing a formula for P(k) and F(k) is a start.</p>
+
+<h3>Acknowledgements</h3>
+
+<p>Many thanks to <a href="http://rnowling.github.io/">RJ Nowling</a> and <a href="http://chapeau.freevariable.com/">Will Benton</a> for proof reading and moral support!  Any remaining errors are my own fault.</p>
+
+<p><a name="LemmaA"></a></p>
+
+<h3>Lemma A, And Its Proof</h3>
+
+<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/lemmaA.png" title="Lemma A" alt="Lemma A" /></p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/lemmaAproof.png" title="Lemma A Proof" alt="Lemma A Proof" /></p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Generalizing Kendall's Tau]]></title>
@@ -2223,149 +2303,6 @@ slot1_1@rorschach | 1
 <p>One implication of this proposed semantic for quotas and weights is that the measure for the maximum number of jobs that may match against any given slot must be some finite number.   It implies that all resource dimensions are quantized in some way by the allocation policy.   This scheme would not support a real-valued resource dimension that had no minimum quantization.  I do not think that this is a very heavy-weight requirement, and in fact we have already been moving in that direction with features such as MODIFY_REQUEST_EXPRS_xxx.</p>
 
 <p>When a slot&#8217;s resource allocation policy is defined over all its resources, what bounds this measure of maximum possible matches?  In a case where each job match <em>must</em> use at least one non-zero quantum of each resource dimension, then the limit is the resource with the mimimum quantized levels.   In a case where jobs may request a zero amount of resources, then the limit is the resource with the maximum quantized levels.  (note, it is required that each match use at least one quantum of at least one resource, otherwise the maximum is not properly bounded).</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Using Accounting Groups With Wallaby]]></title>
-    <link href="http://erikerlandson.github.com/blog/2012/11/01/using-accounting-groups-with-wallaby/"/>
-    <updated>2012-11-01T07:41:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2012/11/01/using-accounting-groups-with-wallaby</id>
-    <content type="html"><![CDATA[<p>In this post I will describe how to use HTCondor accounting groups with <a href="http://getwallaby.com">Wallaby</a>.  I will begin by walking through an accounting group configuration on a pool managed by wallaby.  Following, I will demonstrate the configuration in action.</p>
-
-<p>The gist of this demo will be to create a simple accounting group hierarchy:  A top-level group called <code>Demo</code>, and three child groups <code>Demo.A, Demo.B, Demo.C</code>.  <code>Demo</code> will be given a <em>static</em> quota to simulate the behavior of a pool with a particular number of slots available.  The child groups will use <em>dynamic</em> quotas to express their quota shares from the parent as ratios.</p>
-
-<p>First, it is good practice to snapshot current wallaby configuration for reference:</p>
-
-<pre><code>$ wallaby make-snapshot "pre demo state"
-</code></pre>
-
-<p>We will be constructing a wallaby feature called <code>AccountingGroups</code> to hold our accounting group configurations.  This creates the feature:</p>
-
-<pre><code>$ wallaby add-feature AccountingGroups
-</code></pre>
-
-<p>Wallaby wants to know about features that are used in configurations, so begin by declaring them to the wallaby store:</p>
-
-<pre><code>$ wallaby add-param GROUP_NAMES
-$ wallaby add-param GROUP_QUOTA_Demo
-$ wallaby add-param GROUP_QUOTA_DYNAMIC_Demo.A
-$ wallaby add-param GROUP_QUOTA_DYNAMIC_Demo.B
-$ wallaby add-param GROUP_QUOTA_DYNAMIC_Demo.C
-$ wallaby add-param GROUP_ACCEPT_SURPLUS_Demo
-$ wallaby add-param NEGOTIATOR_ALLOW_QUOTA_OVERSUBSCRIPTION
-$ wallaby add-param NEGOTIATOR_CONSIDER_PREEMPTION
-$ wallaby add-param CLAIM_WORKLIFE
-</code></pre>
-
-<p>Here we disable the &#8220;claim worklife&#8221; feature by setting claims to expire immediately.   This prevents jobs under one accounting group from acquiring surplus quota and holding on to it when new jobs arrive under a different group:</p>
-
-<pre><code>$ wallaby add-params-to-feature ExecuteNode CLAIM_WORKLIFE=0
-$ wallaby add-params-to-subsystem startd CLAIM_WORKLIFE
-$ wallaby add-params-to-feature Scheduler CLAIM_WORKLIFE=0
-$ wallaby add-params-to-subsystem scheduler CLAIM_WORKLIFE
-</code></pre>
-
-<p>If you alter the configuration parameters, you will want the negotiator to reconfigure itself when you activate.  Here we declare the accounting group features as part of the negotiator subsystem:</p>
-
-<pre><code>$ wallaby add-params-to-subsystem negotiator \
-GROUP_NAMES \
-GROUP_QUOTA_Demo \
-GROUP_QUOTA_DYNAMIC_Demo.A \
-GROUP_QUOTA_DYNAMIC_Demo.B \
-GROUP_QUOTA_DYNAMIC_Demo.C \
-NEGOTIATOR_ALLOW_QUOTA_OVERSUBSCRIPTION \
-NEGOTIATOR_CONSIDER_PREEMPTION
-</code></pre>
-
-<p>Activate the configuration so far to tell subsystems about new parameters for reconfig</p>
-
-<pre><code>$ wallaby activate
-</code></pre>
-
-<p>Now we construct the actual configuration as the <code>AccountingGroups</code> wallaby feature.  Here we are constructing a group <code>Demo</code> with three subgroups <code>Demo.{A|B|C}</code>.  In a multi-node pool with several cores, it is often easiest to play with group behavior by creating a sub-hierarchy such as this <code>Demo</code> sub-hierarchy, and configuring <code>GROUP_ACCEPT_SURPLUS_Demo=False</code>, so that the sub-hierarchy behaves with a well-defined total slot quota (in this case 15).  The sub-groups A,B and C each take 1/3 of the parent&#8217;s quota, so in this example each will receive 5 slots.</p>
-
-<pre><code>$ wallaby add-params-to-feature AccountingGroups \
-NEGOTIATOR_ALLOW_QUOTA_OVERSUBSCRIPTION=False \
-NEGOTIATOR_CONSIDER_PREEMPTION=False \
-GROUP_NAMES='Demo, Demo.A, Demo.B, Demo.C' \
-GROUP_ACCEPT_SURPLUS=True \
-GROUP_QUOTA_Demo=15 \
-GROUP_ACCEPT_SURPLUS_Demo=False \
-GROUP_QUOTA_DYNAMIC_Demo.A=0.333 \
-GROUP_QUOTA_DYNAMIC_Demo.B=0.333 \
-GROUP_QUOTA_DYNAMIC_Demo.C=0.333
-</code></pre>
-
-<p>With our accounting group feature created, we can apply it to the machine our negotiator daemon is running on.  Then snapshot our configuration modifications for reference, and activate the new configuration:</p>
-
-<pre><code>$ wallaby add-features-to-node negotiator.node.com AccountingGroups
-$ wallaby make-snapshot 'new acct group config'
-$ wallaby activate
-</code></pre>
-
-<p>Now we will demonstrate the new feature in action.  Submit the following file to your pool, which submits 100 jobs each to groups <code>Demo.A</code> with durations randomly chosen between 25 and 35 seconds:</p>
-
-<pre><code>universe = vanilla
-cmd = /bin/sleep
-args = $$([25 + random(11)])
-transfer_executable = false
-should_transfer_files = if_needed
-when_to_transfer_output = on_exit
-+AccountingGroup="Demo.A.user1"
-queue 100
-</code></pre>
-
-<p>Once you make this submission, allow the jobs to negotiate, and you can check to see what accounting groups are running on slots by inspecting the value of <code>RemoteNegotiatingGroup</code> on slot ads.   You should see that subgroup <code>Demo.A</code> has acquired surplus and is running 15 jobs, as there are no jobs under groups <code>Demo.B</code> or <code>Demo.C</code> that need slots.  Note, due to jobs completing between negotiation cycles, these numbers can be less than the maximum possible at certain times.  If you have any other slots in the pool, they will show up in the output below as having either <code>undefined</code> negotiating group or possibly <code>&lt;none&gt;</code> if any other jobs are running.</p>
-
-<pre><code>$ condor_status -format "%s\n" 'ifThenElse(RemoteNegotiatingGroup isnt undefined, string(RemoteNegotiatingGroup), "undefined")' -constraint 'True' | sort | uniq -c | awk '{ print $0; t += $1 } END { printf("%7d total\n",t) }'
- 15 Demo.A
- 50 &lt;none&gt;
- 50 undefined
-115 total
-</code></pre>
-
-<p>Now submit some jobs against <code>Demo.B</code> and <code>Demo.C</code>, like so:</p>
-
-<pre><code>universe = vanilla
-cmd = /bin/sleep
-args = $$([25 + random(11)])
-transfer_executable = false
-should_transfer_files = if_needed
-when_to_transfer_output = on_exit
-+AccountingGroup="Demo.B.user1"
-queue 100
-+AccountingGroup="Demo.C.user1"
-queue 100
-</code></pre>
-
-<p>Once these jobs begin to negotiate, we expect to see the jobs balanced between the three groups evenly, as we gave each group 1/3 of the quota:</p>
-
-<pre><code>$ condor_status -format "%s\n" 'ifThenElse(RemoteNegotiatingGroup isnt undefined, string(RemoteNegotiatingGroup), "undefined")' -constraint 'True' | sort | uniq -c | awk '{ print $0; t += $1 } END { printf("%7d total\n",t) }'
-  5 Demo.A
-  5 Demo.B
-  5 Demo.C
- 50 &lt;none&gt;
- 50 undefined
-115 total
-</code></pre>
-
-<p>Finally, we see what happens if we remove jobs under <code>Demo.B</code>:</p>
-
-<pre><code>$ condor_rm -constraint 'AccountingGroup =?= "Demo.B.user1"'
-</code></pre>
-
-<p>Now we should see quota start to share between <code>Demo.A</code> and <code>Demo.C</code>:</p>
-
-<pre><code>$ condor_status -format "%s\n" 'ifThenElse(RemoteNegotiatingGroup isnt undefined, string(RemoteNegotiatingGroup), "undefined")' -constraint 'True' | sort | uniq -c | awk '{ print $0; t += $1 } END { printf("%7d total\n",t) }'
-  7 Demo.A
-  8 Demo.C
- 50 &lt;none&gt;
- 50 undefined
-115 total
-</code></pre>
-
-<p>With this accounting group configuration in place, you can play with changing quotas for the accounting groups and observe the numbers of running jobs change in response.</p>
 ]]></content>
   </entry>
   
