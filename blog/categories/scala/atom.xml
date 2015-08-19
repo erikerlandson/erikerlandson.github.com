@@ -4,7 +4,7 @@
   <title><![CDATA[Category: scala | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/scala/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-08-19T08:18:02-07:00</updated>
+  <updated>2015-08-19T11:49:24-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -19,6 +19,8 @@
     <updated>2015-08-18T17:42:00-07:00</updated>
     <id>http://erikerlandson.github.com/blog/2015/08/18/lightweight-non-negative-numerics-for-better-scala-type-signatures</id>
     <content type="html"><![CDATA[<p>In this post I want to discuss several advantages of defining lightweight non-negative numeric types in Scala, whose primary benefit is that they allow improved type signatures for Scala functions and methods.  I'll first describe the simple class definition, and then demonstrate how it can be used in function signatures and the benefits of doing so.</p>
+
+<p>If the following ideas interest you at all, I highly recommend looking at the <a href="https://github.com/fthomas/refined">'refined' project</a> authored by <a href="http://timepit.eu/~frank/">Frank S. Thomas</a>, which generalizes on the ideas below and supports additional static checking functionalities via macros.</p>
 
 <h5>A Non-Negative Integer Type</h5>
 

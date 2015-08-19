@@ -99,6 +99,8 @@
 
 <div class="entry-content"><p>In this post I want to discuss several advantages of defining lightweight non-negative numeric types in Scala, whose primary benefit is that they allow improved type signatures for Scala functions and methods.  I&#8217;ll first describe the simple class definition, and then demonstrate how it can be used in function signatures and the benefits of doing so.</p>
 
+<p>If the following ideas interest you at all, I highly recommend looking at the <a href="https://github.com/fthomas/refined">&#8216;refined&#8217; project</a> authored by <a href="http://timepit.eu/~frank/">Frank S. Thomas</a>, which generalizes on the ideas below and supports additional static checking functionalities via macros.</p>
+
 <h5>A Non-Negative Integer Type</h5>
 
 <p>As a working example, I&#8217;ll discuss a non-negative integer type <code>NonNegInt</code>.  My proposed definition is sufficiently lightweight to view as a single code block:</p>
