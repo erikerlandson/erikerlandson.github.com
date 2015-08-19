@@ -4,7 +4,7 @@
   <title><![CDATA[tool monkey]]></title>
   <link href="http://erikerlandson.github.com/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-08-17T08:33:39-07:00</updated>
+  <updated>2015-08-18T17:46:17-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,97 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Lightweight Non-Negative Numerics for Better Scala Type Signatures]]></title>
+    <link href="http://erikerlandson.github.com/blog/2015/08/18/lightweight-non-negative-numerics-for-better-scala-type-signatures/"/>
+    <updated>2015-08-18T17:42:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2015/08/18/lightweight-non-negative-numerics-for-better-scala-type-signatures</id>
+    <content type="html"><![CDATA[<p>In this post I want to discuss several advantages of defining lightweight non-negative numeric types in Scala, whose primary benefit is that they allow improved the type signatures for Scala functions and methods.  I&#8217;ll first describe the simple class definition, and then demonstrate how it can be used in function signatures and the benefits of doing so.</p>
+
+<h5>A Non-Negative Integer Type</h5>
+
+<p>As a working example, I&#8217;ll discuss a non-negative integer type <code>NonNegInt</code>.  My proposed definition is sufficiently lightweight to view as a single code block:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">object</span> <span class="nc">nonneg</span> <span class="o">{</span>
+</span><span class='line'>  <span class="k">import</span> <span class="nn">scala.language.implicitConversions</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">class</span> <span class="nc">NonNegInt</span> <span class="k">private</span> <span class="o">(</span><span class="k">val</span> <span class="n">value</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span> <span class="k">extends</span> <span class="nc">AnyVal</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">object</span> <span class="nc">NonNegInt</span> <span class="o">{</span>
+</span><span class='line'>    <span class="k">def</span> <span class="n">apply</span><span class="o">(</span><span class="n">v</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span> <span class="k">=</span> <span class="o">{</span>
+</span><span class='line'>      <span class="n">require</span><span class="o">(</span><span class="n">v</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="o">,</span> <span class="s">&quot;NonNegInt forbids negative integer values&quot;</span><span class="o">)</span>
+</span><span class='line'>      <span class="k">new</span> <span class="nc">NonNegInt</span><span class="o">(</span><span class="n">v</span><span class="o">)</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">implicit</span> <span class="k">def</span> <span class="n">toNonNegInt</span><span class="o">(</span><span class="n">v</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span> <span class="k">=</span> <span class="nc">NonNegInt</span><span class="o">(</span><span class="n">v</span><span class="o">)</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">implicit</span> <span class="k">def</span> <span class="n">toInt</span><span class="o">(</span><span class="n">nn</span><span class="k">:</span> <span class="kt">NonNegInt</span><span class="o">)</span> <span class="k">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">value</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>The notable properties and features of <code>NonNegInt</code> are:</p>
+
+<ul>
+<li><code>NonNegInt</code> is a value class around an <code>Int</code>, and so invokes no actual object construction or allocation</li>
+<li>Its constructor is private, and so is safe from directly constructing around a negative integer</li>
+<li>It supplies factory method <code>NonNegInt(v)</code> to construct a non negative integer value</li>
+<li>It supplies implicit conversion from <code>Int</code> values to <code>NonNegInt</code></li>
+<li>Both factory method and implicit conversion check for negative values.  There is no way to construct a <code>NonNegInt</code> that contains a negative integer value.</li>
+<li>It also supplies implicit conversion from <code>NonNegInt</code> back to <code>Int</code>.  Moving back and forth between <code>Int</code> and <code>NonNegInt</code> is effectively transparent.</li>
+</ul>
+
+
+<p>The above properties work to make <code>NonNegInt</code> very lightweight with respect to size and runtime properties, and semantically safe in the sense that it is impossible to construct one with a negative value inside it.</p>
+
+<h5>Application of <code>NonNegInt</code></h5>
+
+<p>I primarily envision <code>NonNegInt</code> as an easy and informative way to declare function parameters that are only well defined for non-negative values, without the need to write any explicit checking code, and yet allowing the programmer to call the function with normal <code>Int</code> values, due to the implicit conversions:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">object</span> <span class="nc">example</span> <span class="o">{</span>
+</span><span class='line'>  <span class="k">import</span> <span class="nn">nonneg._</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">def</span> <span class="n">element</span><span class="o">[</span><span class="kt">T</span><span class="o">](</span><span class="n">seq</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">T</span><span class="o">],</span> <span class="n">j</span><span class="k">:</span> <span class="kt">NonNegInt</span><span class="o">)</span> <span class="k">=</span> <span class="n">seq</span><span class="o">(</span><span class="n">j</span><span class="o">)</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// call element function with a regular Int index</span>
+</span><span class='line'>  <span class="k">val</span> <span class="n">e</span> <span class="k">=</span> <span class="n">element</span><span class="o">(</span><span class="nc">Vector</span><span class="o">(</span><span class="mi">1</span><span class="o">,</span><span class="mi">2</span><span class="o">,</span><span class="mi">3</span><span class="o">),</span> <span class="mi">1</span><span class="o">)</span> <span class="c1">// e is set to 2</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>This short example demonstrates some appealing properties of <code>NonNegInt</code>.  Firstly, the constraint that index <code>j &gt;= 0</code> is enforced via the type definition, and so the programmer does not have to write the usual <code>require(j &gt;= 0, ...)</code> check (or worry about forgetting it).  Secondly, the implicit conversion from <code>Int</code> to <code>NonNegInt</code> means the programmer can just provide a regular integer value for parameter <code>j</code>, instead of having to explicitly say <code>NonNegInt(1)</code>.  Third, the implicit conversion from <code>NonNegInt</code> to <code>Int</code> means that <code>j</code> can easily be used anywhere a regular <code>Int</code> is used.  Last, and very definitely not least, the fact that function <code>element</code> requires a non-negative integer is obvious <strong>right in the function signature</strong>.  There is no need for a programmer to guess whether <code>j</code> can be negative, and no need for the author of <code>element</code> to document that <code>j</code> cannot be negative.  Its type makes that completely clear.</p>
+
+<h5>Conclusions</h5>
+
+<p>In this post I&#8217;ve laid out some advantages of defining lightweight non-negative numeric types, in particular using <code>NonNegInt</code> as a working example.  Clearly, if you want to apply this idea, you&#8217;d want to also define <code>NonNegLong</code>, <code>NonNegDouble</code>, <code>NonNegFloat</code> and for that matter <code>PosInt</code>, <code>PosLong</code>, etc.  Happy computing!</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[The Reservoir Sampling Gap Distribution]]></title>
@@ -2278,35 +2369,6 @@ slot1_1@rorschach | 1
 <p>In the HTCondor vocabulary, a job acquires a <em>claim</em> on resources to actually run after it has been matched.  It has been proposed that it may be beneficial for HTCondor to evolve toward a model where there are (aggregate) resource ads, and claims against those ads, as a simplification of the current model which involves static, partitionable and dynamic slots, with claims.  With this in mind, a preferable terminology for group quota and weight semantics might be that a resource ad (or slot) has a measure of the maximum number of claims it could dispense: a <em>claim capacity</em> measure.  The cost of a claim (or match) is the corresponding reduction of the resource&#8217;s claim capacity.</p>
 
 <p>So, this semantic model could be referred to as the Claim Capacity Model of group quotas and slot weights.  With this terminology, the shared &#8216;unit&#8217; for group quotas and slot weights would be <em>claims</em> instead of <em>jobs</em>.</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Rethinking the Semantics of Group Quotas and Slot Weights for Heterogeneous and Multidimensional Compute Resources]]></title>
-    <link href="http://erikerlandson.github.com/blog/2012/11/13/rethinking-the-semantics-of-group-quotas-and-slot-weights-for-heterogeneous-and-multidimensional-compute-resources/"/>
-    <updated>2012-11-13T15:31:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2012/11/13/rethinking-the-semantics-of-group-quotas-and-slot-weights-for-heterogeneous-and-multidimensional-compute-resources</id>
-    <content type="html"><![CDATA[<p>The HTCondor semantic for accounting group quotas and slot weights is currently cpu-centric.  This is an artifact of the historic primacy of cpu as the most commonly-considered limiting resource in computations.  For example the <code>SlotWeight</code> attribute is currently defaulted to <code>Cpus</code>, and when slot weights are disabled, there is logic activated in matchmaking to sum the available cpus on slots to avoid &#8216;undercounting&#8217; total pool quotas.</p>
-
-<p>However, HTCondor slots &#8211; the core model of computational resources in an HTCondor pool &#8211; manage four resources by default: cpu, memory, disk and swap.  Furthermore, slots may now be configured with arbitrary custom resources.  As recently mentioned by <a href="http://spinningmatt.wordpress.com/2012/11/13/no-longer-thinking-in-slots-thinking-in-aggregate-resources-and-consumption-policies">Matthew Farrellee</a>, there is a growing pressure to provide robust support not just for traditional cpu-centric resource presentation, usage and allocation, but also seamlessly mediated with memory-centric, gpu-centric or &#8216;*&#8217;-centric resource allocation policies and more generally allocation policies that are simultaneously aware of all resource dimensions.</p>
-
-<p>This goal immediately raises some questions for the semantics of accounting groups and slot weights when matching jobs against slots during matchmaking.</p>
-
-<p>Consider a pool where 50% of the slots are &#8216;weighted&#8217; in a traditional cpu-centric way, but the other 50% are intended to be allocated in a memory-centric way.  This is currently possible, as the <code>SlotWeight</code> attribute can be configured appropriately to be a function of either <code>Cpus</code> or <code>Memory</code>.</p>
-
-<p>But in a scenario where slots are weighted as functions of heterogeneous resource dimensions, it raises a semantic question:  when we sum these weights to obtain the pool-wide available quota, what &#8216;real world&#8217; quantity does this total represent &#8211; if any?   Is it a purely heuristic numeric value with no well defined unit attached?</p>
-
-<p>This question has import.  Understanding what the answer is, or should be, impacts what story we tell to users about what their accounting group configuration actually means.  When I assign a quota to an accounting group in such a heterogeneous environment, what is that quota regulating?   When a job matches a cpu-centric slot, does the cost of that match have a different meaning than when matching against a memory-centric slot?   When the slots are partitionable, a match implies a certain multi-dimensional slice of resources allocated from that slot.  What is the cost of that slice?  Does the sum of costs add up to the original weight on the partitionable slot?  If not, how does that affect our understanding of quota semantics?</p>
-
-<p>It may be possible unify all of these ideas by adopting the perspective that a slot&#8217;s weight is a measure of the maximum number of jobs that can be matched against it.  The cost of a match is W(S)-W(S&#8217;), where W(S) is the weight function evaluated on the slot prior to match, and W(S&#8217;) is the corresponding weight after the match has extracted its requested resources.  The pool&#8217;s total quota is just the sum of W(S), over all slots S in the pool.  Note, this implies that the &#8216;unit&#8217; attached to both slot weights and accounting group quotas is &#8216;jobs&#8217;.</p>
-
-<p>Consider a simple example from the traditional cpu-centric configuration:   A partitionable slot is configured with 8 cpus, and <code>SlotWeight</code> is just its default <code>Cpus</code>.  Using this model, the allocation policy is: &#8216;each match must use >= 1 cpu&#8221;, and that other resource requests are assumed to be not limiting.  The maximum number of matches is 8 jobs, each requesting 1 cpu.   However, a job might also request 2 cpus.  In this case, note that the cost of the match is 2, since the remaining slot has 6 slots, and so W(S&#8217;) now evaluates to 6.   So, the cost of the match is how many fewer possible jobs the original slot can support after the match takes its requested resources.</p>
-
-<p>This approach can be applied equally well to a memory-centric strategy, or a disk centric strategy, or a gpu-based strategy, or any combination simultaneously.  All weights evaluate to a value with unit &#8216;jobs&#8217;.   All match costs are differences between weights (before and after match), and so their values are also in units of &#8216;jobs&#8217;.  Therefore, the semantics of the sum of weights over a pool is always well defined: it is a number of jobs, and spefically a measure of the maximum number of jobs that might match against all the slots in the pool.  When a match acquires resources that reduce this maximum by more than 1 job, that is not in any way inconsistent.  It means the job used resources that might have supported two or more &#8216;smaller&#8217; jobs.   This means that accounting group quotas (and submitter shares) also have a well defined unit and semantic, which is &#8216;how many (or what fraction of) the maximum possible jobs is this group guaranteed by my accounting policy&#8217;</p>
-
-<p>One implication of this proposed semantic for quotas and weights is that the measure for the maximum number of jobs that may match against any given slot must be some finite number.   It implies that all resource dimensions are quantized in some way by the allocation policy.   This scheme would not support a real-valued resource dimension that had no minimum quantization.  I do not think that this is a very heavy-weight requirement, and in fact we have already been moving in that direction with features such as MODIFY_REQUEST_EXPRS_xxx.</p>
-
-<p>When a slot&#8217;s resource allocation policy is defined over all its resources, what bounds this measure of maximum possible matches?  In a case where each job match <em>must</em> use at least one non-zero quantum of each resource dimension, then the limit is the resource with the mimimum quantized levels.   In a case where jobs may request a zero amount of resources, then the limit is the resource with the maximum quantized levels.  (note, it is required that each match use at least one quantum of at least one resource, otherwise the maximum is not properly bounded).</p>
 ]]></content>
   </entry>
   

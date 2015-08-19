@@ -1,0 +1,364 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Lightweight Non-Negative Numerics for Better Scala Type Signatures - tool monkey</title>
+  <meta name="author" content="Erik Erlandson">
+
+  
+  <meta name="description" content="In this post I want to discuss several advantages of defining lightweight non-negative numeric types in Scala, whose primary benefit is that they &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://erikerlandson.github.com/blog/2015/08/18/lightweight-non-negative-numerics-for-better-scala-type-signatures/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="tool monkey" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+
+  <!-- enables inclusion of MathJax LaTeX: http://greglus.com/blog/2011/11/29/integrate-MathJax-LaTeX-and-MathML-Markup-in-Octopress/ -->
+  <script type="text/javascript"
+    src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">tool monkey</a></h1>
+  
+    <h2>a many-angled blog</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:erikerlandson.github.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Lightweight Non-Negative Numerics for Better Scala Type Signatures</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2015-08-18T17:42:00-07:00" pubdate data-updated="true">Aug 18<span>th</span>, 2015</time>
+        
+        
+         | <a href="#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>In this post I want to discuss several advantages of defining lightweight non-negative numeric types in Scala, whose primary benefit is that they allow improved the type signatures for Scala functions and methods.  I&#8217;ll first describe the simple class definition, and then demonstrate how it can be used in function signatures and the benefits of doing so.</p>
+
+<h5>A Non-Negative Integer Type</h5>
+
+<p>As a working example, I&#8217;ll discuss a non-negative integer type <code>NonNegInt</code>.  My proposed definition is sufficiently lightweight to view as a single code block:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">object</span> <span class="nc">nonneg</span> <span class="o">{</span>
+</span><span class='line'>  <span class="k">import</span> <span class="nn">scala.language.implicitConversions</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">class</span> <span class="nc">NonNegInt</span> <span class="k">private</span> <span class="o">(</span><span class="k">val</span> <span class="n">value</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span> <span class="k">extends</span> <span class="nc">AnyVal</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">object</span> <span class="nc">NonNegInt</span> <span class="o">{</span>
+</span><span class='line'>    <span class="k">def</span> <span class="n">apply</span><span class="o">(</span><span class="n">v</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span> <span class="k">=</span> <span class="o">{</span>
+</span><span class='line'>      <span class="n">require</span><span class="o">(</span><span class="n">v</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="o">,</span> <span class="s">&quot;NonNegInt forbids negative integer values&quot;</span><span class="o">)</span>
+</span><span class='line'>      <span class="k">new</span> <span class="nc">NonNegInt</span><span class="o">(</span><span class="n">v</span><span class="o">)</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">implicit</span> <span class="k">def</span> <span class="n">toNonNegInt</span><span class="o">(</span><span class="n">v</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span> <span class="k">=</span> <span class="nc">NonNegInt</span><span class="o">(</span><span class="n">v</span><span class="o">)</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">implicit</span> <span class="k">def</span> <span class="n">toInt</span><span class="o">(</span><span class="n">nn</span><span class="k">:</span> <span class="kt">NonNegInt</span><span class="o">)</span> <span class="k">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">value</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>The notable properties and features of <code>NonNegInt</code> are:</p>
+
+<ul>
+<li><code>NonNegInt</code> is a value class around an <code>Int</code>, and so invokes no actual object construction or allocation</li>
+<li>Its constructor is private, and so is safe from directly constructing around a negative integer</li>
+<li>It supplies factory method <code>NonNegInt(v)</code> to construct a non negative integer value</li>
+<li>It supplies implicit conversion from <code>Int</code> values to <code>NonNegInt</code></li>
+<li>Both factory method and implicit conversion check for negative values.  There is no way to construct a <code>NonNegInt</code> that contains a negative integer value.</li>
+<li>It also supplies implicit conversion from <code>NonNegInt</code> back to <code>Int</code>.  Moving back and forth between <code>Int</code> and <code>NonNegInt</code> is effectively transparent.</li>
+</ul>
+
+
+<p>The above properties work to make <code>NonNegInt</code> very lightweight with respect to size and runtime properties, and semantically safe in the sense that it is impossible to construct one with a negative value inside it.</p>
+
+<h5>Application of <code>NonNegInt</code></h5>
+
+<p>I primarily envision <code>NonNegInt</code> as an easy and informative way to declare function parameters that are only well defined for non-negative values, without the need to write any explicit checking code, and yet allowing the programmer to call the function with normal <code>Int</code> values, due to the implicit conversions:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">object</span> <span class="nc">example</span> <span class="o">{</span>
+</span><span class='line'>  <span class="k">import</span> <span class="nn">nonneg._</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">def</span> <span class="n">element</span><span class="o">[</span><span class="kt">T</span><span class="o">](</span><span class="n">seq</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">T</span><span class="o">],</span> <span class="n">j</span><span class="k">:</span> <span class="kt">NonNegInt</span><span class="o">)</span> <span class="k">=</span> <span class="n">seq</span><span class="o">(</span><span class="n">j</span><span class="o">)</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// call element function with a regular Int index</span>
+</span><span class='line'>  <span class="k">val</span> <span class="n">e</span> <span class="k">=</span> <span class="n">element</span><span class="o">(</span><span class="nc">Vector</span><span class="o">(</span><span class="mi">1</span><span class="o">,</span><span class="mi">2</span><span class="o">,</span><span class="mi">3</span><span class="o">),</span> <span class="mi">1</span><span class="o">)</span> <span class="c1">// e is set to 2</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>This short example demonstrates some appealing properties of <code>NonNegInt</code>.  Firstly, the constraint that index <code>j &gt;= 0</code> is enforced via the type definition, and so the programmer does not have to write the usual <code>require(j &gt;= 0, ...)</code> check (or worry about forgetting it).  Secondly, the implicit conversion from <code>Int</code> to <code>NonNegInt</code> means the programmer can just provide a regular integer value for parameter <code>j</code>, instead of having to explicitly say <code>NonNegInt(1)</code>.  Third, the implicit conversion from <code>NonNegInt</code> to <code>Int</code> means that <code>j</code> can easily be used anywhere a regular <code>Int</code> is used.  Last, and very definitely not least, the fact that function <code>element</code> requires a non-negative integer is obvious <strong>right in the function signature</strong>.  There is no need for a programmer to guess whether <code>j</code> can be negative, and no need for the author of <code>element</code> to document that <code>j</code> cannot be negative.  Its type makes that completely clear.</p>
+
+<h5>Conclusions</h5>
+
+<p>In this post I&#8217;ve laid out some advantages of defining lightweight non-negative numeric types, in particular using <code>NonNegInt</code> as a working example.  Clearly, if you want to apply this idea, you&#8217;d want to also define <code>NonNegLong</code>, <code>NonNegDouble</code>, <code>NonNegFloat</code> and for that matter <code>PosInt</code>, <code>PosLong</code>, etc.  Happy computing!</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Erik Erlandson</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2015-08-18T17:42:00-07:00" pubdate data-updated="true">Aug 18<span>th</span>, 2015</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/computing/'>computing</a>, <a class='category' href='/blog/categories/functional-programming/'>functional programming</a>, <a class='category' href='/blog/categories/scala/'>scala</a>, <a class='category' href='/blog/categories/type-signature/'>type signature</a>, <a class='category' href='/blog/categories/value-class/'>value class</a>
+  
+</span>
+
+
+      <br>
+<a id="feedback"></a>Feedback • 
+ 
+    <script type="text/javascript" src="//platform.twitter.com/widgets.js"></script>
+    
+  <a href="https://twitter.com/intent/tweet?text=@manyangled%20re:%20http://erikerlandson.github.com/blog/2015/08/18/lightweight-non-negative-numerics-for-better-scala-type-signatures/">Reply to this post on Twitter</a> • 
+ 
+<a href="mailto:erikerlandson@yahoo.com">Email the author</a>
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://erikerlandson.github.com/blog/2015/08/18/lightweight-non-negative-numerics-for-better-scala-type-signatures/" data-via="manyangled" data-counturl="http://erikerlandson.github.com/blog/2015/08/18/lightweight-non-negative-numerics-for-better-scala-type-signatures/" >Tweet</a>
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2015/08/17/the-reservoir-sampling-gap-distribution/" title="Previous Post: The Reservoir Sampling Gap Distribution">&laquo; The Reservoir Sampling Gap Distribution</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>About The Author</h1>
+  <p>Erik is a senior software engineer on the <a href="http://www.redhat.com">Red Hat</a> Emerging Technologies Group.</p>
+</section>
+<section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2015/08/18/lightweight-non-negative-numerics-for-better-scala-type-signatures/">Lightweight Non-Negative Numerics for Better Scala Type Signatures</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/08/17/the-reservoir-sampling-gap-distribution/">The Reservoir Sampling Gap Distribution</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/08/14/generalizing-kendalls-tau/">Generalizing Kendall's Tau</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/05/06/parallel-k-medoids-using-scala-parseq/">Parallel K-Medoids Using Scala ParSeq</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/03/31/hygienic-closures-for-scala-function-serialization/">Hygienic Closures for Scala Function Serialization</a>
+      </li>
+    
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/erikerlandson">@erikerlandson</a> on GitHub
+  
+  <script type="text/javascript">
+    $.domReady(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'erikerlandson',
+            count: 0,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+
+<section>
+  <h1>Latest Tweets</h1>
+  <ul id="tweets">
+    <li class="loading">Status updating...</li>
+  </ul>
+  <script type="text/javascript">
+    $.domReady(function(){
+      getTwitterFeed("manyangled", 4, true);
+    });
+  </script>
+  <script src="/javascripts/twitter.js" type="text/javascript"> </script>
+  
+    <a href="http://twitter.com/manyangled" class="twitter-follow-button" data-show-count="false">Follow @manyangled</a>
+  
+</section>
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2015 - Erik Erlandson -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+
+
+
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>

@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-08-17T08:33:39-07:00</updated>
+  <updated>2015-08-18T17:46:17-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,76 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Lightweight Non-Negative Numerics for Better Scala Type Signatures]]></title>
+    <link href="http://erikerlandson.github.com/blog/2015/08/18/lightweight-non-negative-numerics-for-better-scala-type-signatures/"/>
+    <updated>2015-08-18T17:42:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2015/08/18/lightweight-non-negative-numerics-for-better-scala-type-signatures</id>
+    <content type="html"><![CDATA[<p>In this post I want to discuss several advantages of defining lightweight non-negative numeric types in Scala, whose primary benefit is that they allow improved the type signatures for Scala functions and methods.  I'll first describe the simple class definition, and then demonstrate how it can be used in function signatures and the benefits of doing so.</p>
+
+<h5>A Non-Negative Integer Type</h5>
+
+<p>As a working example, I'll discuss a non-negative integer type <code>NonNegInt</code>.  My proposed definition is sufficiently lightweight to view as a single code block:</p>
+
+<p>``` scala
+object nonneg {
+  import scala.language.implicitConversions</p>
+
+<p>  class NonNegInt private (val value: Int) extends AnyVal</p>
+
+<p>  object NonNegInt {</p>
+
+<pre><code>def apply(v: Int) = {
+  require(v &gt;= 0, "NonNegInt forbids negative integer values")
+  new NonNegInt(v)
+}
+
+implicit def toNonNegInt(v: Int) = NonNegInt(v)
+</code></pre>
+
+<p>  }</p>
+
+<p>  implicit def toInt(nn: NonNegInt) = nn.value
+}
+```</p>
+
+<p>The notable properties and features of <code>NonNegInt</code> are:</p>
+
+<ul>
+<li><code>NonNegInt</code> is a value class around an <code>Int</code>, and so invokes no actual object construction or allocation</li>
+<li>Its constructor is private, and so is safe from directly constructing around a negative integer</li>
+<li>It supplies factory method <code>NonNegInt(v)</code> to construct a non negative integer value</li>
+<li>It supplies implicit conversion from <code>Int</code> values to <code>NonNegInt</code></li>
+<li>Both factory method and implicit conversion check for negative values.  There is no way to construct a <code>NonNegInt</code> that contains a negative integer value.</li>
+<li>It also supplies implicit conversion from <code>NonNegInt</code> back to <code>Int</code>.  Moving back and forth between <code>Int</code> and <code>NonNegInt</code> is effectively transparent.</li>
+</ul>
+
+
+<p>The above properties work to make <code>NonNegInt</code> very lightweight with respect to size and runtime properties, and semantically safe in the sense that it is impossible to construct one with a negative value inside it.</p>
+
+<h5>Application of <code>NonNegInt</code></h5>
+
+<p>I primarily envision <code>NonNegInt</code> as an easy and informative way to declare function parameters that are only well defined for non-negative values, without the need to write any explicit checking code, and yet allowing the programmer to call the function with normal <code>Int</code> values, due to the implicit conversions:</p>
+
+<p>``` scala
+object example {
+  import nonneg._</p>
+
+<p>  def element<a href="seq:%20Seq[T],%20j:%20NonNegInt">T</a> = seq(j)</p>
+
+<p>  // call element function with a regular Int index
+  val e = element(Vector(1,2,3), 1) // e is set to 2
+}
+```</p>
+
+<p>This short example demonstrates some appealing properties of <code>NonNegInt</code>.  Firstly, the constraint that index <code>j &gt;= 0</code> is enforced via the type definition, and so the programmer does not have to write the usual <code>require(j &gt;= 0, ...)</code> check (or worry about forgetting it).  Secondly, the implicit conversion from <code>Int</code> to <code>NonNegInt</code> means the programmer can just provide a regular integer value for parameter <code>j</code>, instead of having to explicitly say <code>NonNegInt(1)</code>.  Third, the implicit conversion from <code>NonNegInt</code> to <code>Int</code> means that <code>j</code> can easily be used anywhere a regular <code>Int</code> is used.  Last, and very definitely not least, the fact that function <code>element</code> requires a non-negative integer is obvious <strong>right in the function signature</strong>.  There is no need for a programmer to guess whether <code>j</code> can be negative, and no need for the author of <code>element</code> to document that <code>j</code> cannot be negative.  Its type makes that completely clear.</p>
+
+<h5>Conclusions</h5>
+
+<p>In this post I've laid out some advantages of defining lightweight non-negative numeric types, in particular using <code>NonNegInt</code> as a working example.  Clearly, if you want to apply this idea, you'd want to also define <code>NonNegLong</code>, <code>NonNegDouble</code>, <code>NonNegFloat</code> and for that matter <code>PosInt</code>, <code>PosLong</code>, etc.  Happy computing!</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[The Reservoir Sampling Gap Distribution]]></title>
@@ -552,174 +622,6 @@ java.io.NotSerializableException: Demo$foo
 </code></pre>
 
 <p>Being aware of the scenarios where parent instances are pulled into closures, and how to keep your closures clean, can save some frustration and wasted time.  Happy programming!</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Monadic 'break' and 'continue' for Scala Sequence Comprehensions]]></title>
-    <link href="http://erikerlandson.github.com/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions/"/>
-    <updated>2015-01-24T11:54:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions</id>
-    <content type="html"><![CDATA[<p>Author's note: I've since received some excellent feedback from the Scala community, which I included in some <a href="#notes">end notes</a>.</p>
-
-<p>Author's note the 2nd: I later realized I could apply an implicit conversion and mediator class to preserve the traditional ordering: the code has been updated with that approach.</p>
-
-<p>Author's note the 3rd: This concept has been submitted to the Scala project as JIRA <a href="https://issues.scala-lang.org/browse/SI-9120">SI-9120</a> (PR <a href="https://github.com/scala/scala/pull/4275">#4275</a>)</p>
-
-<p>Scala <a href="http://docs.scala-lang.org/tutorials/tour/sequence-comprehensions.html">sequence comprehensions</a> are an excellent functional programming idiom for looping in Scala.  However, sequence comprehensions encompass much more than just looping -- they represent a powerful syntax for manipulating <em>all</em> monadic structures<a href="#ref1">[1]</a>.</p>
-
-<p>The <code>break</code> and <code>continue</code> looping constructs are a popular framework for cleanly representing multiple loop halting and continuation conditions at differing stages in the execution flow.  Although there is no native support for <code>break</code> or <code>continue</code> in Scala control constructs, it is possible to implement them in a clean and idiomatic way for sequence comprehensions.</p>
-
-<p>In this post I will describe a lightweight and easy-to-use implementation of <code>break</code> and <code>continue</code> for use in Scala sequence comprehensions (aka <code>for</code> statements).  The entire implementation is as follows:</p>
-
-<pre><code>object BreakableGenerators {
-  import scala.language.implicitConversions
-
-  type Generator[+A] = Iterator[A]
-  type BreakableGenerator[+A] = BreakableIterator[A]
-
-  // Generates a new breakable generator from any traversable object.
-  def breakable[A](t1: TraversableOnce[A]): Generator[BreakableGenerator[A]] =
-    List(new BreakableIterator(t1.toIterator)).iterator
-
-  // Mediates boolean expression with 'break' and 'continue' invocations
-  case class BreakableGuardCondition(cond: Boolean) {
-    // Break the looping over one or more breakable generators, if 'cond' 
-    // evaluates to true.
-    def break(b: BreakableGenerator[_], bRest: BreakableGenerator[_]*): Boolean = {
-      if (cond) {
-        b.break
-        for (x &lt;- bRest) { x.break }
-      }
-      !cond
-    }
-
-    // Continue to next iteration of enclosing generator if 'cond' 
-    // evaluates to true.
-    def continue: Boolean = !cond
-  }
-
-  // implicit conversion of boolean values to breakable guard condition mediary
-  implicit def toBreakableGuardCondition(cond: Boolean) =
-    BreakableGuardCondition(cond)
-
-  // An iterator that can be halted via its 'break' method.  Not invoked directly
-  class BreakableIterator[+A](itr: Iterator[A]) extends Iterator[A] {
-    private var broken = false
-    private[BreakableGenerators] def break { broken = true }
-
-    def hasNext = !broken &amp;&amp; itr.hasNext
-    def next = itr.next
-  }
-}
-</code></pre>
-
-<p>The approach is based on a simple subclass of <code>Iterator</code> -- <code>BreakableIterator</code> -- that can be halted by 'breaking' it.  The function <code>breakable(&lt;traversable-object&gt;)</code> returns an Iterator over a single <code>BreakableIterator</code> object.  Iterators are monad-like structures in that they implement <code>map</code> and <code>flatMap</code>, and so its output can be used with <code>&lt;-</code> at the start of a <code>for</code> construct in the usual way.  Note that this means the result of the <code>for</code> statement will also be an Iterator.</p>
-
-<p>Whenever the boolean expression for an <code>if</code> guard is followed by either <code>break</code> or <code>continue</code>, it is implicitly converted to a "breakable guard condition" that supports those methods.  The function <code>break</code> accepts one or more instances of <code>BreakableIterator</code>.  If it evaluates to <code>true</code>, the loops embodied by the given iterators are immediately halted via the associated <code>if</code> guard, and the iterators are halted via their <code>break</code> method.  The <code>continue</code> function is mostly syntactic sugar for a standard <code>if</code> guard, simply with the condition inverted.</p>
-
-<p>Here is a simple example of <code>break</code> and <code>continue</code> in use:</p>
-
-<pre><code>object Main {
-  import BreakableGenerators._
-
-  def main(args: Array[String]) {
-
-    val r = for (
-      // generate a breakable sequence from some sequential input
-      loop &lt;- breakable(1 to 1000);
-      // iterate over the breakable sequence
-      j &lt;- loop;
-      // print out at each iteration
-      _ = { println(s"iteration j= $j") };
-      // continue to next iteration when 'j' is even
-      if { j % 2 == 0 } continue;
-      // break out of the loop when 'j' exceeds 5
-      if { j &gt; 5 } break(loop)
-    ) yield {
-      j
-    }
-    println(s"result= ${r.toList}")
-  }
-}
-</code></pre>
-
-<p>We can see from the resulting output that <code>break</code> and <code>continue</code> function in the usual way.  The <code>continue</code> clause ignores all subsequent code when <code>j</code> is even.  The <code>break</code> clause halts the loop when it sees its first value > 5, which is 7.  Only odd values &lt;= 5 are output from the <code>yield</code> statement:</p>
-
-<pre><code>$ scalac -d /home/eje/class monadic_break.scala
-$ scala -classpath /home/eje/class Main
-iteration j= 1
-iteration j= 2
-iteration j= 3
-iteration j= 4
-iteration j= 5
-iteration j= 6
-iteration j= 7
-result= List(1, 3, 5)
-</code></pre>
-
-<p>Breakable iterators can be nested in the way one would expect.  The following example shows an inner breakable loop nested inside an outer one:</p>
-
-<pre><code>object Main {
-  import BreakableGenerators._
-
-  def main(args: Array[String]) {
-    val r = for (
-      outer &lt;- breakable(1 to 7);
-      j &lt;- outer;
-      _ = { println(s"outer  j= $j") };
-      if { j % 2 == 0 } continue;
-      inner &lt;- breakable(List("a", "b", "c", "d", "e"));
-      k &lt;- inner;
-      _ = { println(s"    inner  j= $j  k= $k") };
-      if { k == "d" } break(inner);
-      if { j == 5  &amp;&amp;  k == "c" } break(inner, outer)
-    ) yield {
-      (j, k)
-    }
-    println(s"result= ${r.toList}")
-  }
-}
-</code></pre>
-
-<p>The output demonstrates that the inner loop breaks whenever <code>k=="d"</code>, and so <code>"e"</code> is never present in the <code>yield</code> result.  When <code>j==5</code> and <code>k=="c"</code>, both the inner and outer loops are broken, and so we see that there is no <code>(5,"c")</code> pair in the result, nor does the outer loop ever iterate over 6 or 7:</p>
-
-<pre><code>$ scalac -d /home/eje/class monadic_break.scala
-$ scala -classpath /home/eje/class Main
-outer  j= 1
-    inner  j= 1  k= a
-    inner  j= 1  k= b
-    inner  j= 1  k= c
-    inner  j= 1  k= d
-outer  j= 2
-outer  j= 3
-    inner  j= 3  k= a
-    inner  j= 3  k= b
-    inner  j= 3  k= c
-    inner  j= 3  k= d
-outer  j= 4
-outer  j= 5
-    inner  j= 5  k= a
-    inner  j= 5  k= b
-    inner  j= 5  k= c
-result= List((1,a), (1,b), (1,c), (3,a), (3,b), (3,c), (5,a), (5,b))
-</code></pre>
-
-<p>Using <code>break</code> and <code>continue</code> with <code>BreakableIterator</code> for sequence comprehensions is that easy.  Enjoy!</p>
-
-<p><a name="notesname" id="notes"></a></p>
-
-<h5>Notes</h5>
-
-<p>The helpful community on freenode #scala made some excellent observations:</p>
-
-<p>1: Iterators in Scala are not strictly monadic -- it would be more accurate to say they're "things with a flatMap and map method, also they can use filter or withFilter sometimes."  However, I personally still prefer to think of them as "monadic in spirit if not law."</p>
-
-<p>2: The <code>break</code> function, as described in this post, is not truly functional in the sense of referential transparency, as the invocation <code>if break(loop) { condition }</code> involves a side-effect on the variable <code>loop</code>.  I would say that it does maintain "scoped functionality."  That is, the break in non-referential transparency is scoped by the variables in question.  The <code>for</code> statement containing them is referentially transparent with respect to its inputs (provided no other code is breaking referential transparency, of course).</p>
-
-<h5>References</h5>
-
-<p><a name="ref1name" id="ref1">[1] </a><em><a href="http://www.manning.com/bjarnason/">Functional Programming in Scala</a></em>, Paul Chiusano and Runar Bjarnason, (section 6.6)</p>
 ]]></content>
   </entry>
   

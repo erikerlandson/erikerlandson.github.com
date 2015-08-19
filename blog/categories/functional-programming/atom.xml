@@ -4,7 +4,7 @@
   <title><![CDATA[Category: functional programming | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/functional-programming/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-08-17T08:33:39-07:00</updated>
+  <updated>2015-08-18T17:46:17-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,76 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Lightweight Non-Negative Numerics for Better Scala Type Signatures]]></title>
+    <link href="http://erikerlandson.github.com/blog/2015/08/18/lightweight-non-negative-numerics-for-better-scala-type-signatures/"/>
+    <updated>2015-08-18T17:42:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2015/08/18/lightweight-non-negative-numerics-for-better-scala-type-signatures</id>
+    <content type="html"><![CDATA[<p>In this post I want to discuss several advantages of defining lightweight non-negative numeric types in Scala, whose primary benefit is that they allow improved the type signatures for Scala functions and methods.  I'll first describe the simple class definition, and then demonstrate how it can be used in function signatures and the benefits of doing so.</p>
+
+<h5>A Non-Negative Integer Type</h5>
+
+<p>As a working example, I'll discuss a non-negative integer type <code>NonNegInt</code>.  My proposed definition is sufficiently lightweight to view as a single code block:</p>
+
+<p>``` scala
+object nonneg {
+  import scala.language.implicitConversions</p>
+
+<p>  class NonNegInt private (val value: Int) extends AnyVal</p>
+
+<p>  object NonNegInt {</p>
+
+<pre><code>def apply(v: Int) = {
+  require(v &gt;= 0, "NonNegInt forbids negative integer values")
+  new NonNegInt(v)
+}
+
+implicit def toNonNegInt(v: Int) = NonNegInt(v)
+</code></pre>
+
+<p>  }</p>
+
+<p>  implicit def toInt(nn: NonNegInt) = nn.value
+}
+```</p>
+
+<p>The notable properties and features of <code>NonNegInt</code> are:</p>
+
+<ul>
+<li><code>NonNegInt</code> is a value class around an <code>Int</code>, and so invokes no actual object construction or allocation</li>
+<li>Its constructor is private, and so is safe from directly constructing around a negative integer</li>
+<li>It supplies factory method <code>NonNegInt(v)</code> to construct a non negative integer value</li>
+<li>It supplies implicit conversion from <code>Int</code> values to <code>NonNegInt</code></li>
+<li>Both factory method and implicit conversion check for negative values.  There is no way to construct a <code>NonNegInt</code> that contains a negative integer value.</li>
+<li>It also supplies implicit conversion from <code>NonNegInt</code> back to <code>Int</code>.  Moving back and forth between <code>Int</code> and <code>NonNegInt</code> is effectively transparent.</li>
+</ul>
+
+
+<p>The above properties work to make <code>NonNegInt</code> very lightweight with respect to size and runtime properties, and semantically safe in the sense that it is impossible to construct one with a negative value inside it.</p>
+
+<h5>Application of <code>NonNegInt</code></h5>
+
+<p>I primarily envision <code>NonNegInt</code> as an easy and informative way to declare function parameters that are only well defined for non-negative values, without the need to write any explicit checking code, and yet allowing the programmer to call the function with normal <code>Int</code> values, due to the implicit conversions:</p>
+
+<p>``` scala
+object example {
+  import nonneg._</p>
+
+<p>  def element<a href="seq:%20Seq[T],%20j:%20NonNegInt">T</a> = seq(j)</p>
+
+<p>  // call element function with a regular Int index
+  val e = element(Vector(1,2,3), 1) // e is set to 2
+}
+```</p>
+
+<p>This short example demonstrates some appealing properties of <code>NonNegInt</code>.  Firstly, the constraint that index <code>j &gt;= 0</code> is enforced via the type definition, and so the programmer does not have to write the usual <code>require(j &gt;= 0, ...)</code> check (or worry about forgetting it).  Secondly, the implicit conversion from <code>Int</code> to <code>NonNegInt</code> means the programmer can just provide a regular integer value for parameter <code>j</code>, instead of having to explicitly say <code>NonNegInt(1)</code>.  Third, the implicit conversion from <code>NonNegInt</code> to <code>Int</code> means that <code>j</code> can easily be used anywhere a regular <code>Int</code> is used.  Last, and very definitely not least, the fact that function <code>element</code> requires a non-negative integer is obvious <strong>right in the function signature</strong>.  There is no need for a programmer to guess whether <code>j</code> can be negative, and no need for the author of <code>element</code> to document that <code>j</code> cannot be negative.  Its type makes that completely clear.</p>
+
+<h5>Conclusions</h5>
+
+<p>In this post I've laid out some advantages of defining lightweight non-negative numeric types, in particular using <code>NonNegInt</code> as a working example.  Clearly, if you want to apply this idea, you'd want to also define <code>NonNegLong</code>, <code>NonNegDouble</code>, <code>NonNegFloat</code> and for that matter <code>PosInt</code>, <code>PosLong</code>, etc.  Happy computing!</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Hygienic Closures for Scala Function Serialization]]></title>
