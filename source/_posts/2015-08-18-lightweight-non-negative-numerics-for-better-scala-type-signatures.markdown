@@ -5,7 +5,7 @@ date: 2015-08-18 17:42
 comments: true
 categories: [ computing, scala, value class, type signature, functional programming ]
 ---
-In this post I want to discuss several advantages of defining lightweight non-negative numeric types in Scala, whose primary benefit is that they allow improved the type signatures for Scala functions and methods.  I'll first describe the simple class definition, and then demonstrate how it can be used in function signatures and the benefits of doing so.
+In this post I want to discuss several advantages of defining lightweight non-negative numeric types in Scala, whose primary benefit is that they allow improved type signatures for Scala functions and methods.  I'll first describe the simple class definition, and then demonstrate how it can be used in function signatures and the benefits of doing so.
 
 #####A Non-Negative Integer Type
 As a working example, I'll discuss a non-negative integer type `NonNegInt`.  My proposed definition is sufficiently lightweight to view as a single code block:
