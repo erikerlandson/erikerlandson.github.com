@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-09-26T13:03:57-07:00</updated>
+  <updated>2015-09-26T13:06:16-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -20,7 +20,7 @@
     <id>http://erikerlandson.github.com/blog/2015/09/26/a-library-of-binary-tree-algorithms-as-mixable-scala-traits</id>
     <content type="html"><![CDATA[<p>In this post I am going to describe some work I've done recently on a system of Scala traits that support tree-based collection algorithms prefix-sum, nearest key query and value increment in a mixable format, all backed by Red-Black balanced tree logic, which is also a fully inheritable trait.</p>
 
-<p>This post eventually became a bit more sprawling and "tl;dr" than I was expecting, so by way of apology, here is a table of contents with links:</p>
+<p>This post eventually became a bit more sprawling and "tl/dr" than I was expecting, so by way of apology, here is a table of contents with links:</p>
 
 <ol>
 <li><a href="#motivation">Motivating Use Case</a></li>
