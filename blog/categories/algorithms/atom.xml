@@ -4,7 +4,7 @@
   <title><![CDATA[Category: algorithms | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/algorithms/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-09-26T14:52:59-07:00</updated>
+  <updated>2015-09-26T16:23:43-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -293,7 +293,7 @@ trait OrderedMapLike[K, V, IN &lt;: INodeMap[K, V], M &lt;: OrderedMapLike[K, V,
   def valuesIterator = nodesIterator.map(_.data.value)
 }
 <code>``
-You can see that this trait supplies collection API methods that a Scala programmer will recognize as being standard for any map-like collection.  Note that this trait also inherits other standard methods from</code>OrderedLike[K,IN,M]<code>(common to both sets and maps) and _also_ inherits from</code>NodeMap[K,V]<code>: In other words, a collection is effectively yet another kind of tree node, with additional collection API methods mixed in.   Note also the use of "self types" (the type parameter</code>M`), which allows the collection to return objects of its own kind.  This is crucial for allowing operations like data insertion to return an object that also supports node insertion, and to maintain consistency of type across operations.  The collectoin type is properly "closed" with respect to its own operations.</p>
+You can see that this trait supplies collection API methods that a Scala programmer will recognize as being standard for any map-like collection.  Note that this trait also inherits other standard methods from</code>OrderedLike[K,IN,M]<code>(common to both sets and maps) and _also_ inherits from</code>NodeMap[K,V]<code>: In other words, a collection is effectively yet another kind of tree node, with additional collection API methods mixed in.   Note also the use of "self types" (the type parameter</code>M`), which allows the collection to return objects of its own kind.  This is crucial for allowing operations like data insertion to return an object that also supports node insertion, and to maintain consistency of type across operations.  The collection type is properly "closed" with respect to its own operations.</p>
 
 <p><a name="orderedmap"></a></p>
 

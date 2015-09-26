@@ -4,7 +4,7 @@
   <title><![CDATA[tool monkey]]></title>
   <link href="http://erikerlandson.github.com/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-09-26T14:52:59-07:00</updated>
+  <updated>2015-09-26T16:23:43-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -355,7 +355,7 @@ text-align: center;
 </span></code></pre></td></tr></table></div></figure>
 
 
-<p>You can see that this trait supplies collection API methods that a Scala programmer will recognize as being standard for any map-like collection.  Note that this trait also inherits other standard methods from <code>OrderedLike[K,IN,M]</code> (common to both sets and maps) and <em>also</em> inherits from <code>NodeMap[K,V]</code>: In other words, a collection is effectively yet another kind of tree node, with additional collection API methods mixed in.   Note also the use of &#8220;self types&#8221; (the type parameter <code>M</code>), which allows the collection to return objects of its own kind.  This is crucial for allowing operations like data insertion to return an object that also supports node insertion, and to maintain consistency of type across operations.  The collectoin type is properly &#8220;closed&#8221; with respect to its own operations.</p>
+<p>You can see that this trait supplies collection API methods that a Scala programmer will recognize as being standard for any map-like collection.  Note that this trait also inherits other standard methods from <code>OrderedLike[K,IN,M]</code> (common to both sets and maps) and <em>also</em> inherits from <code>NodeMap[K,V]</code>: In other words, a collection is effectively yet another kind of tree node, with additional collection API methods mixed in.   Note also the use of &#8220;self types&#8221; (the type parameter <code>M</code>), which allows the collection to return objects of its own kind.  This is crucial for allowing operations like data insertion to return an object that also supports node insertion, and to maintain consistency of type across operations.  The collection type is properly &#8220;closed&#8221; with respect to its own operations.</p>
 
 <p><a name="orderedmap"></a></p>
 
