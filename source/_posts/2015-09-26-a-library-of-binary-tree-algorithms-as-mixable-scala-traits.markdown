@@ -5,9 +5,9 @@ date: 2015-09-26 12:43
 comments: true
 categories: [ computing, scala, binary tree, algorithms, prefix sum, nearest entry, t-digest ]
 ---
-In this post I am going to describe some work I've done recently on a system of Scala traits that support tree-based collection algorithms prefix-sum, nearest key queyr and value increment in a mixable format, all backed by Red-Black balanced tree logic, which is also a fully inheritable trait.
+In this post I am going to describe some work I've done recently on a system of Scala traits that support tree-based collection algorithms prefix-sum, nearest key query and value increment in a mixable format, all backed by Red-Black balanced tree logic, which is also a fully inheritable trait.
 
-This post eventually became a bit more sprawling and "tl;dr" than I was expecting, so by way of apology, here is a table of contents with links:
+This post eventually became a bit more sprawling and "tl/dr" than I was expecting, so by way of apology, here is a table of contents with links:
 
 1. [Motivating Use Case](#motivation)
 1. [Library Overview](#overview)
@@ -50,7 +50,7 @@ For the programmer who wishes to either create a trait mixture, or add new mixab
 
 The three tables that follow summarize the currently available traits of each kind listed above.  They are (at the time of this posting) all under the package namespace `com.redhat.et.silex.maps` :
 
-<table>
+<table border="5">
 <caption>Tree Node Traits</caption>
 <tr><td>trait</td><td>sub-package</td><td>description</td></tr>
 <tr><td>Node[K]</td> <td>redblack.tree</td><td>Fundamental Red-Black tree functionality</td></tr>
@@ -62,7 +62,7 @@ The three tables that follow summarize the currently available traits of each ki
 </table>
 
 <br>
-<table>
+<table border="5">
 <caption>Collection Traits</caption>
 <tr><td>trait</td><td>sub-package</td><td>description</td></tr>
 <tr><td>OrderedSetLike[K,IN,M]</td><td>ordered</td><td>ordered set of keys</td></tr>
@@ -74,7 +74,7 @@ The three tables that follow summarize the currently available traits of each ki
 </table>
 
 <br>
-<table>
+<table border="5">
 <caption>Concrete Collections</caption>
 <tr><td>trait</td><td>sub-package</td><td>description</td></tr>
 <tr><td>OrderedSet[K]</td><td>ordered</td><td>ordered set</td></tr>
