@@ -4,7 +4,7 @@
   <title><![CDATA[Category: scala | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/scala/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-09-26T13:13:27-07:00</updated>
+  <updated>2015-09-26T13:14:02-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -74,7 +74,7 @@
 
 <p>For the programmer who wishes to either create a trait mixture, or add new mixable traits, the collections also function as reference implementations.</p>
 
-<p>The three tables that follow summarize the currently available traits of each kind listed above.  They are (at the time of this posting) all under the package namespace <code>com.redhat.et.silex.maps</code> :</p>
+<p>The three tables that follow summarize the currently available traits of each kind listed above.  They are (at the time of this posting) all under the package namespace <code>com.redhat.et.silex.maps</code>:</p>
 
 <table border="5">
 <caption>Tree Node Traits</caption>
