@@ -295,7 +295,7 @@ Here you can see that all logic for both "basic" internal nodes and also for mai
 
 <a name="mixing"></a>
 #####Finale: Trait Mixing
-I will conclude by showing the code for mixing tree node traits and collection traits, which is elegant.  Here are type definitions for tree nodes and collection traits that inherit from incrementable values, nearest-key queries, and prefix-sum queries, and there is literally no code except the proper inheritances:
+I will conclude by showing the code for mixing tree node traits and collection traits, which is elegant.  Here are type definitions for tree nodes and collection traits that inherit from incrementable values, nearest-key queries, and prefix-sum queries, and there is almost no code except the proper inheritances:
 
 ``` scala
 object tree {
