@@ -1,0 +1,795 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>A Library of Binary Tree Algorithms as Mixable Scala Traits - tool monkey</title>
+  <meta name="author" content="Erik Erlandson">
+
+  
+  <meta name="description" content="In this post I am going to describe some work I&#8217;ve done recently on a system of Scala traits that support tree-based collection algorithms &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://erikerlandson.github.com/blog/2015/09/26/a-library-of-binary-tree-algorithms-as-mixable-scala-traits/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="tool monkey" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+
+  <!-- enables inclusion of MathJax LaTeX: http://greglus.com/blog/2011/11/29/integrate-MathJax-LaTeX-and-MathML-Markup-in-Octopress/ -->
+  <script type="text/javascript"
+    src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">tool monkey</a></h1>
+  
+    <h2>a many-angled blog</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:erikerlandson.github.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">A Library of Binary Tree Algorithms as Mixable Scala Traits</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2015-09-26T12:43:00-07:00" pubdate data-updated="true">Sep 26<span>th</span>, 2015</time>
+        
+        
+         | <a href="#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>In this post I am going to describe some work I&#8217;ve done recently on a system of Scala traits that support tree-based collection algorithms prefix-sum, nearest key queyr and value increment in a mixable format, all backed by Red-Black balanced tree logic, which is also a fully inheritable trait.</p>
+
+<p>This post eventually became a bit more sprawling and &#8220;tl;dr&#8221; than I was expecting, so by way of apology, here is a table of contents with links:</p>
+
+<ol>
+<li><a href="#motivation">Motivating Use Case</a></li>
+<li><a href="#overview">Library Overview</a></li>
+<li><a href="#redblack">A Red-Black Tree Base Class</a></li>
+<li><a href="#nodemap">Node Inheritance Example: NodeMap[K,V]</a></li>
+<li><a href="#orderedmaplike">Collection Trait Example: OrderedMapLike[K,V,IN,M]</a></li>
+<li><a href="#orderedmap">Collection Example: OrderedMap[K,V]</a></li>
+<li><a href="#mixing">Finale: Trait Mixing</a></li>
+</ol>
+
+
+<p><a name="motivation"></a></p>
+
+<h5>A Motivating Use Case</h5>
+
+<p>The skeptical programmer may be wondering what the point of Yet Another Map Collection really is, much less an entire class hierarchy.  The use case that inspired this work was my project of implementing the <a href="https://github.com/tdunning/t-digest/blob/master/docs/t-digest-paper/histo.pdf">t-digest algorithm</a>.  Discussion of t-digest is beyond the scope of this post, but suffice it to say that constructing a t-digest requires the maintenance of a collection of &#8220;cluster&#8221; objects, that needs to satisfy the following several properties:</p>
+
+<ol>
+<li>an entry contains one <strong>or more</strong> cluster objects at a given numeric location</li>
+<li>entries are maintained in a numeric key order</li>
+<li>entries will be frequently inserted and deleted, in arbitrary order</li>
+<li>given a numeric key value, be able to find the entry nearest to that value</li>
+<li>given a key, compute a <a href="https://en.wikipedia.org/wiki/Prefix_sum">prefix-sum</a> for that value</li>
+<li>all of the above should be bounded by logarithmic time complexity</li>
+</ol>
+
+
+<p>Propreties 2,3 and 6 are commonly satisfied by a map structure backed by some variety of balanced tree representation, of which the best-known is the <a href="https://en.wikipedia.org/wiki/Red%E2%80%93black_tree">Red-Black tree</a>.</p>
+
+<p>Properties 1, 4 and 5 are more interesting.  Property 1 &#8211; representing a collection of multiple objects at each entry &#8211; can be accomplished in a generalizable way by noting that a collection is representable as a monoid, and so supporting values that can be incremented with respect to a <a href="http://twitter.github.io/algebird/index.html#com.twitter.algebird.Monoid">user-supplied monoid relation</a> can satisfy property-1, but also can support many other kinds of update, including but not limited to classical numeric incrementing operations.</p>
+
+<p>Properties 4 and 5 &#8211; nearest-entry queries and prefix-sum queries &#8211; are also both supportable in logarithmic time using a tree data structure, provided that tree is balanced.  Again, the details of the algorithms are out of the current scope, however they are not extremely complex, and their implementations are available in the code.</p>
+
+<p>A reader with their software engineering hat on will notice that these properties are <em>orthogonal</em>.  A programmer might be interested in a data structure supporting any one of them, or in some mixed combination.   This kind of situation fairly shouts &#8220;Scala traits&#8221; (or, alternatively, interfaces in Java, etc).  With that idea in mind, I designed a system of Scala collection traits that support all of the above properties, in a pure trait form that is fully &#8220;mixable&#8221; by the programmer, so that one can use exactly the properties needed, but not pay for anything else.</p>
+
+<p><a name="overview"></a></p>
+
+<h5>Library Overview</h5>
+
+<p>The source files containing the code discussed in the remainder of this post are available <a href="https://github.com/erikerlandson/silex/tree/blog/rbtraits/src/main/scala/com/redhat/et/silex/maps">here</a>, and the unit testing files are <a href="https://github.com/erikerlandson/silex/tree/blog/rbtraits/src/test/scala/com/redhat/et/silex/maps">here</a>.  At the time of this post the tree algorithm trait system is a <a href="https://github.com/willb/silex/pull/35">PR against the silex project</a>.</p>
+
+<p>The library consists broadly of 3 kinds of traits:</p>
+
+<ul>
+<li>tree node traits &#8211; implement core tree support for some functionality</li>
+<li>collection traits &#8211; provide additional collection API methods the user</li>
+<li>collections &#8211; instantiate a usable incarnation of a collection</li>
+</ul>
+
+
+<p>For the programmer who wishes to either create a trait mixture, or add new mixable traits, the collections also function as reference implementations.</p>
+
+<p>The three tables that follow summarize the currently available traits of each kind listed above.  They are (at the time of this posting) all under the package namespace <code>com.redhat.et.silex.maps</code> :</p>
+
+<table>
+<caption>Tree Node Traits</caption>
+<tr><td>trait</td><td>sub-package</td><td>description</td></tr>
+<tr><td>Node[K]</td> <td>redblack.tree</td><td>Fundamental Red-Black tree functionality</td></tr>
+<tr><td>NodeMap[K,V]</td><td>ordered.tree</td><td>Support a mapping from keys to values</td></tr>
+<tr><td>NodeNear[K]</td><td>nearest.tree</td><td>Nearest-entry query (key-only)</td></tr>
+<tr><td>NodeNearMap[K,V]</td><td>nearest.tree</td><td>Nearest-entry query for key/value maps</td></tr>
+<tr><td>NodeInc[K,V]</td><td>increment.tree</td><td>Increment values w.r.t. a monoid</td></tr>
+<tr><td>NodePS[K,V,P]</td><td>prefixsum.tree</td><td>Prefix sum queries by key (w.r.t. a monoid)</td></tr>
+</table>
+
+
+
+
+<br>
+
+
+<table>
+<caption>Collection Traits</caption>
+<tr><td>trait</td><td>sub-package</td><td>description</td></tr>
+<tr><td>OrderedSetLike[K,IN,M]</td><td>ordered</td><td>ordered set of keys</td></tr>
+<tr><td>OrderedMapLike[K,V,IN,M]</td><td>ordered</td><td>ordered key/value map</td></tr>
+<tr><td>NearestSetLike[K,IN,M]</td><td>nearest</td><td>nearest entry query on keys</td></tr>
+<tr><td>NearestMapLike[K,V,IN,M]</td><td>nearest</td><td>nearest entry query on key/value map</td></tr>
+<tr><td>IncrementMapLike[K,V,IN,M]</td><td>increment</td><td>increment values w.r.t a monoid</td></tr>
+<tr><td>PrefixSumMapLike[K,V,P,IN,M]</td><td>prefixsum</td><td>prefix sum queries w.r.t. a monoid</td></tr>
+</table>
+
+
+
+
+<br>
+
+
+<table>
+<caption>Concrete Collections</caption>
+<tr><td>trait</td><td>sub-package</td><td>description</td></tr>
+<tr><td>OrderedSet[K]</td><td>ordered</td><td>ordered set</td></tr>
+<tr><td>OrderedMap[K,V]</td><td>ordered</td><td>ordered key/value map</td></tr>
+<tr><td>NearestSet[K]</td><td>nearest</td><td>ordered set with nearest-entry query</td></tr>
+<tr><td>NearestMap[K,V]</td><td>nearest</td><td>ordred map with nearest-entry query</td></tr>
+<tr><td>IncrementMap[K,V]</td><td>increment</td><td>ordered map with value increment w.r.t. a monoid</td></tr>
+<tr><td>PrefixSumMap[K,V,P]</td><td>prefixsum</td><td>ordered map with prefix sum query w.r.t. a monoid</td></tr>
+</table>
+
+
+
+
+<br>
+
+
+<p>The following diagram summarizes the organization and inheritance relationships of the classes.</p>
+
+<p><img src="/assets/images/rbtraits/rbtraits.png" alt="diagram" /></p>
+
+<p><a name="redblack"></a></p>
+
+<h5>A Red/Black Tree Base Class</h5>
+
+<p>The most fundamental trait in this hierarchy is the trait that embodies Red-Black balancing; a &#8220;red-black-ness&#8221; trait, as it were.  This trait supplies the axiomatic tree operations of insertion, deletion and key lookup, where the Red-Black balancing operations are encapsulated for insertion (due to [Chris Okasaki] (http://journals.cambridge.org/action/displayAbstract?fromPage=online&amp;aid=44273)) and deletion (due to <a href="http://www.cs.kent.ac.uk/people/staff/smk/redblack/rb.html">Stefan Kahrs</a>)  Note that Red-Black trees do not assume a separate value, as in a map, but require only keys (thus implementing an ordered set over the key type):</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">object</span> <span class="nc">tree</span> <span class="o">{</span>
+</span><span class='line'>  <span class="cm">/** The color (red or black) of a node in a Red/Black tree */</span>
+</span><span class='line'>  <span class="k">sealed</span> <span class="k">trait</span> <span class="nc">Color</span>
+</span><span class='line'>  <span class="k">case</span> <span class="k">object</span> <span class="nc">R</span> <span class="k">extends</span> <span class="nc">Color</span>
+</span><span class='line'>  <span class="k">case</span> <span class="k">object</span> <span class="nc">B</span> <span class="k">extends</span> <span class="nc">Color</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="cm">/** Defines the data payload of a tree node */</span>
+</span><span class='line'>  <span class="k">trait</span> <span class="nc">Data</span><span class="o">[</span><span class="kt">K</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>    <span class="cm">/** The axiomatic unit of data for R/B trees is a key */</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">key</span><span class="k">:</span> <span class="kt">K</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="cm">/** Base class of a Red/Black tree node</span>
+</span><span class='line'><span class="cm">    * @tparam K The key type</span>
+</span><span class='line'><span class="cm">    */</span>
+</span><span class='line'>  <span class="k">trait</span> <span class="nc">Node</span><span class="o">[</span><span class="kt">K</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="cm">/** The ordering that is applied to key values */</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">keyOrdering</span><span class="k">:</span> <span class="kt">Ordering</span><span class="o">[</span><span class="kt">K</span><span class="o">]</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="cm">/** Instantiate an internal node. */</span>
+</span><span class='line'>    <span class="k">protected</span> <span class="k">def</span> <span class="n">iNode</span><span class="o">(</span><span class="n">color</span><span class="k">:</span> <span class="kt">Color</span><span class="o">,</span> <span class="n">d</span><span class="k">:</span> <span class="kt">Data</span><span class="o">[</span><span class="kt">K</span><span class="o">],</span> <span class="n">lsub</span><span class="k">:</span> <span class="kt">Node</span><span class="o">[</span><span class="kt">K</span><span class="o">],</span> <span class="n">rsub</span><span class="k">:</span> <span class="kt">Node</span><span class="o">[</span><span class="kt">K</span><span class="o">])</span><span class="k">:</span> <span class="kt">INode</span><span class="o">[</span><span class="kt">K</span><span class="o">]</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c1">// ... declarations for insertion, deletion and key lookup ...</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c1">// ... red-black balancing rules ...</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>   <span class="cm">/** Represents a leaf node in the Red Black tree system */</span>
+</span><span class='line'>  <span class="k">trait</span> <span class="nc">LNode</span><span class="o">[</span><span class="kt">K</span><span class="o">]</span> <span class="nc">extends</span> <span class="nc">Node</span><span class="o">[</span><span class="kt">K</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>    <span class="c1">// ... basis case insertion, deletion, lookup ...</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="cm">/** Represents an internal node (Red or Black) in the Red Black tree system */</span>
+</span><span class='line'>  <span class="k">trait</span> <span class="nc">INode</span><span class="o">[</span><span class="kt">K</span><span class="o">]</span> <span class="nc">extends</span> <span class="nc">Node</span><span class="o">[</span><span class="kt">K</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>    <span class="cm">/** The Red/Black color of this node */</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">color</span><span class="k">:</span> <span class="kt">Color</span>
+</span><span class='line'>    <span class="cm">/** Including, but not limited to, the key */</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">data</span><span class="k">:</span> <span class="kt">Data</span><span class="o">[</span><span class="kt">K</span><span class="o">]</span>
+</span><span class='line'>    <span class="cm">/** The left sub-tree */</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">lsub</span><span class="k">:</span> <span class="kt">Node</span><span class="o">[</span><span class="kt">K</span><span class="o">]</span>
+</span><span class='line'>    <span class="cm">/** The right sub-tree */</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">rsub</span><span class="k">:</span> <span class="kt">Node</span><span class="o">[</span><span class="kt">K</span><span class="o">]</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c1">// ... implementations for insertion, deletion, lookup ...</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>I will assume most readers are familiar with basic binary tree operations, and the Red-Black rules are described elsewhere (I adapted them from the Scala red-black implementation).  For the purposes of this discussion, the most interesting feature is that this is a <em>pure Scala trait</em>.  All <code>val</code> declarations are abstract.  This trait, by itself, cannot function without a subclass to eventually perform dependency injection.   However, this abstraction allows the trait to be inherited freely &#8211; any programmer can inherit from this trait and get a basic Red-Black balanced tree for (nearly) free, as long as a few basic principles are adhered to for proper dependency injection.</p>
+
+<p>Another detail to call out is the abstraction of the usual <code>key</code> with a <code>Data</code> element.  This element represents any node payload that is moved around as a unit during tree structure manipulations, such as balancing pivots.  In the case of a map-like subclass, <code>Data</code> is extended to include a <code>value</code> field as well as a <code>key</code> field.</p>
+
+<p>The other noteworthy detail is the abstract definition <code>def iNode(color: Color, d: Data[K], lsub: Node[K], rsub: Node[K]): INode[K]</code> - this is the function called to create any new tree node.  In fact, this function, when eventually instantiated, is what performs dependency injection of other tree node fields.</p>
+
+<p><a name="nodemap"></a></p>
+
+<h5>Node Inheritance Example: NodeMap[K,V]</h5>
+
+<p>A relatively simple example of node inheritance is hopefully instructive.  Here is the definition for tree nodes supporting a key/value map:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">object</span> <span class="nc">tree</span> <span class="o">{</span>
+</span><span class='line'>  <span class="cm">/** Trees that back a map-like object have a value as well as a key */</span>
+</span><span class='line'>  <span class="k">trait</span> <span class="nc">DataMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span> <span class="nc">extends</span> <span class="nc">Data</span><span class="o">[</span><span class="kt">K</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">value</span><span class="k">:</span> <span class="kt">V</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="cm">/** Base class of ordered K/V tree node</span>
+</span><span class='line'><span class="cm">    * @tparam K The key type</span>
+</span><span class='line'><span class="cm">    * @tparam V The value type</span>
+</span><span class='line'><span class="cm">    */</span>
+</span><span class='line'>  <span class="k">trait</span> <span class="nc">NodeMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span> <span class="nc">extends</span> <span class="nc">Node</span><span class="o">[</span><span class="kt">K</span><span class="o">]</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">trait</span> <span class="nc">LNodeMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span> <span class="nc">extends</span> <span class="nc">NodeMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span> <span class="k">with</span> <span class="nc">LNode</span><span class="o">[</span><span class="kt">K</span><span class="o">]</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">trait</span> <span class="nc">INodeMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span> <span class="nc">extends</span> <span class="nc">NodeMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span> <span class="k">with</span> <span class="nc">INode</span><span class="o">[</span><span class="kt">K</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">data</span><span class="k">:</span> <span class="kt">DataMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Note that in this case very little is added to the red/black functionality already provided by <code>Node[K]</code>.  A <code>DataMap[K,V]</code> trait is defined to add a <code>value</code> field in addition to the <code>key</code>, and the internal node <code>INodeMap[K,V]</code> refines the type of its <code>data</code> field to be <code>DataMap[K,V]</code>.  The semantics is little more than &#8220;tree nodes now carry a value in addition to a key.&#8221;</p>
+
+<p>A tree node trait inherits from its own parent class <em>and</em> the corresponding traits for any mixed-in functionality.  So for example <code>INodeMap[K,V]</code> inherits from <code>NodeMap[K,V]</code> but also <code>INode[K]</code>.</p>
+
+<p><a name="orderedmaplike"></a></p>
+
+<h5>Collection Trait Example: OrderedMapLike[K,V,IN,M]</h5>
+
+<p>Continuing with the ordered map example, here is the definition of the collection trait for an ordered map:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">trait</span> <span class="nc">OrderedMapLike</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">IN</span> <span class="k">&lt;:</span> <span class="kt">INodeMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span>, <span class="kt">M</span> <span class="k">&lt;:</span> <span class="kt">OrderedMapLike</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">IN</span>, <span class="kt">M</span><span class="o">]]</span>
+</span><span class='line'>    <span class="nc">extends</span> <span class="nc">NodeMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span> <span class="k">with</span> <span class="nc">OrderedLike</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">IN</span>, <span class="kt">M</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="cm">/** Obtain a new map with a (key, val) pair inserted */</span>
+</span><span class='line'>  <span class="k">def</span> <span class="o">+(</span><span class="n">kv</span><span class="k">:</span> <span class="o">(</span><span class="kt">K</span><span class="o">,</span> <span class="kt">V</span><span class="o">))</span> <span class="k">=</span> <span class="k">this</span><span class="o">.</span><span class="n">insert</span><span class="o">(</span>
+</span><span class='line'>    <span class="k">new</span> <span class="nc">DataMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>      <span class="k">val</span> <span class="n">key</span> <span class="k">=</span> <span class="n">kv</span><span class="o">.</span><span class="n">_1</span>
+</span><span class='line'>      <span class="k">val</span> <span class="n">value</span> <span class="k">=</span> <span class="n">kv</span><span class="o">.</span><span class="n">_2</span>
+</span><span class='line'>    <span class="o">}).</span><span class="n">asInstanceOf</span><span class="o">[</span><span class="kt">M</span><span class="o">]</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="cm">/** Get the value stored at a key, or None if key is not present */</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">get</span><span class="o">(</span><span class="n">k</span><span class="k">:</span> <span class="kt">K</span><span class="o">)</span> <span class="k">=</span> <span class="k">this</span><span class="o">.</span><span class="n">getNode</span><span class="o">(</span><span class="n">k</span><span class="o">).</span><span class="n">map</span><span class="o">(</span><span class="k">_</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">value</span><span class="o">)</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="cm">/** Iterator over (key,val) pairs, in key order */</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">iterator</span> <span class="k">=</span> <span class="n">nodesIterator</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="n">n</span> <span class="k">=&gt;</span> <span class="o">((</span><span class="n">n</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">key</span><span class="o">,</span> <span class="n">n</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">value</span><span class="o">)))</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="cm">/** Container of values, in key order */</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">values</span> <span class="k">=</span> <span class="n">valuesIterator</span><span class="o">.</span><span class="n">toIterable</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="cm">/** Iterator over values, in key order */</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">valuesIterator</span> <span class="k">=</span> <span class="n">nodesIterator</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="k">_</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">value</span><span class="o">)</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>You can see that this trait supplies collection API methods that a Scala programmer will recognize as being standard for any map-like collection.  Note that this trait also inherits other standard methods from <code>OrderedLike[K,IN,M]</code> (common to both sets and maps) and <em>also</em> inherits from <code>NodeMap[K,V]</code>: In other words, a collection is effectively yet another kind of tree node, with additional collection API methods mixed in.   Note also the use of &#8220;self types&#8221; (the type parameter <code>M</code>), which allows the collection to return objects of its own kind.  This is crucial for allowing operations like data insertion to return an object that also supports node insertion, and to maintain consistency of type across operations.  The collectoin type is properly &#8220;closed&#8221; with respect to its own operations.</p>
+
+<p><a name="orderedmap"></a></p>
+
+<h5>Collection Example: OrderedMap[K,V]</h5>
+
+<p>To conclude the ordered map example, consider the task of defining a concrete instantiation of an ordered map:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">sealed</span> <span class="k">trait</span> <span class="nc">OrderedMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span> <span class="nc">extends</span> <span class="nc">OrderedMapLike</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">INodeMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span>, <span class="kt">OrderedMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]]</span> <span class="o">{</span>
+</span><span class='line'>  <span class="k">override</span> <span class="k">def</span> <span class="n">toString</span> <span class="k">=</span>
+</span><span class='line'>    <span class="s">&quot;OrderedMap(&quot;</span> <span class="o">+</span>
+</span><span class='line'>      <span class="n">nodesIterator</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="n">n</span> <span class="k">=&gt;</span> <span class="n">s</span><span class="s">&quot;${n.data.key} -&gt; ${n.data.value}&quot;</span><span class="o">).</span><span class="n">mkString</span><span class="o">(</span><span class="s">&quot;, &quot;</span><span class="o">)</span> <span class="o">+</span>
+</span><span class='line'>    <span class="s">&quot;)&quot;</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>You can see that (aside from a convenience override of <code>toString</code>) the trait <code>OrderedMap[K,V]</code> is nothing more than a vehicle for instantiating a particular concrete <code>OrderedMapLike[K,V,IN,M]</code> subtype, with particular concrete types for internal node (<code>INodeMap[K,V]</code>) and its own self-type.</p>
+
+<p>Things become a little more interesting inside the companion object <code>OrderedMap</code>:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">object</span> <span class="nc">OrderedMap</span> <span class="o">{</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">key</span><span class="o">[</span><span class="kt">K</span><span class="o">](</span><span class="k">implicit</span> <span class="n">ord</span><span class="k">:</span> <span class="kt">Ordering</span><span class="o">[</span><span class="kt">K</span><span class="o">])</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">AnyRef</span> <span class="o">{</span>
+</span><span class='line'>    <span class="k">def</span> <span class="n">value</span><span class="o">[</span><span class="kt">V</span><span class="o">]</span><span class="k">:</span> <span class="kt">OrderedMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span> <span class="k">=</span>
+</span><span class='line'>      <span class="k">new</span> <span class="nc">InjectMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">](</span><span class="n">ord</span><span class="o">)</span> <span class="k">with</span> <span class="nc">LNodeMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span> <span class="k">with</span> <span class="nc">OrderedMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Note that the object returned by the factory method is upcast to <code>OrderedMap[K,V]</code>, but in fact has the more complicated type: <code>InjectMap[K,V] with LNodeMap[K,V] with OrderedMap[K,V]</code>.  There are a couple things going on here.  The trait <code>LNodeMap[K,V]</code> ensures that the new object is in particular a leaf node, which embodies a new empty tree in the Red-Black tree system.</p>
+
+<p>The type <code>InjectMap[K,V]</code> has an even more interesting purpose.  Here is its definition:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">class</span> <span class="nc">InjectMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">](</span><span class="k">val</span> <span class="n">keyOrdering</span><span class="k">:</span> <span class="kt">Ordering</span><span class="o">[</span><span class="kt">K</span><span class="o">])</span> <span class="o">{</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">iNode</span><span class="o">(</span><span class="n">clr</span><span class="k">:</span> <span class="kt">Color</span><span class="o">,</span> <span class="n">dat</span><span class="k">:</span> <span class="kt">Data</span><span class="o">[</span><span class="kt">K</span><span class="o">],</span> <span class="n">ls</span><span class="k">:</span> <span class="kt">Node</span><span class="o">[</span><span class="kt">K</span><span class="o">],</span> <span class="n">rs</span><span class="k">:</span> <span class="kt">Node</span><span class="o">[</span><span class="kt">K</span><span class="o">])</span> <span class="k">=</span>
+</span><span class='line'>    <span class="k">new</span> <span class="nc">InjectMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">](</span><span class="n">keyOrdering</span><span class="o">)</span> <span class="k">with</span> <span class="nc">INodeMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span> <span class="k">with</span> <span class="nc">OrderedMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>      <span class="c1">// INode</span>
+</span><span class='line'>      <span class="k">val</span> <span class="n">color</span> <span class="k">=</span> <span class="n">clr</span>
+</span><span class='line'>      <span class="k">val</span> <span class="n">lsub</span> <span class="k">=</span> <span class="n">ls</span>
+</span><span class='line'>      <span class="k">val</span> <span class="n">rsub</span> <span class="k">=</span> <span class="n">rs</span>
+</span><span class='line'>      <span class="k">val</span> <span class="n">data</span> <span class="k">=</span> <span class="n">dat</span><span class="o">.</span><span class="n">asInstanceOf</span><span class="o">[</span><span class="kt">DataMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]]</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Firstly, note that it is a bona fide <em>class</em>, as opposed to a trait.  This class is where, finally, all things abstract are made real &#8211; &#8220;dependency injection&#8221; in the parlance of Scala idioms.  You can see that it defines the implementation of abstract method <code>iNode</code>, and that it does this by returning yet <em>another</em> <code>InjectMap[K,V]</code> object, mixed with both <code>INodeMap[K,V]</code> and <code>OrderedMap[K,V]</code>, thus maintaining closure with respect to all three slices of functionality: dependency injection, the proper type of internal node, and map collection methods.</p>
+
+<p>The various abstract <code>val</code> fields <code>color</code>, <code>data</code>, <code>lsub</code> and <code>rsub</code> are all given concrete values inside of <code>iNode</code>.  Here is where the value of concrete &#8220;reference&#8221; implementations manifests.  Any fields in the relevant internal-node type must be instantiated here, and the logic of instantiation cannot be inherited while still preserving the ability to mix abstract traits.  Therefore, any programmer wishing to create a new concrete sub-class must replicate the logic for instantiating all inherited in an internal node.</p>
+
+<p>Another example makes the implications more clear.  Here is the definition of injection for a <a href="https://github.com/erikerlandson/silex/blob/blog/rbtraits/src/test/scala/com/redhat/et/silex/maps/mixed.scala">collection that mixes in all three traits</a> for incrementable values, nearest-key queries, and prefix-sum queries:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'>  <span class="k">class</span> <span class="nc">Inject</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">](</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">keyOrdering</span><span class="k">:</span> <span class="kt">Numeric</span><span class="o">[</span><span class="kt">K</span><span class="o">],</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">valueMonoid</span><span class="k">:</span> <span class="kt">Monoid</span><span class="o">[</span><span class="kt">V</span><span class="o">],</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">prefixMonoid</span><span class="k">:</span> <span class="kt">IncrementingMonoid</span><span class="o">[</span><span class="kt">P</span>, <span class="kt">V</span><span class="o">])</span> <span class="o">{</span>
+</span><span class='line'>      <span class="k">def</span> <span class="n">iNode</span><span class="o">(</span><span class="n">clr</span><span class="k">:</span> <span class="kt">Color</span><span class="o">,</span> <span class="n">dat</span><span class="k">:</span> <span class="kt">Data</span><span class="o">[</span><span class="kt">K</span><span class="o">],</span> <span class="n">ls</span><span class="k">:</span> <span class="kt">Node</span><span class="o">[</span><span class="kt">K</span><span class="o">],</span> <span class="n">rs</span><span class="k">:</span> <span class="kt">Node</span><span class="o">[</span><span class="kt">K</span><span class="o">])</span> <span class="k">=</span>
+</span><span class='line'>      <span class="k">new</span> <span class="nc">Inject</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">](</span><span class="n">keyOrdering</span><span class="o">,</span> <span class="n">valueMonoid</span><span class="o">,</span> <span class="n">prefixMonoid</span><span class="o">)</span>
+</span><span class='line'>          <span class="k">with</span> <span class="nc">INodeTD</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]</span> <span class="k">with</span> <span class="nc">TDigestMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>        <span class="c1">// INode[K]</span>
+</span><span class='line'>        <span class="k">val</span> <span class="n">color</span> <span class="k">=</span> <span class="n">clr</span>
+</span><span class='line'>        <span class="k">val</span> <span class="n">lsub</span> <span class="k">=</span> <span class="n">ls</span><span class="o">.</span><span class="n">asInstanceOf</span><span class="o">[</span><span class="kt">NodeTD</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]]</span>
+</span><span class='line'>        <span class="k">val</span> <span class="n">rsub</span> <span class="k">=</span> <span class="n">rs</span><span class="o">.</span><span class="n">asInstanceOf</span><span class="o">[</span><span class="kt">NodeTD</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]]</span>
+</span><span class='line'>        <span class="k">val</span> <span class="n">data</span> <span class="k">=</span> <span class="n">dat</span><span class="o">.</span><span class="n">asInstanceOf</span><span class="o">[</span><span class="kt">DataMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]]</span>
+</span><span class='line'>        <span class="c1">// INodePS[K, V, P]</span>
+</span><span class='line'>        <span class="k">val</span> <span class="n">prefix</span> <span class="k">=</span> <span class="n">prefixMonoid</span><span class="o">.</span><span class="n">inc</span><span class="o">(</span><span class="n">prefixMonoid</span><span class="o">.</span><span class="n">plus</span><span class="o">(</span><span class="n">lsub</span><span class="o">.</span><span class="n">pfs</span><span class="o">,</span> <span class="n">rsub</span><span class="o">.</span><span class="n">pfs</span><span class="o">),</span> <span class="n">data</span><span class="o">.</span><span class="n">value</span><span class="o">)</span>
+</span><span class='line'>        <span class="c1">// INodeNear[K, V]</span>
+</span><span class='line'>        <span class="k">val</span> <span class="n">kmin</span> <span class="k">=</span> <span class="n">lsub</span> <span class="k">match</span> <span class="o">{</span>
+</span><span class='line'>          <span class="k">case</span> <span class="n">n</span><span class="k">:</span> <span class="kt">INodeTD</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]</span> <span class="k">=&gt;</span> <span class="n">n</span><span class="o">.</span><span class="n">kmin</span>
+</span><span class='line'>          <span class="k">case</span> <span class="k">_</span> <span class="k">=&gt;</span> <span class="n">data</span><span class="o">.</span><span class="n">key</span>
+</span><span class='line'>        <span class="o">}</span>
+</span><span class='line'>        <span class="k">val</span> <span class="n">kmax</span> <span class="k">=</span> <span class="n">rsub</span> <span class="k">match</span> <span class="o">{</span>
+</span><span class='line'>          <span class="k">case</span> <span class="n">n</span><span class="k">:</span> <span class="kt">INodeTD</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]</span> <span class="k">=&gt;</span> <span class="n">n</span><span class="o">.</span><span class="n">kmax</span>
+</span><span class='line'>          <span class="k">case</span> <span class="k">_</span> <span class="k">=&gt;</span> <span class="n">data</span><span class="o">.</span><span class="n">key</span>
+</span><span class='line'>        <span class="o">}</span>
+</span><span class='line'>      <span class="o">}</span>
+</span><span class='line'>  <span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Here you can see that all logic for both &#8220;basic&#8221; internal nodes and also for maintaining prefix sums, and key min/max information for nearest-entry queries, must be supplied.  If there is a singularity in this design here is where it is.  The saving grace is that it is localized into a single well defined place, and any logic can be transcribed from a proper reference implementation of whatever traits are being mixed.</p>
+
+<p><a name="mixing"></a></p>
+
+<h5>Finale: Trait Mixing</h5>
+
+<p>I will conclude by showing the code for mixing tree node traits and collection traits, which is elegant.  Here are type definitions for tree nodes and collection traits that inherit from incrementable values, nearest-key queries, and prefix-sum queries, and there is literally no code except the proper inheritances:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">object</span> <span class="nc">tree</span> <span class="o">{</span>
+</span><span class='line'>  <span class="k">import</span> <span class="nn">com.redhat.et.silex.maps.increment.tree._</span>
+</span><span class='line'>  <span class="k">import</span> <span class="nn">com.redhat.et.silex.maps.prefixsum.tree._</span>
+</span><span class='line'>  <span class="k">import</span> <span class="nn">com.redhat.et.silex.maps.nearest.tree._</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">trait</span> <span class="nc">NodeTD</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]</span> <span class="nc">extends</span> <span class="nc">NodePS</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]</span> <span class="k">with</span> <span class="nc">NodeInc</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span> <span class="k">with</span> <span class="nc">NodeNearMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">trait</span> <span class="nc">LNodeTD</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]</span> <span class="nc">extends</span> <span class="nc">NodeTD</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]</span>
+</span><span class='line'>      <span class="k">with</span> <span class="nc">LNodePS</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]</span> <span class="k">with</span> <span class="nc">LNodeInc</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span> <span class="k">with</span> <span class="nc">LNodeNearMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">trait</span> <span class="nc">INodeTD</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]</span> <span class="nc">extends</span> <span class="nc">NodeTD</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]</span>
+</span><span class='line'>      <span class="k">with</span> <span class="nc">INodePS</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]</span> <span class="k">with</span> <span class="nc">INodeInc</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span> <span class="k">with</span> <span class="nc">INodeNearMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">lsub</span><span class="k">:</span> <span class="kt">NodeTD</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">rsub</span><span class="k">:</span> <span class="kt">NodeTD</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// ...</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">sealed</span> <span class="k">trait</span> <span class="nc">TDigestMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]</span>
+</span><span class='line'>  <span class="nc">extends</span> <span class="nc">IncrementMapLike</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">INodeTD</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]</span>, <span class="kt">TDigestMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]]</span>
+</span><span class='line'>  <span class="k">with</span> <span class="nc">PrefixSumMapLike</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span>, <span class="kt">INodeTD</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]</span>, <span class="kt">TDigestMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]]</span>
+</span><span class='line'>  <span class="k">with</span> <span class="nc">NearestMapLike</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">INodeTD</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]</span>, <span class="kt">TDigestMap</span><span class="o">[</span><span class="kt">K</span>, <span class="kt">V</span>, <span class="kt">P</span><span class="o">]]</span> <span class="o">{</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">override</span> <span class="k">def</span> <span class="n">toString</span> <span class="k">=</span> <span class="c1">// ...</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Erik Erlandson</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2015-09-26T12:43:00-07:00" pubdate data-updated="true">Sep 26<span>th</span>, 2015</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/algorithms/'>algorithms</a>, <a class='category' href='/blog/categories/binary-tree/'>binary tree</a>, <a class='category' href='/blog/categories/computing/'>computing</a>, <a class='category' href='/blog/categories/nearest-entry/'>nearest entry</a>, <a class='category' href='/blog/categories/prefix-sum/'>prefix sum</a>, <a class='category' href='/blog/categories/scala/'>scala</a>, <a class='category' href='/blog/categories/t-digest/'>t-digest</a>
+  
+</span>
+
+
+      <br>
+<a id="feedback"></a>Feedback • 
+ 
+    <script type="text/javascript" src="//platform.twitter.com/widgets.js"></script>
+    
+  <a href="https://twitter.com/intent/tweet?text=@manyangled%20re:%20http://erikerlandson.github.com/blog/2015/09/26/a-library-of-binary-tree-algorithms-as-mixable-scala-traits/">Reply to this post on Twitter</a> • 
+ 
+<a href="mailto:erikerlandson@yahoo.com">Email the author</a>
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://erikerlandson.github.com/blog/2015/09/26/a-library-of-binary-tree-algorithms-as-mixable-scala-traits/" data-via="manyangled" data-counturl="http://erikerlandson.github.com/blog/2015/09/26/a-library-of-binary-tree-algorithms-as-mixable-scala-traits/" >Tweet</a>
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2015/08/18/lightweight-non-negative-numerics-for-better-scala-type-signatures/" title="Previous Post: Lightweight Non-Negative Numerics for Better Scala Type Signatures">&laquo; Lightweight Non-Negative Numerics for Better Scala Type Signatures</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>About The Author</h1>
+  <p>Erik is a senior software engineer on the <a href="http://www.redhat.com">Red Hat</a> Emerging Technologies Group.</p>
+</section>
+<section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2015/09/26/a-library-of-binary-tree-algorithms-as-mixable-scala-traits/">A Library of Binary Tree Algorithms as Mixable Scala Traits</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/08/18/lightweight-non-negative-numerics-for-better-scala-type-signatures/">Lightweight Non-Negative Numerics for Better Scala Type Signatures</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/08/17/the-reservoir-sampling-gap-distribution/">The Reservoir Sampling Gap Distribution</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/08/14/generalizing-kendalls-tau/">Generalizing Kendall's Tau</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/05/06/parallel-k-medoids-using-scala-parseq/">Parallel K-Medoids Using Scala ParSeq</a>
+      </li>
+    
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/erikerlandson">@erikerlandson</a> on GitHub
+  
+  <script type="text/javascript">
+    $.domReady(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'erikerlandson',
+            count: 0,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+
+<section>
+  <h1>Latest Tweets</h1>
+  <ul id="tweets">
+    <li class="loading">Status updating...</li>
+  </ul>
+  <script type="text/javascript">
+    $.domReady(function(){
+      getTwitterFeed("manyangled", 4, true);
+    });
+  </script>
+  <script src="/javascripts/twitter.js" type="text/javascript"> </script>
+  
+    <a href="http://twitter.com/manyangled" class="twitter-follow-button" data-show-count="false">Follow @manyangled</a>
+  
+</section>
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2015 - Erik Erlandson -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+
+
+
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>

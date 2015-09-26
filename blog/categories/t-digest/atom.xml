@@ -1,0 +1,413 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: t-digest | tool monkey]]></title>
+  <link href="http://erikerlandson.github.com/blog/categories/t-digest/atom.xml" rel="self"/>
+  <link href="http://erikerlandson.github.com/"/>
+  <updated>2015-09-26T12:53:57-07:00</updated>
+  <id>http://erikerlandson.github.com/</id>
+  <author>
+    <name><![CDATA[Erik Erlandson]]></name>
+    <email><![CDATA[erikerlandson@yahoo.com]]></email>
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[A Library of Binary Tree Algorithms as Mixable Scala Traits]]></title>
+    <link href="http://erikerlandson.github.com/blog/2015/09/26/a-library-of-binary-tree-algorithms-as-mixable-scala-traits/"/>
+    <updated>2015-09-26T12:43:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2015/09/26/a-library-of-binary-tree-algorithms-as-mixable-scala-traits</id>
+    <content type="html"><![CDATA[<p>In this post I am going to describe some work I've done recently on a system of Scala traits that support tree-based collection algorithms prefix-sum, nearest key queyr and value increment in a mixable format, all backed by Red-Black balanced tree logic, which is also a fully inheritable trait.</p>
+
+<p>This post eventually became a bit more sprawling and "tl;dr" than I was expecting, so by way of apology, here is a table of contents with links:</p>
+
+<ol>
+<li><a href="#motivation">Motivating Use Case</a></li>
+<li><a href="#overview">Library Overview</a></li>
+<li><a href="#redblack">A Red-Black Tree Base Class</a></li>
+<li><a href="#nodemap">Node Inheritance Example: NodeMap[K,V]</a></li>
+<li><a href="#orderedmaplike">Collection Trait Example: OrderedMapLike[K,V,IN,M]</a></li>
+<li><a href="#orderedmap">Collection Example: OrderedMap[K,V]</a></li>
+<li><a href="#mixing">Finale: Trait Mixing</a></li>
+</ol>
+
+
+<p><a name="motivation"></a></p>
+
+<h5>A Motivating Use Case</h5>
+
+<p>The skeptical programmer may be wondering what the point of Yet Another Map Collection really is, much less an entire class hierarchy.  The use case that inspired this work was my project of implementing the <a href="https://github.com/tdunning/t-digest/blob/master/docs/t-digest-paper/histo.pdf">t-digest algorithm</a>.  Discussion of t-digest is beyond the scope of this post, but suffice it to say that constructing a t-digest requires the maintenance of a collection of "cluster" objects, that needs to satisfy the following several properties:</p>
+
+<ol>
+<li>an entry contains one <strong>or more</strong> cluster objects at a given numeric location</li>
+<li>entries are maintained in a numeric key order</li>
+<li>entries will be frequently inserted and deleted, in arbitrary order</li>
+<li>given a numeric key value, be able to find the entry nearest to that value</li>
+<li>given a key, compute a <a href="https://en.wikipedia.org/wiki/Prefix_sum">prefix-sum</a> for that value</li>
+<li>all of the above should be bounded by logarithmic time complexity</li>
+</ol>
+
+
+<p>Propreties 2,3 and 6 are commonly satisfied by a map structure backed by some variety of balanced tree representation, of which the best-known is the <a href="https://en.wikipedia.org/wiki/Red%E2%80%93black_tree">Red-Black tree</a>.</p>
+
+<p>Properties 1, 4 and 5 are more interesting.  Property 1 -- representing a collection of multiple objects at each entry -- can be accomplished in a generalizable way by noting that a collection is representable as a monoid, and so supporting values that can be incremented with respect to a <a href="http://twitter.github.io/algebird/index.html#com.twitter.algebird.Monoid">user-supplied monoid relation</a> can satisfy property-1, but also can support many other kinds of update, including but not limited to classical numeric incrementing operations.</p>
+
+<p>Properties 4 and 5 -- nearest-entry queries and prefix-sum queries -- are also both supportable in logarithmic time using a tree data structure, provided that tree is balanced.  Again, the details of the algorithms are out of the current scope, however they are not extremely complex, and their implementations are available in the code.</p>
+
+<p>A reader with their software engineering hat on will notice that these properties are <em>orthogonal</em>.  A programmer might be interested in a data structure supporting any one of them, or in some mixed combination.   This kind of situation fairly shouts "Scala traits" (or, alternatively, interfaces in Java, etc).  With that idea in mind, I designed a system of Scala collection traits that support all of the above properties, in a pure trait form that is fully "mixable" by the programmer, so that one can use exactly the properties needed, but not pay for anything else.</p>
+
+<p><a name="overview"></a></p>
+
+<h5>Library Overview</h5>
+
+<p>The source files containing the code discussed in the remainder of this post are available <a href="https://github.com/erikerlandson/silex/tree/blog/rbtraits/src/main/scala/com/redhat/et/silex/maps">here</a>, and the unit testing files are <a href="https://github.com/erikerlandson/silex/tree/blog/rbtraits/src/test/scala/com/redhat/et/silex/maps">here</a>.  At the time of this post the tree algorithm trait system is a <a href="https://github.com/willb/silex/pull/35">PR against the silex project</a>.</p>
+
+<p>The library consists broadly of 3 kinds of traits:</p>
+
+<ul>
+<li>tree node traits -- implement core tree support for some functionality</li>
+<li>collection traits -- provide additional collection API methods the user</li>
+<li>collections -- instantiate a usable incarnation of a collection</li>
+</ul>
+
+
+<p>For the programmer who wishes to either create a trait mixture, or add new mixable traits, the collections also function as reference implementations.</p>
+
+<p>The three tables that follow summarize the currently available traits of each kind listed above.  They are (at the time of this posting) all under the package namespace <code>com.redhat.et.silex.maps</code> :</p>
+
+<table>
+<caption>Tree Node Traits</caption>
+<tr><td>trait</td><td>sub-package</td><td>description</td></tr>
+<tr><td>Node[K]</td> <td>redblack.tree</td><td>Fundamental Red-Black tree functionality</td></tr>
+<tr><td>NodeMap[K,V]</td><td>ordered.tree</td><td>Support a mapping from keys to values</td></tr>
+<tr><td>NodeNear[K]</td><td>nearest.tree</td><td>Nearest-entry query (key-only)</td></tr>
+<tr><td>NodeNearMap[K,V]</td><td>nearest.tree</td><td>Nearest-entry query for key/value maps</td></tr>
+<tr><td>NodeInc[K,V]</td><td>increment.tree</td><td>Increment values w.r.t. a monoid</td></tr>
+<tr><td>NodePS[K,V,P]</td><td>prefixsum.tree</td><td>Prefix sum queries by key (w.r.t. a monoid)</td></tr>
+</table>
+
+
+
+
+<br>
+
+
+<table>
+<caption>Collection Traits</caption>
+<tr><td>trait</td><td>sub-package</td><td>description</td></tr>
+<tr><td>OrderedSetLike[K,IN,M]</td><td>ordered</td><td>ordered set of keys</td></tr>
+<tr><td>OrderedMapLike[K,V,IN,M]</td><td>ordered</td><td>ordered key/value map</td></tr>
+<tr><td>NearestSetLike[K,IN,M]</td><td>nearest</td><td>nearest entry query on keys</td></tr>
+<tr><td>NearestMapLike[K,V,IN,M]</td><td>nearest</td><td>nearest entry query on key/value map</td></tr>
+<tr><td>IncrementMapLike[K,V,IN,M]</td><td>increment</td><td>increment values w.r.t a monoid</td></tr>
+<tr><td>PrefixSumMapLike[K,V,P,IN,M]</td><td>prefixsum</td><td>prefix sum queries w.r.t. a monoid</td></tr>
+</table>
+
+
+
+
+<br>
+
+
+<table>
+<caption>Concrete Collections</caption>
+<tr><td>trait</td><td>sub-package</td><td>description</td></tr>
+<tr><td>OrderedSet[K]</td><td>ordered</td><td>ordered set</td></tr>
+<tr><td>OrderedMap[K,V]</td><td>ordered</td><td>ordered key/value map</td></tr>
+<tr><td>NearestSet[K]</td><td>nearest</td><td>ordered set with nearest-entry query</td></tr>
+<tr><td>NearestMap[K,V]</td><td>nearest</td><td>ordred map with nearest-entry query</td></tr>
+<tr><td>IncrementMap[K,V]</td><td>increment</td><td>ordered map with value increment w.r.t. a monoid</td></tr>
+<tr><td>PrefixSumMap[K,V,P]</td><td>prefixsum</td><td>ordered map with prefix sum query w.r.t. a monoid</td></tr>
+</table>
+
+
+
+
+<br>
+
+
+<p>The following diagram summarizes the organization and inheritance relationships of the classes.</p>
+
+<p><img src="/assets/images/rbtraits/rbtraits.png" alt="diagram" /></p>
+
+<p><a name="redblack"></a></p>
+
+<h5>A Red/Black Tree Base Class</h5>
+
+<p>The most fundamental trait in this hierarchy is the trait that embodies Red-Black balancing; a "red-black-ness" trait, as it were.  This trait supplies the axiomatic tree operations of insertion, deletion and key lookup, where the Red-Black balancing operations are encapsulated for insertion (due to [Chris Okasaki] (http://journals.cambridge.org/action/displayAbstract?fromPage=online&amp;aid=44273)) and deletion (due to <a href="http://www.cs.kent.ac.uk/people/staff/smk/redblack/rb.html">Stefan Kahrs</a>)  Note that Red-Black trees do not assume a separate value, as in a map, but require only keys (thus implementing an ordered set over the key type):</p>
+
+<p>``` scala
+object tree {
+  /<em>* The color (red or black) of a node in a Red/Black tree </em>/
+  sealed trait Color
+  case object R extends Color
+  case object B extends Color</p>
+
+<p>  /<em>* Defines the data payload of a tree node </em>/
+  trait Data[K] {</p>
+
+<pre><code>/** The axiomatic unit of data for R/B trees is a key */
+val key: K
+</code></pre>
+
+<p>  }</p>
+
+<p>  /** Base class of a Red/Black tree node</p>
+
+<pre><code>* @tparam K The key type
+*/
+</code></pre>
+
+<p>  trait Node[K] {</p>
+
+<pre><code>/** The ordering that is applied to key values */
+val keyOrdering: Ordering[K]
+
+/** Instantiate an internal node. */
+protected def iNode(color: Color, d: Data[K], lsub: Node[K], rsub: Node[K]): INode[K]
+
+// ... declarations for insertion, deletion and key lookup ...
+
+// ... red-black balancing rules ...
+</code></pre>
+
+<p>  }</p>
+
+<p>   /<em>* Represents a leaf node in the Red Black tree system </em>/
+  trait LNode[K] extends Node[K] {</p>
+
+<pre><code>// ... basis case insertion, deletion, lookup ...
+</code></pre>
+
+<p>  }</p>
+
+<p>  /<em>* Represents an internal node (Red or Black) in the Red Black tree system </em>/
+  trait INode[K] extends Node[K] {</p>
+
+<pre><code>/** The Red/Black color of this node */
+val color: Color
+/** Including, but not limited to, the key */
+val data: Data[K]
+/** The left sub-tree */
+val lsub: Node[K]
+/** The right sub-tree */
+val rsub: Node[K]
+
+// ... implementations for insertion, deletion, lookup ...
+</code></pre>
+
+<p>  }
+}
+<code>``
+I will assume most readers are familiar with basic binary tree operations, and the Red-Black rules are described elsewhere (I adapted them from the Scala red-black implementation).  For the purposes of this discussion, the most interesting feature is that this is a _pure Scala trait_.  All</code>val` declarations are abstract.  This trait, by itself, cannot function without a subclass to eventually perform dependency injection.   However, this abstraction allows the trait to be inherited freely -- any programmer can inherit from this trait and get a basic Red-Black balanced tree for (nearly) free, as long as a few basic principles are adhered to for proper dependency injection.</p>
+
+<p>Another detail to call out is the abstraction of the usual <code>key</code> with a <code>Data</code> element.  This element represents any node payload that is moved around as a unit during tree structure manipulations, such as balancing pivots.  In the case of a map-like subclass, <code>Data</code> is extended to include a <code>value</code> field as well as a <code>key</code> field.</p>
+
+<p>The other noteworthy detail is the abstract definition <code>def iNode(color: Color, d: Data[K], lsub: Node[K], rsub: Node[K]): INode[K]</code> - this is the function called to create any new tree node.  In fact, this function, when eventually instantiated, is what performs dependency injection of other tree node fields.</p>
+
+<p><a name="nodemap"></a></p>
+
+<h5>Node Inheritance Example: NodeMap[K,V]</h5>
+
+<p>A relatively simple example of node inheritance is hopefully instructive.  Here is the definition for tree nodes supporting a key/value map:</p>
+
+<p>``` scala
+object tree {
+  /<em>* Trees that back a map-like object have a value as well as a key </em>/
+  trait DataMap[K, V] extends Data[K] {</p>
+
+<pre><code>val value: V
+</code></pre>
+
+<p>  }</p>
+
+<p>  /** Base class of ordered K/V tree node</p>
+
+<pre><code>* @tparam K The key type
+* @tparam V The value type
+*/
+</code></pre>
+
+<p>  trait NodeMap[K, V] extends Node[K]</p>
+
+<p>  trait LNodeMap[K, V] extends NodeMap[K, V] with LNode[K]</p>
+
+<p>  trait INodeMap[K, V] extends NodeMap[K, V] with INode[K] {</p>
+
+<pre><code>val data: DataMap[K, V]
+</code></pre>
+
+<p>  }
+}
+```</p>
+
+<p>Note that in this case very little is added to the red/black functionality already provided by <code>Node[K]</code>.  A <code>DataMap[K,V]</code> trait is defined to add a <code>value</code> field in addition to the <code>key</code>, and the internal node <code>INodeMap[K,V]</code> refines the type of its <code>data</code> field to be <code>DataMap[K,V]</code>.  The semantics is little more than "tree nodes now carry a value in addition to a key."</p>
+
+<p>A tree node trait inherits from its own parent class <em>and</em> the corresponding traits for any mixed-in functionality.  So for example <code>INodeMap[K,V]</code> inherits from <code>NodeMap[K,V]</code> but also <code>INode[K]</code>.</p>
+
+<p><a name="orderedmaplike"></a></p>
+
+<h5>Collection Trait Example: OrderedMapLike[K,V,IN,M]</h5>
+
+<p>Continuing with the ordered map example, here is the definition of the collection trait for an ordered map:</p>
+
+<p>``` scala
+trait OrderedMapLike[K, V, IN &lt;: INodeMap[K, V], M &lt;: OrderedMapLike[K, V, IN, M]]</p>
+
+<pre><code>extends NodeMap[K, V] with OrderedLike[K, IN, M] {
+</code></pre>
+
+<p>  /<em>* Obtain a new map with a (key, val) pair inserted </em>/
+  def +(kv: (K, V)) = this.insert(</p>
+
+<pre><code>new DataMap[K, V] {
+  val key = kv._1
+  val value = kv._2
+}).asInstanceOf[M]
+</code></pre>
+
+<p>  /<em>* Get the value stored at a key, or None if key is not present </em>/
+  def get(k: K) = this.getNode(k).map(_.data.value)</p>
+
+<p>  /<em>* Iterator over (key,val) pairs, in key order </em>/
+  def iterator = nodesIterator.map(n => ((n.data.key, n.data.value)))</p>
+
+<p>  /<em>* Container of values, in key order </em>/
+  def values = valuesIterator.toIterable</p>
+
+<p>  /<em>* Iterator over values, in key order </em>/
+  def valuesIterator = nodesIterator.map(_.data.value)
+}
+<code>``
+You can see that this trait supplies collection API methods that a Scala programmer will recognize as being standard for any map-like collection.  Note that this trait also inherits other standard methods from</code>OrderedLike[K,IN,M]<code>(common to both sets and maps) and _also_ inherits from</code>NodeMap[K,V]<code>: In other words, a collection is effectively yet another kind of tree node, with additional collection API methods mixed in.   Note also the use of "self types" (the type parameter</code>M`), which allows the collection to return objects of its own kind.  This is crucial for allowing operations like data insertion to return an object that also supports node insertion, and to maintain consistency of type across operations.  The collectoin type is properly "closed" with respect to its own operations.</p>
+
+<p><a name="orderedmap"></a></p>
+
+<h5>Collection Example: OrderedMap[K,V]</h5>
+
+<p>To conclude the ordered map example, consider the task of defining a concrete instantiation of an ordered map:
+``` scala
+sealed trait OrderedMap[K, V] extends OrderedMapLike[K, V, INodeMap[K, V], OrderedMap[K, V]] {
+  override def toString =</p>
+
+<pre><code>"OrderedMap(" +
+  nodesIterator.map(n =&gt; s"${n.data.key} -&gt; ${n.data.value}").mkString(", ") +
+")"
+</code></pre>
+
+<p>}
+<code>``
+You can see that (aside from a convenience override of</code>toString<code>) the trait</code>OrderedMap[K,V]<code>is nothing more than a vehicle for instantiating a particular concrete</code>OrderedMapLike[K,V,IN,M]<code>subtype, with particular concrete types for internal node (</code>INodeMap[K,V]`) and its own self-type.</p>
+
+<p>Things become a little more interesting inside the companion object <code>OrderedMap</code>:
+``` scala
+object OrderedMap {
+  def key<a href="implicit%20ord:%20Ordering[K]">K</a> = new AnyRef {</p>
+
+<pre><code>def value[V]: OrderedMap[K, V] =
+  new InjectMap[K, V](ord) with LNodeMap[K, V] with OrderedMap[K, V]
+</code></pre>
+
+<p>  }
+}
+<code>``
+Note that the object returned by the factory method is upcast to</code>OrderedMap[K,V]<code>, but in fact has the more complicated type:</code>InjectMap[K,V] with LNodeMap[K,V] with OrderedMap[K,V]<code>.  There are a couple things going on here.  The trait</code>LNodeMap[K,V]` ensures that the new object is in particular a leaf node, which embodies a new empty tree in the Red-Black tree system.</p>
+
+<p>The type <code>InjectMap[K,V]</code> has an even more interesting purpose.  Here is its definition:
+``` scala
+class InjectMap<a href="val%20keyOrdering:%20Ordering[K]">K, V</a> {
+  def iNode(clr: Color, dat: Data[K], ls: Node[K], rs: Node[K]) =</p>
+
+<pre><code>new InjectMap[K, V](keyOrdering) with INodeMap[K, V] with OrderedMap[K, V] {
+  // INode
+  val color = clr
+  val lsub = ls
+  val rsub = rs
+  val data = dat.asInstanceOf[DataMap[K, V]]
+}
+</code></pre>
+
+<p>}
+<code>``
+Firstly, note that it is a bona fide _class_, as opposed to a trait.  This class is where, finally, all things abstract are made real -- "dependency injection" in the parlance of Scala idioms.  You can see that it defines the implementation of abstract method</code>iNode<code>, and that it does this by returning yet _another_</code>InjectMap[K,V]<code>object, mixed with both</code>INodeMap[K,V]<code>and</code>OrderedMap[K,V]`, thus maintaining closure with respect to all three slices of functionality: dependency injection, the proper type of internal node, and map collection methods.</p>
+
+<p>The various abstract <code>val</code> fields <code>color</code>, <code>data</code>, <code>lsub</code> and <code>rsub</code> are all given concrete values inside of <code>iNode</code>.  Here is where the value of concrete "reference" implementations manifests.  Any fields in the relevant internal-node type must be instantiated here, and the logic of instantiation cannot be inherited while still preserving the ability to mix abstract traits.  Therefore, any programmer wishing to create a new concrete sub-class must replicate the logic for instantiating all inherited in an internal node.</p>
+
+<p>Another example makes the implications more clear.  Here is the definition of injection for a <a href="https://github.com/erikerlandson/silex/blob/blog/rbtraits/src/test/scala/com/redhat/et/silex/maps/mixed.scala">collection that mixes in all three traits</a> for incrementable values, nearest-key queries, and prefix-sum queries:</p>
+
+<p>``` scala
+  class Inject[K, V, P](</p>
+
+<pre><code>val keyOrdering: Numeric[K],
+val valueMonoid: Monoid[V],
+val prefixMonoid: IncrementingMonoid[P, V]) {
+  def iNode(clr: Color, dat: Data[K], ls: Node[K], rs: Node[K]) =
+  new Inject[K, V, P](keyOrdering, valueMonoid, prefixMonoid)
+      with INodeTD[K, V, P] with TDigestMap[K, V, P] {
+    // INode[K]
+    val color = clr
+    val lsub = ls.asInstanceOf[NodeTD[K, V, P]]
+    val rsub = rs.asInstanceOf[NodeTD[K, V, P]]
+    val data = dat.asInstanceOf[DataMap[K, V]]
+    // INodePS[K, V, P]
+    val prefix = prefixMonoid.inc(prefixMonoid.plus(lsub.pfs, rsub.pfs), data.value)
+    // INodeNear[K, V]
+    val kmin = lsub match {
+      case n: INodeTD[K, V, P] =&gt; n.kmin
+      case _ =&gt; data.key
+    }
+    val kmax = rsub match {
+      case n: INodeTD[K, V, P] =&gt; n.kmax
+      case _ =&gt; data.key
+    }
+  }
+</code></pre>
+
+<p>  }
+```
+Here you can see that all logic for both "basic" internal nodes and also for maintaining prefix sums, and key min/max information for nearest-entry queries, must be supplied.  If there is a singularity in this design here is where it is.  The saving grace is that it is localized into a single well defined place, and any logic can be transcribed from a proper reference implementation of whatever traits are being mixed.</p>
+
+<p><a name="mixing"></a></p>
+
+<h5>Finale: Trait Mixing</h5>
+
+<p>I will conclude by showing the code for mixing tree node traits and collection traits, which is elegant.  Here are type definitions for tree nodes and collection traits that inherit from incrementable values, nearest-key queries, and prefix-sum queries, and there is literally no code except the proper inheritances:</p>
+
+<p>``` scala
+object tree {
+  import com.redhat.et.silex.maps.increment.tree.<em>
+  import com.redhat.et.silex.maps.prefixsum.tree.</em>
+  import com.redhat.et.silex.maps.nearest.tree._</p>
+
+<p>  trait NodeTD[K, V, P] extends NodePS[K, V, P] with NodeInc[K, V] with NodeNearMap[K, V]</p>
+
+<p>  trait LNodeTD[K, V, P] extends NodeTD[K, V, P]</p>
+
+<pre><code>  with LNodePS[K, V, P] with LNodeInc[K, V] with LNodeNearMap[K, V]
+</code></pre>
+
+<p>  trait INodeTD[K, V, P] extends NodeTD[K, V, P]</p>
+
+<pre><code>  with INodePS[K, V, P] with INodeInc[K, V] with INodeNearMap[K, V] {
+val lsub: NodeTD[K, V, P]
+val rsub: NodeTD[K, V, P]
+</code></pre>
+
+<p>  }
+}</p>
+
+<p>// ...</p>
+
+<p>sealed trait TDigestMap[K, V, P]
+  extends IncrementMapLike[K, V, INodeTD[K, V, P], TDigestMap[K, V, P]]
+  with PrefixSumMapLike[K, V, P, INodeTD[K, V, P], TDigestMap[K, V, P]]
+  with NearestMapLike[K, V, INodeTD[K, V, P], TDigestMap[K, V, P]] {</p>
+
+<p>  override def toString = // ...
+}
+```</p>
+]]></content>
+  </entry>
+  
+</feed>
