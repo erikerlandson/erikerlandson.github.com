@@ -4,7 +4,7 @@
   <title><![CDATA[Category: binary tree | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/binary-tree/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-09-26T14:28:52-07:00</updated>
+  <updated>2015-09-26T14:52:59-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -385,7 +385,7 @@ Here you can see that all logic for both "basic" internal nodes and also for mai
 
 <h5>Finale: Trait Mixing</h5>
 
-<p>I will conclude by showing the code for mixing tree node traits and collection traits, which is elegant.  Here are type definitions for tree nodes and collection traits that inherit from incrementable values, nearest-key queries, and prefix-sum queries, and there is literally no code except the proper inheritances:</p>
+<p>I will conclude by showing the code for mixing tree node traits and collection traits, which is elegant.  Here are type definitions for tree nodes and collection traits that inherit from incrementable values, nearest-key queries, and prefix-sum queries, and there is almost no code except the proper inheritances:</p>
 
 <p>``` scala
 object tree {
