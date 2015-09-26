@@ -50,7 +50,20 @@ For the programmer who wishes to either create a trait mixture, or add new mixab
 
 The three tables that follow summarize the currently available traits of each kind listed above.  They are (at the time of this posting) all under the package namespace `com.redhat.et.silex.maps`:
 
-<table border="5">
+<head><style>
+table, th, td {
+border: 1px solid black;
+border-collapse: collapse;
+}
+th, td {
+padding: 10px;
+}
+th {
+text-align: center;
+}
+</style></head>
+
+<table>
 <caption>Tree Node Traits</caption>
 <tr><td>trait</td><td>sub-package</td><td>description</td></tr>
 <tr><td>Node[K]</td> <td>redblack.tree</td><td>Fundamental Red-Black tree functionality</td></tr>
@@ -62,7 +75,7 @@ The three tables that follow summarize the currently available traits of each ki
 </table>
 
 <br>
-<table border="5">
+<table>
 <caption>Collection Traits</caption>
 <tr><td>trait</td><td>sub-package</td><td>description</td></tr>
 <tr><td>OrderedSetLike[K,IN,M]</td><td>ordered</td><td>ordered set of keys</td></tr>
@@ -74,7 +87,7 @@ The three tables that follow summarize the currently available traits of each ki
 </table>
 
 <br>
-<table border="5">
+<table>
 <caption>Concrete Collections</caption>
 <tr><td>trait</td><td>sub-package</td><td>description</td></tr>
 <tr><td>OrderedSet[K]</td><td>ordered</td><td>ordered set</td></tr>
