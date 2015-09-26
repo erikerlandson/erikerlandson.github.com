@@ -48,7 +48,7 @@ The library consists broadly of 3 kinds of traits:
 
 For the programmer who wishes to either create a trait mixture, or add new mixable traits, the collections also function as reference implementations.
 
-The three tables that follow summarize the currently available traits of each kind listed above.  They are (at the time of this posting) all under the package namespace `com.redhat.et.silex.maps` :
+The three tables that follow summarize the currently available traits of each kind listed above.  They are (at the time of this posting) all under the package namespace `com.redhat.et.silex.maps`:
 
 <table border="5">
 <caption>Tree Node Traits</caption>
@@ -92,7 +92,7 @@ The following diagram summarizes the organization and inheritance relationships 
 
 <a name="redblack"></a>
 #####A Red/Black Tree Base Class
-The most fundamental trait in this hierarchy is the trait that embodies Red-Black balancing; a "red-black-ness" trait, as it were.  This trait supplies the axiomatic tree operations of insertion, deletion and key lookup, where the Red-Black balancing operations are encapsulated for insertion (due to [Chris Okasaki] (http://journals.cambridge.org/action/displayAbstract?fromPage=online&aid=44273)) and deletion (due to [Stefan Kahrs](http://www.cs.kent.ac.uk/people/staff/smk/redblack/rb.html))  Note that Red-Black trees do not assume a separate value, as in a map, but require only keys (thus implementing an ordered set over the key type):
+The most fundamental trait in this hierarchy is the trait that embodies Red-Black balancing; a "red-black-ness" trait, as it were.  This trait supplies the axiomatic tree operations of insertion, deletion and key lookup, where the Red-Black balancing operations are encapsulated for insertion (due to [Chris Okasaki](http://journals.cambridge.org/action/displayAbstract?fromPage=online&aid=44273)) and deletion (due to [Stefan Kahrs](http://www.cs.kent.ac.uk/people/staff/smk/redblack/rb.html))  Note that Red-Black trees do not assume a separate value, as in a map, but require only keys (thus implementing an ordered set over the key type):
 
 ``` scala
 object tree {
