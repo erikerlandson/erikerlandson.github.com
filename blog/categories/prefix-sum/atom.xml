@@ -4,7 +4,7 @@
   <title><![CDATA[Category: prefix sum | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/prefix-sum/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-09-26T14:27:16-07:00</updated>
+  <updated>2015-09-26T14:28:52-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -89,7 +89,7 @@ text-align: center;
 }
 </style></head></p>
 
-<table border="5px" padding="5px">
+<table>
 <caption>Tree Node Traits</caption>
 <tr><td>trait</td><td>sub-package</td><td>description</td></tr>
 <tr><td>Node[K]</td> <td>redblack.tree</td><td>Fundamental Red-Black tree functionality</td></tr>
@@ -106,7 +106,7 @@ text-align: center;
 <br>
 
 
-<table border="5px">
+<table>
 <caption>Collection Traits</caption>
 <tr><td>trait</td><td>sub-package</td><td>description</td></tr>
 <tr><td>OrderedSetLike[K,IN,M]</td><td>ordered</td><td>ordered set of keys</td></tr>
@@ -123,7 +123,7 @@ text-align: center;
 <br>
 
 
-<table border="5px">
+<table>
 <caption>Concrete Collections</caption>
 <tr><td>trait</td><td>sub-package</td><td>description</td></tr>
 <tr><td>OrderedSet[K]</td><td>ordered</td><td>ordered set</td></tr>
