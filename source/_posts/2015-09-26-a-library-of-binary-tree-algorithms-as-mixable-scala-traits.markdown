@@ -7,6 +7,8 @@ categories: [ computing, scala, binary tree, algorithms, prefix sum, nearest ent
 ---
 In this post I am going to describe some work I've done recently on a system of Scala traits that support tree-based collection algorithms prefix-sum, nearest key query and value increment in a mixable format, all backed by Red-Black balanced tree logic, which is also a fully inheritable trait.
 
+> (update) Since I wrote this post, the code has evolved into a [PR against the algebird project](https://github.com/twitter/algebird/pull/496). The original source files, containing the exact code fragments discussed in the remainder of this post, are preserved for posterity [here](https://github.com/erikerlandson/silex/tree/blog/rbtraits/src/main/scala/com/redhat/et/silex/maps).
+
 This post eventually became a bit more sprawling and "tl/dr" than I was expecting, so by way of apology, here is a table of contents with links:
 
 1. [Motivating Use Case](#motivation)
@@ -19,7 +21,7 @@ This post eventually became a bit more sprawling and "tl/dr" than I was expectin
 
 <a name="motivation"></a>
 #####A Motivating Use Case
-The skeptical programmer may be wondering what the point of Yet Another Map Collection really is, much less an entire class hierarchy.  The use case that inspired this work was my project of implementing the [t-digest algorithm](https://github.com/tdunning/t-digest/blob/master/docs/t-digest-paper/histo.pdf).  Discussion of t-digest is beyond the scope of this post, but suffice it to say that constructing a t-digest requires the maintenance of a collection of "cluster" objects, that needs to satisfy the following several properties:
+The skeptical programmer may be wondering what the point of Yet Another Map Collection really is, much less an entire class hierarchy.  The use case that inspired this work was [my project](https://github.com/twitter/algebird/pull/495) of implementing the [t-digest algorithm](https://github.com/tdunning/t-digest/blob/master/docs/t-digest-paper/histo.pdf).  Discussion of t-digest is beyond the scope of this post, but suffice it to say that constructing a t-digest requires the maintenance of a collection of "cluster" objects, that needs to satisfy the following several properties:
 
 1. an entry contains one **or more** cluster objects at a given numeric location
 1. entries are maintained in a numeric key order
@@ -38,8 +40,6 @@ A reader with their software engineering hat on will notice that these propertie
 
 <a name="overview"></a>
 #####Library Overview
-The source files containing the code discussed in the remainder of this post are available [here](https://github.com/erikerlandson/silex/tree/blog/rbtraits/src/main/scala/com/redhat/et/silex/maps), and the unit testing files are [here](https://github.com/erikerlandson/silex/tree/blog/rbtraits/src/test/scala/com/redhat/et/silex/maps).  At the time of this post the tree algorithm trait system is a [PR against the silex project](https://github.com/willb/silex/pull/35).
-
 The library consists broadly of 3 kinds of traits:
 
 * tree node traits -- implement core tree support for some functionality
