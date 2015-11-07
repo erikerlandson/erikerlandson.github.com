@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-09-26T16:23:43-07:00</updated>
+  <updated>2015-11-07T08:48:43-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -19,6 +19,8 @@
     <updated>2015-09-26T12:43:00-07:00</updated>
     <id>http://erikerlandson.github.com/blog/2015/09/26/a-library-of-binary-tree-algorithms-as-mixable-scala-traits</id>
     <content type="html"><![CDATA[<p>In this post I am going to describe some work I've done recently on a system of Scala traits that support tree-based collection algorithms prefix-sum, nearest key query and value increment in a mixable format, all backed by Red-Black balanced tree logic, which is also a fully inheritable trait.</p>
+
+<blockquote><p>(update) Since I wrote this post, the code has evolved into a <a href="https://github.com/twitter/algebird/pull/496">PR against the algebird project</a>. The original source files, containing the exact code fragments discussed in the remainder of this post, are preserved for posterity <a href="https://github.com/erikerlandson/silex/tree/blog/rbtraits/src/main/scala/com/redhat/et/silex/maps">here</a>.</p></blockquote>
 
 <p>This post eventually became a bit more sprawling and "tl/dr" than I was expecting, so by way of apology, here is a table of contents with links:</p>
 
@@ -37,7 +39,7 @@
 
 <h5>A Motivating Use Case</h5>
 
-<p>The skeptical programmer may be wondering what the point of Yet Another Map Collection really is, much less an entire class hierarchy.  The use case that inspired this work was my project of implementing the <a href="https://github.com/tdunning/t-digest/blob/master/docs/t-digest-paper/histo.pdf">t-digest algorithm</a>.  Discussion of t-digest is beyond the scope of this post, but suffice it to say that constructing a t-digest requires the maintenance of a collection of "cluster" objects, that needs to satisfy the following several properties:</p>
+<p>The skeptical programmer may be wondering what the point of Yet Another Map Collection really is, much less an entire class hierarchy.  The use case that inspired this work was <a href="https://github.com/twitter/algebird/pull/495">my project</a> of implementing the <a href="https://github.com/tdunning/t-digest/blob/master/docs/t-digest-paper/histo.pdf">t-digest algorithm</a>.  Discussion of t-digest is beyond the scope of this post, but suffice it to say that constructing a t-digest requires the maintenance of a collection of "cluster" objects, that needs to satisfy the following several properties:</p>
 
 <ol>
 <li>an entry contains one <strong>or more</strong> cluster objects at a given numeric location</li>
@@ -60,8 +62,6 @@
 <p><a name="overview"></a></p>
 
 <h5>Library Overview</h5>
-
-<p>The source files containing the code discussed in the remainder of this post are available <a href="https://github.com/erikerlandson/silex/tree/blog/rbtraits/src/main/scala/com/redhat/et/silex/maps">here</a>, and the unit testing files are <a href="https://github.com/erikerlandson/silex/tree/blog/rbtraits/src/test/scala/com/redhat/et/silex/maps">here</a>.  At the time of this post the tree algorithm trait system is a <a href="https://github.com/willb/silex/pull/35">PR against the silex project</a>.</p>
 
 <p>The library consists broadly of 3 kinds of traits:</p>
 
