@@ -4,7 +4,7 @@
   <title><![CDATA[tool monkey]]></title>
   <link href="http://erikerlandson.github.com/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-11-07T08:48:43-07:00</updated>
+  <updated>2015-11-20T16:35:28-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,71 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Very Fast Reservoir Sampling]]></title>
+    <link href="http://erikerlandson.github.com/blog/2015/11/20/very-fast-reservoir-sampling/"/>
+    <updated>2015-11-20T11:27:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2015/11/20/very-fast-reservoir-sampling</id>
+    <content type="html"><![CDATA[<blockquote><p>The code I used to collect the data for this post can be viewed <a href="https://github.com/erikerlandson/silex/blob/blog/reservoir/src/main/scala/com/redhat/et/silex/sample/reservoir/reservoir.scala">here</a>.  I generated the plots using the <a href="https://github.com/quantifind/wisp">quantifind WISP</a> project.</p></blockquote>
+
+<p>In a <a href="http://erikerlandson.github.io/blog/2014/09/11/faster-random-samples-with-gap-sampling/">previous post</a>, I showed that random Bernoulli and Poisson sampling could be made much faster by modeling the <em>sampling gap distribution</em> for the corresponding smapling distributions.  More recently, I also began exploring whether <a href="https://en.wikipedia.org/wiki/Reservoir_sampling">reservoir sampling</a> might also be optimized using the gap sampling technique, by deriving the <a href="http://erikerlandson.github.io/blog/2015/08/17/the-reservoir-sampling-gap-distribution/">reservoir sampling gap distribution</a>.  For a sampling reservoir of size (R), starting at data element (j), the probability distribution of the sampling gap is:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/figure6.png" title="Figure 1" alt="Figure 1" /></p>
+
+<p>Modeling a sampling gap distribution is a powerful tool for optimizing a sampling algorithm, but it presupposes that you can actually draw values from that distribution substantially faster than just applying a random process to drawing each data element.  I was unable to come up with a &#8220;direct&#8221; algorithm for drawing samples from P(k) above (I suspect none exists), however I also know the CDF F(k), so it <em>is</em> possible to apply <a href="https://en.wikipedia.org/wiki/Inverse_transform_sampling">inversion sampling</a>, which runs in logarithmic time w.r.t the desired accuracy.  Although its logarithmic cost effectively guarantees that it will be a net efficiency win for sufficiently large (j), it still involves a substantial number of computations to yield its samples, and it seems unlikely to be competitive with straight &#8220;naive&#8221; reservoir sampling over many real-world data sizes, where (j) may never grow very large.</p>
+
+<p>Well, if exact computations are too expensive, we can always look for a fast approximation.  Consider the original &#8220;first principles&#8221; formula for the sampling gap P(k):</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/reservoir2/figure2.png" title="Figure 2" alt="Figure 2" /></p>
+
+<p>As the figure above alludes to, if (j) is relatively large compared to (k), then values (j+1),(j+2)&#8230;(j+k) are all going to be effectively &#8220;close&#8221; to (j), and so we can replace them all with (j) as an approximation.  Note that the resulting approximation is just the PMF of the <a href="https://en.wikipedia.org/wiki/Geometric_distribution">geometric distribution</a>, with probability of success p=(R/j), and we already saw how to efficiently draw values from a geometric distribution from our experience with Bernoulli sampling.</p>
+
+<p>Do we have any reason to hope that this approximation will be useful?  For reasons that are similar to those for Bernoulli gap sampling, it will only be efficient to employ gap sampling when the probability (R/j) becomes small enough.  From our experiences with Bernoulli sampling that is <em>at least</em> j>=2R.  So, we have some assurance that (j) itself will be never be <em>very</em> small.  What about (k)?  Note that a geometric distribution &#8220;favors&#8221; smaller values of (k) &#8211; that is, small values of (k) have the highest probabilities.  In fact, the smaller that (j) is, the larger the probability (R/j) is, and so the more likely that (k) values that are small relative to (j) will be the frequent ones.  It is also promising that the true distribution for P(k) <em>also</em> favors smaller values of (k) (in fact it favors them even a bit more strongly than the approximation).</p>
+
+<p>Although it is encouraging, it is also clear that my argument above is limited to heuristic hand-waving.  What does this approximation really <em>look</em> like, compared to the true distribution?  Fortunately, it is easy to plot both distributions numerically, since we now know the formulas for both:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/reservoir2/CDFs_R=10.png" title="Figure 3" alt="Figure 3" /></p>
+
+<p>The plot above shows that, in fact, the geometric approximation is a <em>surprisingly good</em> approximation to the true distribution!  Furthermore, the approximation remains good as both (j) and (k) grow larger.</p>
+
+<p>Our numeric eye-balling looks quite promising.  Is there an effective way to <em>measure</em> how good this approximation is?  One useful measure is the <a href="https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test">Kolmogorov-Smirnov D statistic</a>, which is just the maximum absolute error between two cumulative distributions.  Here is a plot of the D statistic for reservoir size R=10, as (j) varies across several magnitudes:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/reservoir2/R=10.png" title="Figure 4" alt="Figure 4" /></p>
+
+<p>This plot is also good news: we can see that deviation, as measured by D, remains bounded at a small value (less than 0.026).  As this is for the specific value R=10, we also want to know how things change as reservoir size changes:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/reservoir2/R=all.png" title="Figure 5" alt="Figure 5" /></p>
+
+<p>The news is still good!  As reservoir size grows, the approximation only gets better: the D values get smaller as R increases, and remain asymtotically bounded as (j) increases.</p>
+
+<p>Now we have some numeric assurance that the geometric approximation is a good one, and stays good as reservoir size grows and sampling runs get longer.  However, we should also verify that an actual implementation of the approximation works as expected.  Following is a plot that shows two-sample D statistics, comparing the distribution in sample gaps between runs of the exact &#8220;naive&#8221; reservoir sampling with the fast geometric approximation:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/reservoir2/D_naive_vs_fast.png" title="Figure 6" alt="Figure 6" /></p>
+
+<p>As expected, the measured difference in sampling characteristics between naive and fast approximation are small, confirming the numeric predictions.</p>
+
+<p>Since the point of this exercise was to achieve faster random sampling, it remains to measure what kind of speed improvements the fast approximation provides.  As a point of reference, here is a plot of run times for reservoir sampling over 10<sup>8</sup> integers:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/reservoir2/naive_sample_time_vs_R.png" title="Figure 7" alt="Figure 7" /></p>
+
+<p>As expected, sample time remains constant at around 1.5 seconds, regardless of reservoir size, since the naive algorithm always samples from its RNG per each sample.</p>
+
+<p>Compare this to the corresponding plot for the fast geometric approximation:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/reservoir2/gap_sample_times_vs_R.png" title="Figure 8" alt="Figure 8" /></p>
+
+<p>Firstly, we see that the sampling times are <em>much faster</em>, as originally anticipated in my <a href="http://erikerlandson.github.io/blog/2015/08/17/the-reservoir-sampling-gap-distribution/">previous post</a> &#8211; in the neighborhood of 3 orders of magnitude faster.  Secondly, we see that the sampling times do increase as a linear function of reservoir size.  Based on our experience with Bernoulli gap sampling, this is expected; the sampling probabilities are given by (R/j), and therefore the amount of sampling is proportional to R.</p>
+
+<p>Another property anticipated in my previous post was that the efficiency of gap sampling should continue to increase as the amount of data sampled grows; the sampling probability being (R/j), the probability of sampling decreases as j gets larger, and so the corresponding gap sizes grow.  The following plot verifies this property, holding reservoir size R constant, and increasing the data size:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/reservoir2/gap_sampling_efficiency.png" title="Figure 9" alt="Figure 9" /></p>
+
+<p>The sampling time (per million elements) decreases as the sample size grows, as predicted by the formula.</p>
+
+<p>In conclusion, I have demonstrated that a geometric distribution can be used as a high quality approximation to the true sampling gap distribution for reservoir sampling, which allows reservoir sampling to be performed much faster than the naive algorithm while still retaining sampling quality.</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[A Library of Binary Tree Algorithms as Mixable Scala Traits]]></title>
@@ -2854,43 +2919,6 @@ $ ccdump condor_status Name TotalSlotCpus
 slot1@rorschach | 10
 slot1_1@rorschach | 1
 </code></pre>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Rethinking the Semantics of Group Quotas and Slot Weights: Computing Claim Capacity from Consumption Policy]]></title>
-    <link href="http://erikerlandson.github.com/blog/2012/11/26/rethinking-the-semantics-of-group-quotas-and-slot-weights-computing-claim-capacity-from-consumption-policy/"/>
-    <updated>2012-11-26T13:52:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2012/11/26/rethinking-the-semantics-of-group-quotas-and-slot-weights-computing-claim-capacity-from-consumption-policy</id>
-    <content type="html"><![CDATA[<p>In two previous posts, I made a case to motivate the need for a better definition of slot weights and group quotas that could accommodate use cases involving aggregate resources (partitionable slots) with heterogeneous consumption policies and also provide a principled unit analysis for weights and quotas.  These previous posts can be viewed here:</p>
-
-<ul>
-<li><a href="http://erikerlandson.github.com/blog/2012/11/13/rethinking-the-semantics-of-group-quotas-and-slot-weights-for-heterogeneous-and-multidimensional-compute-resources/">Rethinking the Semantics of Group Quotas and Slot Weights for Heterogeneous and Multidimensional Compute Resources</a></li>
-<li><a href="http://erikerlandson.github.com/blog/2012/11/15/rethinking-the-semantics-of-group-quotas-and-slot-weights-claim-capacity-model/">Rethinking the Semantics of Group Quotas and Slot Weights: Claim Capacity Model</a></li>
-</ul>
-
-
-<p>As previously mentioned, a Claim Capacity Model of accounting group quotas and slot weights (or &#8220;resource consumption costs&#8221;) requires a resource claiming model that assigns a well defined finite value for the maximum number of claims that each resource and its consumption policy can support.  It must also be re-evaluatable on a resource as its assets are consumed, so that the cost of a proposed claim (or match, in negotiation-speak) can be defined as W(R) - W(R&#8217;), were R&#8217; embodies the amounts of all assets remaining after the claim has taken its share.  (Here, I will be using the term &#8216;assets&#8217; to refer to quantities such as cpus, memory, disk, swap or any <a href="http://spinningmatt.wordpress.com/2012/11/19/extensible-machine-resources/">extensible resources</a> defined, to clarify the difference between an aggregate resource (i.e. a partitionable slot) versus a single resource dimension such as cpus, memory, etc).</p>
-
-<p>This almost immediately raises the question of how best to define such a resource claiming model.  In this post I will briefly describe a few possible approaches, focusing on models which are easy reason about, easy to configure and additionally allow claim capacity for a resource - W(R) - to be computed automatically for the user, thus making a sane relationship between consumption policies and consumption costs possible to enforce.</p>
-
-<h3>Approach 1: fixed claim consumption model</h3>
-
-<p>The simplest-possible approach is arguably to just directly configure a fixed number, M, of claims attached to a resource.  In this model, each match of a job against a resource consumes one of the M claims.   Here, match cost W(R) - W(R&#8217;) = 1 in all cases, and is independent of the &#8216;size&#8217; of assets consumed from a resource.</p>
-
-<p>A possible use case for such a model is that one might wish to declare that a resource can run up to a certain number of jobs, without assigning any particular cost to consuming individual assets.  If the pool users&#8217; workload consists of large numbers of resource-cheap jobs that can effectively share cpu, memory, etc, then such a model might be a good fit.</p>
-
-<h3>Approach 2: configure asset quantization levels</h3>
-
-<p>Another approach that makes the relation between consumption policy and claim capacity easy to think about is to configure a quantization level for each resource asset.  For example, here we might quantize memory into 20 levels, i.e. Q(memory) = 20.  Similarly we might define Q(cpus) = 10 (note that HTCondor does not currently handle fractional cpus on resources, but this kind of model would benefit if floating point asset fractions were supported).  At any time, a resource R has some number q(a) left of the original Q(a).  A job requests an amount r(a) for asset (a).   Here, a claim gets a quantized approximation of any requested asset = V(a)(n(a)/Q(a)), where V(a) is the total original value available for asset (a), and n(a) = ceiling(r(a)Q(a)/V(a)).   Here there are two possible sub-policies.  If we demand that each claim consume >= 1 quantum of every asset (i.e. n(a) >= 1), then the claim capacity W(R) is the minimum of q(a), for (a) over all assets.  However, if a claim is allowed to consume a zero quantity of some individual assets (n(a)=0), then the claim capacity is the <em>maximum</em> of the q(a).   In this case, one must address the corner case of a claim attempting to consume (n(a)=0) over all assets.  The resulting resource R&#8217; has q&#8217;(a) = q(a)-n(a), and W(R&#8217;) is the minium (or maximum) over the new q&#8217;(a).</p>
-
-<h3>Approach 3: configure minimum asset charges</h3>
-
-<p>A third approach is to configure a <em>minimum</em> amount of each asset that any claim must be charged.   For example, we might define a minimum amount of memory C(memory) to charge any claim.   If a job requests an amount r(a), it will always receive max(r(a), C(a)).  As above, q(a) is the number of quanta currently available for asset (a).  Let v(a) be the amount of (a) currently available.  Here we define q(a) for an asset (a) to be floor(v(a)/C(a)).   If we adhere to a reasonable restriction that C(a) must be strictly > 0 for all (a), we are guaranteed a well defined W(R) = min over the q(a).</p>
-
-<p>It is an open question which of these models (or some other completely different options) should be supported.  Conceivably all of them could be provided as options.</p>
-
-<p>Currently my personal preference leans toward Approach 3.  It is easy to reason about and configure.  It yields a well defined W(R) in all circumstances, with no corner cases, that is straightforward to compute and enforce automatically.  It is easy to configure heterogeneous consumption policies that cost different resource assets in different ways, simply by tuning minimum charge C(a) appropriately for each asset.  This includes claim capacity models where jobs are assumed to use very small amounts of any resource, including fractional shares of cpu assets.</p>
 ]]></content>
   </entry>
   

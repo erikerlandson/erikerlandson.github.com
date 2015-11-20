@@ -4,7 +4,7 @@
   <title><![CDATA[Category: math | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/math/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-11-07T08:48:43-07:00</updated>
+  <updated>2015-11-20T16:35:28-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,71 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Very Fast Reservoir Sampling]]></title>
+    <link href="http://erikerlandson.github.com/blog/2015/11/20/very-fast-reservoir-sampling/"/>
+    <updated>2015-11-20T11:27:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2015/11/20/very-fast-reservoir-sampling</id>
+    <content type="html"><![CDATA[<blockquote><p>The code I used to collect the data for this post can be viewed <a href="https://github.com/erikerlandson/silex/blob/blog/reservoir/src/main/scala/com/redhat/et/silex/sample/reservoir/reservoir.scala">here</a>.  I generated the plots using the <a href="https://github.com/quantifind/wisp">quantifind WISP</a> project.</p></blockquote>
+
+<p>In a <a href="http://erikerlandson.github.io/blog/2014/09/11/faster-random-samples-with-gap-sampling/">previous post</a>, I showed that random Bernoulli and Poisson sampling could be made much faster by modeling the <em>sampling gap distribution</em> for the corresponding smapling distributions.  More recently, I also began exploring whether <a href="https://en.wikipedia.org/wiki/Reservoir_sampling">reservoir sampling</a> might also be optimized using the gap sampling technique, by deriving the <a href="http://erikerlandson.github.io/blog/2015/08/17/the-reservoir-sampling-gap-distribution/">reservoir sampling gap distribution</a>.  For a sampling reservoir of size (R), starting at data element (j), the probability distribution of the sampling gap is:</p>
+
+<p><img src="/assets/images/reservoir1/figure6.png" title="Figure 1" alt="Figure 1" /></p>
+
+<p>Modeling a sampling gap distribution is a powerful tool for optimizing a sampling algorithm, but it presupposes that you can actually draw values from that distribution substantially faster than just applying a random process to drawing each data element.  I was unable to come up with a "direct" algorithm for drawing samples from P(k) above (I suspect none exists), however I also know the CDF F(k), so it <em>is</em> possible to apply <a href="https://en.wikipedia.org/wiki/Inverse_transform_sampling">inversion sampling</a>, which runs in logarithmic time w.r.t the desired accuracy.  Although its logarithmic cost effectively guarantees that it will be a net efficiency win for sufficiently large (j), it still involves a substantial number of computations to yield its samples, and it seems unlikely to be competitive with straight "naive" reservoir sampling over many real-world data sizes, where (j) may never grow very large.</p>
+
+<p>Well, if exact computations are too expensive, we can always look for a fast approximation.  Consider the original "first principles" formula for the sampling gap P(k):</p>
+
+<p><img src="/assets/images/reservoir2/figure2.png" title="Figure 2" alt="Figure 2" /></p>
+
+<p>As the figure above alludes to, if (j) is relatively large compared to (k), then values (j+1),(j+2)...(j+k) are all going to be effectively "close" to (j), and so we can replace them all with (j) as an approximation.  Note that the resulting approximation is just the PMF of the <a href="https://en.wikipedia.org/wiki/Geometric_distribution">geometric distribution</a>, with probability of success p=(R/j), and we already saw how to efficiently draw values from a geometric distribution from our experience with Bernoulli sampling.</p>
+
+<p>Do we have any reason to hope that this approximation will be useful?  For reasons that are similar to those for Bernoulli gap sampling, it will only be efficient to employ gap sampling when the probability (R/j) becomes small enough.  From our experiences with Bernoulli sampling that is <em>at least</em> j>=2R.  So, we have some assurance that (j) itself will be never be <em>very</em> small.  What about (k)?  Note that a geometric distribution "favors" smaller values of (k) -- that is, small values of (k) have the highest probabilities.  In fact, the smaller that (j) is, the larger the probability (R/j) is, and so the more likely that (k) values that are small relative to (j) will be the frequent ones.  It is also promising that the true distribution for P(k) <em>also</em> favors smaller values of (k) (in fact it favors them even a bit more strongly than the approximation).</p>
+
+<p>Although it is encouraging, it is also clear that my argument above is limited to heuristic hand-waving.  What does this approximation really <em>look</em> like, compared to the true distribution?  Fortunately, it is easy to plot both distributions numerically, since we now know the formulas for both:</p>
+
+<p><img src="/assets/images/reservoir2/CDFs_R=10.png" title="Figure 3" alt="Figure 3" /></p>
+
+<p>The plot above shows that, in fact, the geometric approximation is a <em>surprisingly good</em> approximation to the true distribution!  Furthermore, the approximation remains good as both (j) and (k) grow larger.</p>
+
+<p>Our numeric eye-balling looks quite promising.  Is there an effective way to <em>measure</em> how good this approximation is?  One useful measure is the <a href="https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test">Kolmogorov-Smirnov D statistic</a>, which is just the maximum absolute error between two cumulative distributions.  Here is a plot of the D statistic for reservoir size R=10, as (j) varies across several magnitudes:</p>
+
+<p><img src="/assets/images/reservoir2/R=10.png" title="Figure 4" alt="Figure 4" /></p>
+
+<p>This plot is also good news: we can see that deviation, as measured by D, remains bounded at a small value (less than 0.026).  As this is for the specific value R=10, we also want to know how things change as reservoir size changes:</p>
+
+<p><img src="/assets/images/reservoir2/R=all.png" title="Figure 5" alt="Figure 5" /></p>
+
+<p>The news is still good!  As reservoir size grows, the approximation only gets better: the D values get smaller as R increases, and remain asymtotically bounded as (j) increases.</p>
+
+<p>Now we have some numeric assurance that the geometric approximation is a good one, and stays good as reservoir size grows and sampling runs get longer.  However, we should also verify that an actual implementation of the approximation works as expected.  Following is a plot that shows two-sample D statistics, comparing the distribution in sample gaps between runs of the exact "naive" reservoir sampling with the fast geometric approximation:</p>
+
+<p><img src="/assets/images/reservoir2/D_naive_vs_fast.png" title="Figure 6" alt="Figure 6" /></p>
+
+<p>As expected, the measured difference in sampling characteristics between naive and fast approximation are small, confirming the numeric predictions.</p>
+
+<p>Since the point of this exercise was to achieve faster random sampling, it remains to measure what kind of speed improvements the fast approximation provides.  As a point of reference, here is a plot of run times for reservoir sampling over 10<sup>8</sup> integers:</p>
+
+<p><img src="/assets/images/reservoir2/naive_sample_time_vs_R.png" title="Figure 7" alt="Figure 7" /></p>
+
+<p>As expected, sample time remains constant at around 1.5 seconds, regardless of reservoir size, since the naive algorithm always samples from its RNG per each sample.</p>
+
+<p>Compare this to the corresponding plot for the fast geometric approximation:</p>
+
+<p><img src="/assets/images/reservoir2/gap_sample_times_vs_R.png" title="Figure 8" alt="Figure 8" /></p>
+
+<p>Firstly, we see that the sampling times are <em>much faster</em>, as originally anticipated in my <a href="http://erikerlandson.github.io/blog/2015/08/17/the-reservoir-sampling-gap-distribution/">previous post</a> -- in the neighborhood of 3 orders of magnitude faster.  Secondly, we see that the sampling times do increase as a linear function of reservoir size.  Based on our experience with Bernoulli gap sampling, this is expected; the sampling probabilities are given by (R/j), and therefore the amount of sampling is proportional to R.</p>
+
+<p>Another property anticipated in my previous post was that the efficiency of gap sampling should continue to increase as the amount of data sampled grows; the sampling probability being (R/j), the probability of sampling decreases as j gets larger, and so the corresponding gap sizes grow.  The following plot verifies this property, holding reservoir size R constant, and increasing the data size:</p>
+
+<p><img src="/assets/images/reservoir2/gap_sampling_efficiency.png" title="Figure 9" alt="Figure 9" /></p>
+
+<p>The sampling time (per million elements) decreases as the sample size grows, as predicted by the formula.</p>
+
+<p>In conclusion, I have demonstrated that a geometric distribution can be used as a high quality approximation to the true sampling gap distribution for reservoir sampling, which allows reservoir sampling to be performed much faster than the naive algorithm while still retaining sampling quality.</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[The Reservoir Sampling Gap Distribution]]></title>
@@ -615,248 +680,6 @@ m_{n-1}
 <li><a href="https://github.com/erikerlandson/capricious/blob/c8ec13f1f49880bb3573034de59971f84d15f7c1/lib/capricious/spline_distribution.rb">Capricious::SplineDistribution</a> -- a ruby class for estimating PDF and CDF of a distribution from sampled data, using cubic Hermite splines (note, at the time of this writing, I'm using an experimental variation on my personal repo fork, at the link)</li>
 </ul>
 
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Deriving an Incremental Form of the Polynomial Regression Equations]]></title>
-    <link href="http://erikerlandson.github.com/blog/2012/07/05/deriving-an-incremental-form-of-the-polynomial-regression-equations/"/>
-    <updated>2012-07-05T19:46:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2012/07/05/deriving-an-incremental-form-of-the-polynomial-regression-equations</id>
-    <content type="html"><![CDATA[<p>Incremental, or on-line, algorithms are increasingly popular as data set sizes explode and web enabled applications create environments where new data arrive continuously (that is, incrementally) from clients out on the internet.</p>
-
-<p>Recently I have been doing some <a href="https://github.com/erikerlandson/ratorade">experiments</a> with applying one of the <em>oldest</em> incremental algorithms to the task of rating predictions: computing a linear regression with a coefficient of correlation.  The incremental formulae look like this:</p>
-
-<div markdown="0">
-To find coefficients \( a_0, a_1 \) of the linear predictor \( y = a_0 + a_1 x \):
-\\[
-a_1 = \\frac {n \\Sigma x y - \\Sigma x \\Sigma y} {n \\Sigma x^2 - \\left( \\Sigma x \\right) ^2 }
-\\hspace{1 cm}
-a_0 = \\frac { \\Sigma y - a_1 \\Sigma x } {n}
-\\]
-The correlation coefficient of this predictor is given by:
-\\[
-\\rho (x,y) = \\frac {n \\Sigma x y - \\Sigma x \\Sigma y} {\\sqrt {n \\Sigma x^2 - \\left( \\Sigma x \\right) ^ 2 } \\sqrt {n \\Sigma y^2 - \\left( \\Sigma y \\right) ^ 2 } }
-\\]
-</div>
-
-
-<p>As you can see from the formulae above, it is sufficient to maintain running sums</p>
-
-<div markdown="0"> \\[ n, \\Sigma x, \\Sigma y, \\Sigma x^2, \\Sigma y^2, \\Sigma x y \\] </div>
-
-
-<p>and so any new data can be included incrementally - that is, the model can be updated without revisiting any previous data.</p>
-
-<p>Working with these models caused me to wonder if there was a way to generalize them to obtain incremental formulae for a quadratic predictor, or generalized polynomials.  As it happens, there is.  To show how, I'll derive an incremental formula for the coefficients of the quadratic predictor:</p>
-
-<div markdown="0">
-\\[
-y = a_0 + a_1 x + a_2 x^2
-\\]
-</div>
-
-
-<p>Recall the <a href="http://en.wikipedia.org/wiki/Polynomial_regression#Matrix_form_and_calculation_of_estimates">matrix formula</a> for polynomial regression:</p>
-
-<div markdown="0">
-\\[ \\vec{a} = \\left( X^T X \\right) ^ {-1} X^T \\vec{y} \\]
-
-where, in the quadratic case:
-
-\\[
-\\vec{a} = \\left( \\begin{array} {c}
-a_0 \\\\
-a_1 \\\\
-a_2 \\\\
-\\end{array} \\right)
-\\hspace{1 cm}
-X = \\left( \\begin{array} {ccc}
-1 & x_1 & x_1^2 \\\\
-1 & x_2 & x_2^2 \\\\
-  &  \vdots  & \\\\
-1 & x_n & x_n^2 \\\\
-\\end{array} \\right)
-\\hspace{1 cm}
-\\vec{y} = \\left( \\begin{array} {c}
-y_1 \\\\
-y_2 \\\\
-\vdots \\\\
-y_n \\\\
-\\end{array} \\right)
-\\]
-
-Note that we can apply the definition of matrix multiplication and express the two products \\( X^T X \\) and \\( X^T \\vec{y} \\) from the above formula like so:
-\\[
-X^T X = 
-\\left( \\begin{array} {ccc}
-n & \\Sigma x & \\Sigma x^2 \\\\
-\\Sigma x & \\Sigma x^2 & \\Sigma x^3 \\\\
-\\Sigma x^2 & \\Sigma x^3 & \\Sigma x^4 \\\\
-\\end{array} \\right)
-\\hspace{1 cm}
-X^T \\vec{y} =
-\\left( \\begin{array} {c}
-\\Sigma y \\\\
-\\Sigma x y \\\\
-\\Sigma x^2 y \\\\
-\\end{array} \\right)
-\\]
-</div>
-
-
-<p>And so now we can express the formula for our quadratic coefficients in this way:</p>
-
-<div markdown="0">
-\\[
-\\left( \\begin{array} {c}
-a_0 \\\\
-a_1 \\\\
-a_2 \\\\
-\\end{array} \\right)
-=
-\\left( \\begin{array} {ccc}
-n & \\Sigma x & \\Sigma x^2 \\\\
-\\Sigma x & \\Sigma x^2 & \\Sigma x^3 \\\\
-\\Sigma x^2 & \\Sigma x^3 & \\Sigma x^4 \\\\
-\\end{array} \\right)
-^ {-1}
-\\left( \\begin{array} {c}
-\\Sigma y \\\\
-\\Sigma x y \\\\
-\\Sigma x^2 y \\\\
-\\end{array} \\right)
-\\]
-</div>
-
-
-<p>Note that we now have a matrix formula that is expressed entirely in sums of various terms in x and y, which means that it can be maintained incrementally, as we desired.  If you have access to a matrix math package, you might very well declare victory right here, as you can easily construct these matrices and do the matrix arithmetic at will to obtain the model coefficients.  However, as an additional step I applied <a href="http://www.sagemath.org/">sage</a> to do the symbolic matrix inversion and multiplication to give:</p>
-
-<div markdown="0">
-\\[
-\\small
-a_0 =
-\\frac {1} {Z}
-\\left( 
-- \\left( \\Sigma x^3 \\Sigma x - \\left( \\Sigma x^2 \\right)^2 \\right) \\Sigma x^2 y  +  \\left( \\Sigma x^4  \\Sigma x - \\Sigma x^3 \\Sigma x^2 \\right) \\Sigma x y  -  \\left( \\Sigma x^4 \\Sigma x^2 - \\left( \\Sigma x^3 \\right)^2 \\right) \\Sigma y 
-\\right)
-\\normalsize
-\\]
-\\[
-\\small
-a_1 =
-\\frac {1} {Z}
-\\left( 
-\\left( n \\Sigma x^3  - \\Sigma x^2 \\Sigma x \\right) \\Sigma x^2 y  -  \\left( n \\Sigma x^4 - \\left( \\Sigma x^2 \\right) ^2 \\right) \\Sigma x y  +  \\left( \\Sigma x^4 \\Sigma x - \\Sigma x^3 \\Sigma x^2 \\right) \\Sigma y
-\\right)
-\\normalsize
-\\]
-\\[
-\\small
-a_2 =
-\\frac {1} {Z}
-\\left( 
-- \\left( n \\Sigma x^2 - \\left( \\Sigma x \\right) ^2 \\right) \\Sigma x^2 y  +  \\left( n \\Sigma x^3 - \\Sigma x^2 \\Sigma x \\right) \\Sigma x y  -  \\left( \\Sigma x^3 \\Sigma x - \\left( \\Sigma x^2 \\right) ^2 \\right) \\Sigma y 
-\\right)
-\\normalsize
-\\]
-where:
-\\[
-Z = n \\left( \\Sigma x^3 \\right) ^ 2 - 2 \\Sigma x^3 \\Sigma x^2 \\Sigma x + \\left( \\Sigma x^2 \\right) ^3 - \\left( n \\Sigma x^2 - \\left( \\Sigma x \\right) ^2  \\right) \\Sigma x^4
-\\]
-</div>
-
-
-<p>Inspecting the quadratic derivation above, it is now fairly easy to see that the general form of the incremental matrix formula for the coefficients of a degree-m polynomial looks like this:</p>
-
-<div markdown="0">
-\\[
-\\left( \\begin{array} {c}
-a_0 \\\\
-a_1 \\\\
-\vdots \\\\
-a_m \\\\
-\\end{array} \\right)
-=
-\\left( \\begin{array} {cccc}
-n & \\Sigma x & \\cdots & \\Sigma x^m \\\\
-\\Sigma x & \\Sigma x^2 & \\cdots & \\Sigma x^{m+1} \\\\
-\\vdots & & \\ddots & \\vdots \\\\
-\\Sigma x^m & \\Sigma x^{m+1} & \\cdots & \\Sigma x^{2 m} \\\\
-\\end{array} \\right)
-^ {-1}
-\\left( \\begin{array} {c}
-\\Sigma y \\\\
-\\Sigma x y \\\\
-\\vdots \\\\
-\\Sigma x^m y \\\\
-\\end{array} \\right)
-\\]
-</div>
-
-
-<p>Having an incremental formula for generalized polynomial regression leaves open the question of how one might generalize the correlation coefficient.  There is such a generalization, called the <a href="http://en.wikipedia.org/wiki/Multiple_correlation">coefficient of multiple determination</a>, which is defined:</p>
-
-<div markdown="0">
-\\[
-r = \\sqrt { \\vec{c} ^ T  R^{-1}  \\vec{c} }
-\\]
-Where
-\\[
-\\vec{c} = 
-\\left ( \\begin{array} {c}
-\\rho (x,y) \\\\
-\\rho (x^2,y) \\\\
-\\vdots \\\\
-\\rho (x^m,y) \\\\
-\\end{array} \\right)
-\\hspace{1 cm}
-R =
-\\left( \\begin{array} {cccc}
-1 & \\rho (x,x^2) & \\cdots & \\rho(x,x^m) \\\\
-\\rho (x^2,x) & 1 & \\cdots & \\rho(x^2,x^m) \\\\
-\\vdots & & \\ddots & \\vdots \\\\
-\\rho (x^m,x) & \\rho (x^m,x^2) & \\cdots & 1 \\\\
-\\end{array} \\right)
-\\]
-and \\( \\rho (x,y) \\) is the traditional pairwise correlation coefficient.
-</div>
-
-
-<p>But we already have an incremental formula for any pairwise correlation coefficient, which is defined above.  And so we can maintain the running sums needed to fill the matrix entries, and compute the coefficient of multiple determination for our polynomial model at any time.</p>
-
-<p>So we now have incremental formulae to maintain any polynomial model in an on-line environment where we either can't or prefer not to store the data history, and also incrementally evaluate the 'generalized correlation coefficient' for that model.</p>
-
-<p>Readers familiar with linear regression may notice that there is also nothing special about polynomial regression, in the sense that powers of x may also be replaced with arbitrary functions of x, and the same regression equations hold.  And so we might generalize the incremental matrix formulae further to replace products of powers of x with products of functions of x:</p>
-
-<div markdown="0">
-for a linear regression model \\( y = a_1 f_1 (x) + a_2 f_2 (x) + \\cdots + a_m f_m(x) \\) :
-\\[
-\\left( \\begin{array} {c}
-a_1 \\\\
-a_2 \\\\
-\vdots \\\\
-a_m \\\\
-\\end{array} \\right)
-=
-\\left( \\begin{array} {cccc}
-\\Sigma f_1 (x) f_1 (x) & \\Sigma f_1 (x) f_2 (x) & \\cdots & \\Sigma f_1 (x) f_m (x) \\\\
-\\Sigma f_2 (x) f_1 (x) & \\Sigma f_2 (x) f_2 (x) & \\cdots & \\Sigma f_2 (x) f_m (x) \\\\
-\\vdots & & \\ddots & \\vdots \\\\
-\\Sigma f_m (x) f_1 (x) & \\Sigma f_m (x) f_2 (x) & \\cdots & \\Sigma f_m (x) f_m (x) \\\\
-\\end{array} \\right)
-^ {-1}
-\\left( \\begin{array} {c}
-\\Sigma y f_1 (x) \\\\
-\\Sigma y f_2 (x) \\\\
-\\vdots \\\\
-\\Sigma y f_m (x) \\\\
-\\end{array} \\right)
-\\]
-</div>
-
-
-<p>The coefficient of multiple determination generalizes in the analogous way.</p>
 ]]></content>
   </entry>
   

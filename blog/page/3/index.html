@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="In my previous post about Rethinking the Semantics of Group Quotas and Slot Weights, I proposed a concept for unifying the semantics of accounting &hellip;">
+  <meta name="description" content="In two previous posts, I made a case to motivate the need for a better definition of slot weights and group quotas that could accommodate use cases &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,73 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2012/11/26/rethinking-the-semantics-of-group-quotas-and-slot-weights-computing-claim-capacity-from-consumption-policy/">Rethinking the Semantics of Group Quotas and Slot Weights: Computing Claim Capacity from Consumption Policy</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-11-26T13:52:00-07:00" pubdate data-updated="true">Nov 26<span>th</span>, 2012</time>
+        
+        
+         | <a href="/blog/2012/11/26/rethinking-the-semantics-of-group-quotas-and-slot-weights-computing-claim-capacity-from-consumption-policy/#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>In two previous posts, I made a case to motivate the need for a better definition of slot weights and group quotas that could accommodate use cases involving aggregate resources (partitionable slots) with heterogeneous consumption policies and also provide a principled unit analysis for weights and quotas.  These previous posts can be viewed here:</p>
+
+<ul>
+<li><a href="http://erikerlandson.github.com/blog/2012/11/13/rethinking-the-semantics-of-group-quotas-and-slot-weights-for-heterogeneous-and-multidimensional-compute-resources/">Rethinking the Semantics of Group Quotas and Slot Weights for Heterogeneous and Multidimensional Compute Resources</a></li>
+<li><a href="http://erikerlandson.github.com/blog/2012/11/15/rethinking-the-semantics-of-group-quotas-and-slot-weights-claim-capacity-model/">Rethinking the Semantics of Group Quotas and Slot Weights: Claim Capacity Model</a></li>
+</ul>
+
+
+<p>As previously mentioned, a Claim Capacity Model of accounting group quotas and slot weights (or &#8220;resource consumption costs&#8221;) requires a resource claiming model that assigns a well defined finite value for the maximum number of claims that each resource and its consumption policy can support.  It must also be re-evaluatable on a resource as its assets are consumed, so that the cost of a proposed claim (or match, in negotiation-speak) can be defined as W(R) - W(R&#8217;), were R&#8217; embodies the amounts of all assets remaining after the claim has taken its share.  (Here, I will be using the term &#8216;assets&#8217; to refer to quantities such as cpus, memory, disk, swap or any <a href="http://spinningmatt.wordpress.com/2012/11/19/extensible-machine-resources/">extensible resources</a> defined, to clarify the difference between an aggregate resource (i.e. a partitionable slot) versus a single resource dimension such as cpus, memory, etc).</p>
+
+<p>This almost immediately raises the question of how best to define such a resource claiming model.  In this post I will briefly describe a few possible approaches, focusing on models which are easy reason about, easy to configure and additionally allow claim capacity for a resource - W(R) - to be computed automatically for the user, thus making a sane relationship between consumption policies and consumption costs possible to enforce.</p>
+
+<h3>Approach 1: fixed claim consumption model</h3>
+
+<p>The simplest-possible approach is arguably to just directly configure a fixed number, M, of claims attached to a resource.  In this model, each match of a job against a resource consumes one of the M claims.   Here, match cost W(R) - W(R&#8217;) = 1 in all cases, and is independent of the &#8216;size&#8217; of assets consumed from a resource.</p>
+
+<p>A possible use case for such a model is that one might wish to declare that a resource can run up to a certain number of jobs, without assigning any particular cost to consuming individual assets.  If the pool users&#8217; workload consists of large numbers of resource-cheap jobs that can effectively share cpu, memory, etc, then such a model might be a good fit.</p>
+
+<h3>Approach 2: configure asset quantization levels</h3>
+
+<p>Another approach that makes the relation between consumption policy and claim capacity easy to think about is to configure a quantization level for each resource asset.  For example, here we might quantize memory into 20 levels, i.e. Q(memory) = 20.  Similarly we might define Q(cpus) = 10 (note that HTCondor does not currently handle fractional cpus on resources, but this kind of model would benefit if floating point asset fractions were supported).  At any time, a resource R has some number q(a) left of the original Q(a).  A job requests an amount r(a) for asset (a).   Here, a claim gets a quantized approximation of any requested asset = V(a)(n(a)/Q(a)), where V(a) is the total original value available for asset (a), and n(a) = ceiling(r(a)Q(a)/V(a)).   Here there are two possible sub-policies.  If we demand that each claim consume >= 1 quantum of every asset (i.e. n(a) >= 1), then the claim capacity W(R) is the minimum of q(a), for (a) over all assets.  However, if a claim is allowed to consume a zero quantity of some individual assets (n(a)=0), then the claim capacity is the <em>maximum</em> of the q(a).   In this case, one must address the corner case of a claim attempting to consume (n(a)=0) over all assets.  The resulting resource R&#8217; has q&#8217;(a) = q(a)-n(a), and W(R&#8217;) is the minium (or maximum) over the new q&#8217;(a).</p>
+
+<h3>Approach 3: configure minimum asset charges</h3>
+
+<p>A third approach is to configure a <em>minimum</em> amount of each asset that any claim must be charged.   For example, we might define a minimum amount of memory C(memory) to charge any claim.   If a job requests an amount r(a), it will always receive max(r(a), C(a)).  As above, q(a) is the number of quanta currently available for asset (a).  Let v(a) be the amount of (a) currently available.  Here we define q(a) for an asset (a) to be floor(v(a)/C(a)).   If we adhere to a reasonable restriction that C(a) must be strictly > 0 for all (a), we are guaranteed a well defined W(R) = min over the q(a).</p>
+
+<p>It is an open question which of these models (or some other completely different options) should be supported.  Conceivably all of them could be provided as options.</p>
+
+<p>Currently my personal preference leans toward Approach 3.  It is easy to reason about and configure.  It yields a well defined W(R) in all circumstances, with no corner cases, that is straightforward to compute and enforce automatically.  It is easy to configure heterogeneous consumption policies that cost different resource assets in different ways, simply by tuning minimum charge C(a) appropriately for each asset.  This includes claim capacity models where jobs are assumed to use very small amounts of any resource, including fractional shares of cpu assets.</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1343,278 +1410,6 @@ $ cchist condor_q JobStatus
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/07/05/deriving-an-incremental-form-of-the-polynomial-regression-equations/">Deriving an Incremental Form of the Polynomial Regression Equations</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-07-05T19:46:00-07:00" pubdate data-updated="true">Jul 5<span>th</span>, 2012</time>
-        
-        
-         | <a href="/blog/2012/07/05/deriving-an-incremental-form-of-the-polynomial-regression-equations/#feedback">Feedback</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Incremental, or on-line, algorithms are increasingly popular as data set sizes explode and web enabled applications create environments where new data arrive continuously (that is, incrementally) from clients out on the internet.</p>
-
-<p>Recently I have been doing some <a href="https://github.com/erikerlandson/ratorade">experiments</a> with applying one of the <em>oldest</em> incremental algorithms to the task of rating predictions: computing a linear regression with a coefficient of correlation.  The incremental formulae look like this:</p>
-
-<div markdown="0">
-To find coefficients \( a_0, a_1 \) of the linear predictor \( y = a_0 + a_1 x \):
-&#92;[
-a_1 = &#92;frac {n &#92;Sigma x y - &#92;Sigma x &#92;Sigma y} {n &#92;Sigma x^2 - &#92;left( &#92;Sigma x &#92;right) ^2 }
-&#92;hspace{1 cm}
-a_0 = &#92;frac { &#92;Sigma y - a_1 &#92;Sigma x } {n}
-&#92;]
-The correlation coefficient of this predictor is given by:
-&#92;[
-&#92;rho (x,y) = &#92;frac {n &#92;Sigma x y - &#92;Sigma x &#92;Sigma y} {&#92;sqrt {n &#92;Sigma x^2 - &#92;left( &#92;Sigma x &#92;right) ^ 2 } &#92;sqrt {n &#92;Sigma y^2 - &#92;left( &#92;Sigma y &#92;right) ^ 2 } }
-&#92;]
-</div>
-
-
-<p>As you can see from the formulae above, it is sufficient to maintain running sums</p>
-
-<div markdown="0"> &#92;[ n, &#92;Sigma x, &#92;Sigma y, &#92;Sigma x^2, &#92;Sigma y^2, &#92;Sigma x y &#92;] </div>
-
-
-<p>and so any new data can be included incrementally - that is, the model can be updated without revisiting any previous data.</p>
-
-<p>Working with these models caused me to wonder if there was a way to generalize them to obtain incremental formulae for a quadratic predictor, or generalized polynomials.  As it happens, there is.  To show how, I&#8217;ll derive an incremental formula for the coefficients of the quadratic predictor:</p>
-
-<div markdown="0">
-&#92;[
-y = a_0 + a_1 x + a_2 x^2
-&#92;]
-</div>
-
-
-<p>Recall the <a href="http://en.wikipedia.org/wiki/Polynomial_regression#Matrix_form_and_calculation_of_estimates">matrix formula</a> for polynomial regression:</p>
-
-<div markdown="0">
-&#92;[ &#92;vec{a} = &#92;left( X^T X &#92;right) ^ {-1} X^T &#92;vec{y} &#92;]
-
-where, in the quadratic case:
-
-&#92;[
-&#92;vec{a} = &#92;left( &#92;begin{array} {c}
-a_0 &#92;&#92;
-a_1 &#92;&#92;
-a_2 &#92;&#92;
-&#92;end{array} &#92;right)
-&#92;hspace{1 cm}
-X = &#92;left( &#92;begin{array} {ccc}
-1 & x_1 & x_1^2 &#92;&#92;
-1 & x_2 & x_2^2 &#92;&#92;
-  &  \vdots  & &#92;&#92;
-1 & x_n & x_n^2 &#92;&#92;
-&#92;end{array} &#92;right)
-&#92;hspace{1 cm}
-&#92;vec{y} = &#92;left( &#92;begin{array} {c}
-y_1 &#92;&#92;
-y_2 &#92;&#92;
-\vdots &#92;&#92;
-y_n &#92;&#92;
-&#92;end{array} &#92;right)
-&#92;]
-
-Note that we can apply the definition of matrix multiplication and express the two products &#92;( X^T X &#92;) and &#92;( X^T &#92;vec{y} &#92;) from the above formula like so:
-&#92;[
-X^T X = 
-&#92;left( &#92;begin{array} {ccc}
-n & &#92;Sigma x & &#92;Sigma x^2 &#92;&#92;
-&#92;Sigma x & &#92;Sigma x^2 & &#92;Sigma x^3 &#92;&#92;
-&#92;Sigma x^2 & &#92;Sigma x^3 & &#92;Sigma x^4 &#92;&#92;
-&#92;end{array} &#92;right)
-&#92;hspace{1 cm}
-X^T &#92;vec{y} =
-&#92;left( &#92;begin{array} {c}
-&#92;Sigma y &#92;&#92;
-&#92;Sigma x y &#92;&#92;
-&#92;Sigma x^2 y &#92;&#92;
-&#92;end{array} &#92;right)
-&#92;]
-</div>
-
-
-<p>And so now we can express the formula for our quadratic coefficients in this way:</p>
-
-<div markdown="0">
-&#92;[
-&#92;left( &#92;begin{array} {c}
-a_0 &#92;&#92;
-a_1 &#92;&#92;
-a_2 &#92;&#92;
-&#92;end{array} &#92;right)
-=
-&#92;left( &#92;begin{array} {ccc}
-n & &#92;Sigma x & &#92;Sigma x^2 &#92;&#92;
-&#92;Sigma x & &#92;Sigma x^2 & &#92;Sigma x^3 &#92;&#92;
-&#92;Sigma x^2 & &#92;Sigma x^3 & &#92;Sigma x^4 &#92;&#92;
-&#92;end{array} &#92;right)
-^ {-1}
-&#92;left( &#92;begin{array} {c}
-&#92;Sigma y &#92;&#92;
-&#92;Sigma x y &#92;&#92;
-&#92;Sigma x^2 y &#92;&#92;
-&#92;end{array} &#92;right)
-&#92;]
-</div>
-
-
-<p>Note that we now have a matrix formula that is expressed entirely in sums of various terms in x and y, which means that it can be maintained incrementally, as we desired.  If you have access to a matrix math package, you might very well declare victory right here, as you can easily construct these matrices and do the matrix arithmetic at will to obtain the model coefficients.  However, as an additional step I applied <a href="http://www.sagemath.org/">sage</a> to do the symbolic matrix inversion and multiplication to give:</p>
-
-<div markdown="0">
-&#92;[
-&#92;small
-a_0 =
-&#92;frac {1} {Z}
-&#92;left( 
-- &#92;left( &#92;Sigma x^3 &#92;Sigma x - &#92;left( &#92;Sigma x^2 &#92;right)^2 &#92;right) &#92;Sigma x^2 y  +  &#92;left( &#92;Sigma x^4  &#92;Sigma x - &#92;Sigma x^3 &#92;Sigma x^2 &#92;right) &#92;Sigma x y  -  &#92;left( &#92;Sigma x^4 &#92;Sigma x^2 - &#92;left( &#92;Sigma x^3 &#92;right)^2 &#92;right) &#92;Sigma y 
-&#92;right)
-&#92;normalsize
-&#92;]
-&#92;[
-&#92;small
-a_1 =
-&#92;frac {1} {Z}
-&#92;left( 
-&#92;left( n &#92;Sigma x^3  - &#92;Sigma x^2 &#92;Sigma x &#92;right) &#92;Sigma x^2 y  -  &#92;left( n &#92;Sigma x^4 - &#92;left( &#92;Sigma x^2 &#92;right) ^2 &#92;right) &#92;Sigma x y  +  &#92;left( &#92;Sigma x^4 &#92;Sigma x - &#92;Sigma x^3 &#92;Sigma x^2 &#92;right) &#92;Sigma y
-&#92;right)
-&#92;normalsize
-&#92;]
-&#92;[
-&#92;small
-a_2 =
-&#92;frac {1} {Z}
-&#92;left( 
-- &#92;left( n &#92;Sigma x^2 - &#92;left( &#92;Sigma x &#92;right) ^2 &#92;right) &#92;Sigma x^2 y  +  &#92;left( n &#92;Sigma x^3 - &#92;Sigma x^2 &#92;Sigma x &#92;right) &#92;Sigma x y  -  &#92;left( &#92;Sigma x^3 &#92;Sigma x - &#92;left( &#92;Sigma x^2 &#92;right) ^2 &#92;right) &#92;Sigma y 
-&#92;right)
-&#92;normalsize
-&#92;]
-where:
-&#92;[
-Z = n &#92;left( &#92;Sigma x^3 &#92;right) ^ 2 - 2 &#92;Sigma x^3 &#92;Sigma x^2 &#92;Sigma x + &#92;left( &#92;Sigma x^2 &#92;right) ^3 - &#92;left( n &#92;Sigma x^2 - &#92;left( &#92;Sigma x &#92;right) ^2  &#92;right) &#92;Sigma x^4
-&#92;]
-</div>
-
-
-<p>Inspecting the quadratic derivation above, it is now fairly easy to see that the general form of the incremental matrix formula for the coefficients of a degree-m polynomial looks like this:</p>
-
-<div markdown="0">
-&#92;[
-&#92;left( &#92;begin{array} {c}
-a_0 &#92;&#92;
-a_1 &#92;&#92;
-\vdots &#92;&#92;
-a_m &#92;&#92;
-&#92;end{array} &#92;right)
-=
-&#92;left( &#92;begin{array} {cccc}
-n & &#92;Sigma x & &#92;cdots & &#92;Sigma x^m &#92;&#92;
-&#92;Sigma x & &#92;Sigma x^2 & &#92;cdots & &#92;Sigma x^{m+1} &#92;&#92;
-&#92;vdots & & &#92;ddots & &#92;vdots &#92;&#92;
-&#92;Sigma x^m & &#92;Sigma x^{m+1} & &#92;cdots & &#92;Sigma x^{2 m} &#92;&#92;
-&#92;end{array} &#92;right)
-^ {-1}
-&#92;left( &#92;begin{array} {c}
-&#92;Sigma y &#92;&#92;
-&#92;Sigma x y &#92;&#92;
-&#92;vdots &#92;&#92;
-&#92;Sigma x^m y &#92;&#92;
-&#92;end{array} &#92;right)
-&#92;]
-</div>
-
-
-<p>Having an incremental formula for generalized polynomial regression leaves open the question of how one might generalize the correlation coefficient.  There is such a generalization, called the <a href="http://en.wikipedia.org/wiki/Multiple_correlation">coefficient of multiple determination</a>, which is defined:</p>
-
-<div markdown="0">
-&#92;[
-r = &#92;sqrt { &#92;vec{c} ^ T  R^{-1}  &#92;vec{c} }
-&#92;]
-Where
-&#92;[
-&#92;vec{c} = 
-&#92;left ( &#92;begin{array} {c}
-&#92;rho (x,y) &#92;&#92;
-&#92;rho (x^2,y) &#92;&#92;
-&#92;vdots &#92;&#92;
-&#92;rho (x^m,y) &#92;&#92;
-&#92;end{array} &#92;right)
-&#92;hspace{1 cm}
-R =
-&#92;left( &#92;begin{array} {cccc}
-1 & &#92;rho (x,x^2) & &#92;cdots & &#92;rho(x,x^m) &#92;&#92;
-&#92;rho (x^2,x) & 1 & &#92;cdots & &#92;rho(x^2,x^m) &#92;&#92;
-&#92;vdots & & &#92;ddots & &#92;vdots &#92;&#92;
-&#92;rho (x^m,x) & &#92;rho (x^m,x^2) & &#92;cdots & 1 &#92;&#92;
-&#92;end{array} &#92;right)
-&#92;]
-and &#92;( &#92;rho (x,y) &#92;) is the traditional pairwise correlation coefficient.
-</div>
-
-
-<p>But we already have an incremental formula for any pairwise correlation coefficient, which is defined above.  And so we can maintain the running sums needed to fill the matrix entries, and compute the coefficient of multiple determination for our polynomial model at any time.</p>
-
-<p>So we now have incremental formulae to maintain any polynomial model in an on-line environment where we either can&#8217;t or prefer not to store the data history, and also incrementally evaluate the &#8216;generalized correlation coefficient&#8217; for that model.</p>
-
-<p>Readers familiar with linear regression may notice that there is also nothing special about polynomial regression, in the sense that powers of x may also be replaced with arbitrary functions of x, and the same regression equations hold.  And so we might generalize the incremental matrix formulae further to replace products of powers of x with products of functions of x:</p>
-
-<div markdown="0">
-for a linear regression model &#92;( y = a_1 f_1 (x) + a_2 f_2 (x) + &#92;cdots + a_m f_m(x) &#92;) :
-&#92;[
-&#92;left( &#92;begin{array} {c}
-a_1 &#92;&#92;
-a_2 &#92;&#92;
-\vdots &#92;&#92;
-a_m &#92;&#92;
-&#92;end{array} &#92;right)
-=
-&#92;left( &#92;begin{array} {cccc}
-&#92;Sigma f_1 (x) f_1 (x) & &#92;Sigma f_1 (x) f_2 (x) & &#92;cdots & &#92;Sigma f_1 (x) f_m (x) &#92;&#92;
-&#92;Sigma f_2 (x) f_1 (x) & &#92;Sigma f_2 (x) f_2 (x) & &#92;cdots & &#92;Sigma f_2 (x) f_m (x) &#92;&#92;
-&#92;vdots & & &#92;ddots & &#92;vdots &#92;&#92;
-&#92;Sigma f_m (x) f_1 (x) & &#92;Sigma f_m (x) f_2 (x) & &#92;cdots & &#92;Sigma f_m (x) f_m (x) &#92;&#92;
-&#92;end{array} &#92;right)
-^ {-1}
-&#92;left( &#92;begin{array} {c}
-&#92;Sigma y f_1 (x) &#92;&#92;
-&#92;Sigma y f_2 (x) &#92;&#92;
-&#92;vdots &#92;&#92;
-&#92;Sigma y f_m (x) &#92;&#92;
-&#92;end{array} &#92;right)
-&#92;]
-</div>
-
-
-<p>The coefficient of multiple determination generalizes in the analogous way.</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/4/">&larr; Older</a>
@@ -1636,6 +1431,10 @@ a_m &#92;&#92;
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2015/11/20/very-fast-reservoir-sampling/">Very Fast Reservoir Sampling</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2015/09/26/a-library-of-binary-tree-algorithms-as-mixable-scala-traits/">A Library of Binary Tree Algorithms as Mixable Scala Traits</a>
       </li>
     
@@ -1649,10 +1448,6 @@ a_m &#92;&#92;
     
       <li class="post">
         <a href="/blog/2015/08/14/generalizing-kendalls-tau/">Generalizing Kendall&#8217;s Tau</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2015/05/06/parallel-k-medoids-using-scala-parseq/">Parallel K-Medoids Using Scala ParSeq</a>
       </li>
     
   </ul>

@@ -4,7 +4,7 @@
   <title><![CDATA[Category: scala | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/scala/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-11-07T08:48:43-07:00</updated>
+  <updated>2015-11-20T16:35:28-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,71 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Very Fast Reservoir Sampling]]></title>
+    <link href="http://erikerlandson.github.com/blog/2015/11/20/very-fast-reservoir-sampling/"/>
+    <updated>2015-11-20T11:27:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2015/11/20/very-fast-reservoir-sampling</id>
+    <content type="html"><![CDATA[<blockquote><p>The code I used to collect the data for this post can be viewed <a href="https://github.com/erikerlandson/silex/blob/blog/reservoir/src/main/scala/com/redhat/et/silex/sample/reservoir/reservoir.scala">here</a>.  I generated the plots using the <a href="https://github.com/quantifind/wisp">quantifind WISP</a> project.</p></blockquote>
+
+<p>In a <a href="http://erikerlandson.github.io/blog/2014/09/11/faster-random-samples-with-gap-sampling/">previous post</a>, I showed that random Bernoulli and Poisson sampling could be made much faster by modeling the <em>sampling gap distribution</em> for the corresponding smapling distributions.  More recently, I also began exploring whether <a href="https://en.wikipedia.org/wiki/Reservoir_sampling">reservoir sampling</a> might also be optimized using the gap sampling technique, by deriving the <a href="http://erikerlandson.github.io/blog/2015/08/17/the-reservoir-sampling-gap-distribution/">reservoir sampling gap distribution</a>.  For a sampling reservoir of size (R), starting at data element (j), the probability distribution of the sampling gap is:</p>
+
+<p><img src="/assets/images/reservoir1/figure6.png" title="Figure 1" alt="Figure 1" /></p>
+
+<p>Modeling a sampling gap distribution is a powerful tool for optimizing a sampling algorithm, but it presupposes that you can actually draw values from that distribution substantially faster than just applying a random process to drawing each data element.  I was unable to come up with a "direct" algorithm for drawing samples from P(k) above (I suspect none exists), however I also know the CDF F(k), so it <em>is</em> possible to apply <a href="https://en.wikipedia.org/wiki/Inverse_transform_sampling">inversion sampling</a>, which runs in logarithmic time w.r.t the desired accuracy.  Although its logarithmic cost effectively guarantees that it will be a net efficiency win for sufficiently large (j), it still involves a substantial number of computations to yield its samples, and it seems unlikely to be competitive with straight "naive" reservoir sampling over many real-world data sizes, where (j) may never grow very large.</p>
+
+<p>Well, if exact computations are too expensive, we can always look for a fast approximation.  Consider the original "first principles" formula for the sampling gap P(k):</p>
+
+<p><img src="/assets/images/reservoir2/figure2.png" title="Figure 2" alt="Figure 2" /></p>
+
+<p>As the figure above alludes to, if (j) is relatively large compared to (k), then values (j+1),(j+2)...(j+k) are all going to be effectively "close" to (j), and so we can replace them all with (j) as an approximation.  Note that the resulting approximation is just the PMF of the <a href="https://en.wikipedia.org/wiki/Geometric_distribution">geometric distribution</a>, with probability of success p=(R/j), and we already saw how to efficiently draw values from a geometric distribution from our experience with Bernoulli sampling.</p>
+
+<p>Do we have any reason to hope that this approximation will be useful?  For reasons that are similar to those for Bernoulli gap sampling, it will only be efficient to employ gap sampling when the probability (R/j) becomes small enough.  From our experiences with Bernoulli sampling that is <em>at least</em> j>=2R.  So, we have some assurance that (j) itself will be never be <em>very</em> small.  What about (k)?  Note that a geometric distribution "favors" smaller values of (k) -- that is, small values of (k) have the highest probabilities.  In fact, the smaller that (j) is, the larger the probability (R/j) is, and so the more likely that (k) values that are small relative to (j) will be the frequent ones.  It is also promising that the true distribution for P(k) <em>also</em> favors smaller values of (k) (in fact it favors them even a bit more strongly than the approximation).</p>
+
+<p>Although it is encouraging, it is also clear that my argument above is limited to heuristic hand-waving.  What does this approximation really <em>look</em> like, compared to the true distribution?  Fortunately, it is easy to plot both distributions numerically, since we now know the formulas for both:</p>
+
+<p><img src="/assets/images/reservoir2/CDFs_R=10.png" title="Figure 3" alt="Figure 3" /></p>
+
+<p>The plot above shows that, in fact, the geometric approximation is a <em>surprisingly good</em> approximation to the true distribution!  Furthermore, the approximation remains good as both (j) and (k) grow larger.</p>
+
+<p>Our numeric eye-balling looks quite promising.  Is there an effective way to <em>measure</em> how good this approximation is?  One useful measure is the <a href="https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test">Kolmogorov-Smirnov D statistic</a>, which is just the maximum absolute error between two cumulative distributions.  Here is a plot of the D statistic for reservoir size R=10, as (j) varies across several magnitudes:</p>
+
+<p><img src="/assets/images/reservoir2/R=10.png" title="Figure 4" alt="Figure 4" /></p>
+
+<p>This plot is also good news: we can see that deviation, as measured by D, remains bounded at a small value (less than 0.026).  As this is for the specific value R=10, we also want to know how things change as reservoir size changes:</p>
+
+<p><img src="/assets/images/reservoir2/R=all.png" title="Figure 5" alt="Figure 5" /></p>
+
+<p>The news is still good!  As reservoir size grows, the approximation only gets better: the D values get smaller as R increases, and remain asymtotically bounded as (j) increases.</p>
+
+<p>Now we have some numeric assurance that the geometric approximation is a good one, and stays good as reservoir size grows and sampling runs get longer.  However, we should also verify that an actual implementation of the approximation works as expected.  Following is a plot that shows two-sample D statistics, comparing the distribution in sample gaps between runs of the exact "naive" reservoir sampling with the fast geometric approximation:</p>
+
+<p><img src="/assets/images/reservoir2/D_naive_vs_fast.png" title="Figure 6" alt="Figure 6" /></p>
+
+<p>As expected, the measured difference in sampling characteristics between naive and fast approximation are small, confirming the numeric predictions.</p>
+
+<p>Since the point of this exercise was to achieve faster random sampling, it remains to measure what kind of speed improvements the fast approximation provides.  As a point of reference, here is a plot of run times for reservoir sampling over 10<sup>8</sup> integers:</p>
+
+<p><img src="/assets/images/reservoir2/naive_sample_time_vs_R.png" title="Figure 7" alt="Figure 7" /></p>
+
+<p>As expected, sample time remains constant at around 1.5 seconds, regardless of reservoir size, since the naive algorithm always samples from its RNG per each sample.</p>
+
+<p>Compare this to the corresponding plot for the fast geometric approximation:</p>
+
+<p><img src="/assets/images/reservoir2/gap_sample_times_vs_R.png" title="Figure 8" alt="Figure 8" /></p>
+
+<p>Firstly, we see that the sampling times are <em>much faster</em>, as originally anticipated in my <a href="http://erikerlandson.github.io/blog/2015/08/17/the-reservoir-sampling-gap-distribution/">previous post</a> -- in the neighborhood of 3 orders of magnitude faster.  Secondly, we see that the sampling times do increase as a linear function of reservoir size.  Based on our experience with Bernoulli gap sampling, this is expected; the sampling probabilities are given by (R/j), and therefore the amount of sampling is proportional to R.</p>
+
+<p>Another property anticipated in my previous post was that the efficiency of gap sampling should continue to increase as the amount of data sampled grows; the sampling probability being (R/j), the probability of sampling decreases as j gets larger, and so the corresponding gap sizes grow.  The following plot verifies this property, holding reservoir size R constant, and increasing the data size:</p>
+
+<p><img src="/assets/images/reservoir2/gap_sampling_efficiency.png" title="Figure 9" alt="Figure 9" /></p>
+
+<p>The sampling time (per million elements) decreases as the sample size grows, as predicted by the formula.</p>
+
+<p>In conclusion, I have demonstrated that a geometric distribution can be used as a high quality approximation to the true sampling gap distribution for reservoir sampling, which allows reservoir sampling to be performed much faster than the naive algorithm while still retaining sampling quality.</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[A Library of Binary Tree Algorithms as Mixable Scala Traits]]></title>
@@ -899,174 +964,6 @@ java.io.NotSerializableException: Demo$foo
 </code></pre>
 
 <p>Being aware of the scenarios where parent instances are pulled into closures, and how to keep your closures clean, can save some frustration and wasted time.  Happy programming!</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Monadic 'break' and 'continue' for Scala Sequence Comprehensions]]></title>
-    <link href="http://erikerlandson.github.com/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions/"/>
-    <updated>2015-01-24T11:54:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions</id>
-    <content type="html"><![CDATA[<p>Author's note: I've since received some excellent feedback from the Scala community, which I included in some <a href="#notes">end notes</a>.</p>
-
-<p>Author's note the 2nd: I later realized I could apply an implicit conversion and mediator class to preserve the traditional ordering: the code has been updated with that approach.</p>
-
-<p>Author's note the 3rd: This concept has been submitted to the Scala project as JIRA <a href="https://issues.scala-lang.org/browse/SI-9120">SI-9120</a> (PR <a href="https://github.com/scala/scala/pull/4275">#4275</a>)</p>
-
-<p>Scala <a href="http://docs.scala-lang.org/tutorials/tour/sequence-comprehensions.html">sequence comprehensions</a> are an excellent functional programming idiom for looping in Scala.  However, sequence comprehensions encompass much more than just looping -- they represent a powerful syntax for manipulating <em>all</em> monadic structures<a href="#ref1">[1]</a>.</p>
-
-<p>The <code>break</code> and <code>continue</code> looping constructs are a popular framework for cleanly representing multiple loop halting and continuation conditions at differing stages in the execution flow.  Although there is no native support for <code>break</code> or <code>continue</code> in Scala control constructs, it is possible to implement them in a clean and idiomatic way for sequence comprehensions.</p>
-
-<p>In this post I will describe a lightweight and easy-to-use implementation of <code>break</code> and <code>continue</code> for use in Scala sequence comprehensions (aka <code>for</code> statements).  The entire implementation is as follows:</p>
-
-<pre><code>object BreakableGenerators {
-  import scala.language.implicitConversions
-
-  type Generator[+A] = Iterator[A]
-  type BreakableGenerator[+A] = BreakableIterator[A]
-
-  // Generates a new breakable generator from any traversable object.
-  def breakable[A](t1: TraversableOnce[A]): Generator[BreakableGenerator[A]] =
-    List(new BreakableIterator(t1.toIterator)).iterator
-
-  // Mediates boolean expression with 'break' and 'continue' invocations
-  case class BreakableGuardCondition(cond: Boolean) {
-    // Break the looping over one or more breakable generators, if 'cond' 
-    // evaluates to true.
-    def break(b: BreakableGenerator[_], bRest: BreakableGenerator[_]*): Boolean = {
-      if (cond) {
-        b.break
-        for (x &lt;- bRest) { x.break }
-      }
-      !cond
-    }
-
-    // Continue to next iteration of enclosing generator if 'cond' 
-    // evaluates to true.
-    def continue: Boolean = !cond
-  }
-
-  // implicit conversion of boolean values to breakable guard condition mediary
-  implicit def toBreakableGuardCondition(cond: Boolean) =
-    BreakableGuardCondition(cond)
-
-  // An iterator that can be halted via its 'break' method.  Not invoked directly
-  class BreakableIterator[+A](itr: Iterator[A]) extends Iterator[A] {
-    private var broken = false
-    private[BreakableGenerators] def break { broken = true }
-
-    def hasNext = !broken &amp;&amp; itr.hasNext
-    def next = itr.next
-  }
-}
-</code></pre>
-
-<p>The approach is based on a simple subclass of <code>Iterator</code> -- <code>BreakableIterator</code> -- that can be halted by 'breaking' it.  The function <code>breakable(&lt;traversable-object&gt;)</code> returns an Iterator over a single <code>BreakableIterator</code> object.  Iterators are monad-like structures in that they implement <code>map</code> and <code>flatMap</code>, and so its output can be used with <code>&lt;-</code> at the start of a <code>for</code> construct in the usual way.  Note that this means the result of the <code>for</code> statement will also be an Iterator.</p>
-
-<p>Whenever the boolean expression for an <code>if</code> guard is followed by either <code>break</code> or <code>continue</code>, it is implicitly converted to a "breakable guard condition" that supports those methods.  The function <code>break</code> accepts one or more instances of <code>BreakableIterator</code>.  If it evaluates to <code>true</code>, the loops embodied by the given iterators are immediately halted via the associated <code>if</code> guard, and the iterators are halted via their <code>break</code> method.  The <code>continue</code> function is mostly syntactic sugar for a standard <code>if</code> guard, simply with the condition inverted.</p>
-
-<p>Here is a simple example of <code>break</code> and <code>continue</code> in use:</p>
-
-<pre><code>object Main {
-  import BreakableGenerators._
-
-  def main(args: Array[String]) {
-
-    val r = for (
-      // generate a breakable sequence from some sequential input
-      loop &lt;- breakable(1 to 1000);
-      // iterate over the breakable sequence
-      j &lt;- loop;
-      // print out at each iteration
-      _ = { println(s"iteration j= $j") };
-      // continue to next iteration when 'j' is even
-      if { j % 2 == 0 } continue;
-      // break out of the loop when 'j' exceeds 5
-      if { j &gt; 5 } break(loop)
-    ) yield {
-      j
-    }
-    println(s"result= ${r.toList}")
-  }
-}
-</code></pre>
-
-<p>We can see from the resulting output that <code>break</code> and <code>continue</code> function in the usual way.  The <code>continue</code> clause ignores all subsequent code when <code>j</code> is even.  The <code>break</code> clause halts the loop when it sees its first value > 5, which is 7.  Only odd values &lt;= 5 are output from the <code>yield</code> statement:</p>
-
-<pre><code>$ scalac -d /home/eje/class monadic_break.scala
-$ scala -classpath /home/eje/class Main
-iteration j= 1
-iteration j= 2
-iteration j= 3
-iteration j= 4
-iteration j= 5
-iteration j= 6
-iteration j= 7
-result= List(1, 3, 5)
-</code></pre>
-
-<p>Breakable iterators can be nested in the way one would expect.  The following example shows an inner breakable loop nested inside an outer one:</p>
-
-<pre><code>object Main {
-  import BreakableGenerators._
-
-  def main(args: Array[String]) {
-    val r = for (
-      outer &lt;- breakable(1 to 7);
-      j &lt;- outer;
-      _ = { println(s"outer  j= $j") };
-      if { j % 2 == 0 } continue;
-      inner &lt;- breakable(List("a", "b", "c", "d", "e"));
-      k &lt;- inner;
-      _ = { println(s"    inner  j= $j  k= $k") };
-      if { k == "d" } break(inner);
-      if { j == 5  &amp;&amp;  k == "c" } break(inner, outer)
-    ) yield {
-      (j, k)
-    }
-    println(s"result= ${r.toList}")
-  }
-}
-</code></pre>
-
-<p>The output demonstrates that the inner loop breaks whenever <code>k=="d"</code>, and so <code>"e"</code> is never present in the <code>yield</code> result.  When <code>j==5</code> and <code>k=="c"</code>, both the inner and outer loops are broken, and so we see that there is no <code>(5,"c")</code> pair in the result, nor does the outer loop ever iterate over 6 or 7:</p>
-
-<pre><code>$ scalac -d /home/eje/class monadic_break.scala
-$ scala -classpath /home/eje/class Main
-outer  j= 1
-    inner  j= 1  k= a
-    inner  j= 1  k= b
-    inner  j= 1  k= c
-    inner  j= 1  k= d
-outer  j= 2
-outer  j= 3
-    inner  j= 3  k= a
-    inner  j= 3  k= b
-    inner  j= 3  k= c
-    inner  j= 3  k= d
-outer  j= 4
-outer  j= 5
-    inner  j= 5  k= a
-    inner  j= 5  k= b
-    inner  j= 5  k= c
-result= List((1,a), (1,b), (1,c), (3,a), (3,b), (3,c), (5,a), (5,b))
-</code></pre>
-
-<p>Using <code>break</code> and <code>continue</code> with <code>BreakableIterator</code> for sequence comprehensions is that easy.  Enjoy!</p>
-
-<p><a name="notesname" id="notes"></a></p>
-
-<h5>Notes</h5>
-
-<p>The helpful community on freenode #scala made some excellent observations:</p>
-
-<p>1: Iterators in Scala are not strictly monadic -- it would be more accurate to say they're "things with a flatMap and map method, also they can use filter or withFilter sometimes."  However, I personally still prefer to think of them as "monadic in spirit if not law."</p>
-
-<p>2: The <code>break</code> function, as described in this post, is not truly functional in the sense of referential transparency, as the invocation <code>if break(loop) { condition }</code> involves a side-effect on the variable <code>loop</code>.  I would say that it does maintain "scoped functionality."  That is, the break in non-referential transparency is scoped by the variables in question.  The <code>for</code> statement containing them is referentially transparent with respect to its inputs (provided no other code is breaking referential transparency, of course).</p>
-
-<h5>References</h5>
-
-<p><a name="ref1name" id="ref1">[1] </a><em><a href="http://www.manning.com/bjarnason/">Functional Programming in Scala</a></em>, Paul Chiusano and Runar Bjarnason, (section 6.6)</p>
 ]]></content>
   </entry>
   
