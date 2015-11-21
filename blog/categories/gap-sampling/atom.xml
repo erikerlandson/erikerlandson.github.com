@@ -4,7 +4,7 @@
   <title><![CDATA[Category: gap sampling | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/gap-sampling/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-11-20T16:35:28-07:00</updated>
+  <updated>2015-11-20T17:11:09-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -44,7 +44,7 @@
 
 <p><img src="/assets/images/reservoir2/R=10.png" title="Figure 4" alt="Figure 4" /></p>
 
-<p>This plot is also good news: we can see that deviation, as measured by D, remains bounded at a small value (less than 0.026).  As this is for the specific value R=10, we also want to know how things change as reservoir size changes:</p>
+<p>This plot is also good news: we can see that deviation, as measured by D, remains bounded at a small value (less than 0.0262).  As this is for the specific value R=10, we also want to know how things change as reservoir size changes:</p>
 
 <p><img src="/assets/images/reservoir2/R=all.png" title="Figure 5" alt="Figure 5" /></p>
 
