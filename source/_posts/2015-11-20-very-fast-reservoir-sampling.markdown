@@ -8,7 +8,7 @@ categories: [ computing, math, scala, sampling, random sampling, reservoir sampl
 
 > The code I used to collect the data for this post can be viewed [here](https://github.com/erikerlandson/silex/blob/blog/reservoir/src/main/scala/com/redhat/et/silex/sample/reservoir/reservoir.scala).  I generated the plots using the [quantifind WISP](https://github.com/quantifind/wisp) project.
 
-In a [previous post](http://erikerlandson.github.io/blog/2014/09/11/faster-random-samples-with-gap-sampling/), I showed that random Bernoulli and Poisson sampling could be made much faster by modeling the _sampling gap distribution_ for the corresponding smapling distributions.  More recently, I also began exploring whether [reservoir sampling](https://en.wikipedia.org/wiki/Reservoir_sampling) might also be optimized using the gap sampling technique, by deriving the [reservoir sampling gap distribution](http://erikerlandson.github.io/blog/2015/08/17/the-reservoir-sampling-gap-distribution/).  For a sampling reservoir of size (R), starting at data element (j), the probability distribution of the sampling gap is:
+In a [previous post](http://erikerlandson.github.io/blog/2014/09/11/faster-random-samples-with-gap-sampling/), I showed that random Bernoulli and Poisson sampling could be made much faster by modeling the _sampling gap distribution_ for the corresponding sampling distributions.  More recently, I also began exploring whether [reservoir sampling](https://en.wikipedia.org/wiki/Reservoir_sampling) might also be optimized using the gap sampling technique, by deriving the [reservoir sampling gap distribution](http://erikerlandson.github.io/blog/2015/08/17/the-reservoir-sampling-gap-distribution/).  For a sampling reservoir of size (R), starting at data element (j), the probability distribution of the sampling gap is:
 
 ![Figure 1](/assets/images/reservoir1/figure6.png "Figure 1")
 
@@ -36,7 +36,7 @@ This plot is also good news: we can see that deviation, as measured by D, remain
 
 ![Figure 5](/assets/images/reservoir2/R=all.png "Figure 5")
 
-The news is still good!  As reservoir size grows, the approximation only gets better: the D values get smaller as R increases, and remain asymtotically bounded as (j) increases.
+The news is still good!  As reservoir size grows, the approximation only gets better: the D values get smaller as R increases, and remain asymptotically bounded as (j) increases.
 
 Now we have some numeric assurance that the geometric approximation is a good one, and stays good as reservoir size grows and sampling runs get longer.  However, we should also verify that an actual implementation of the approximation works as expected.  Following is a plot that shows two-sample D statistics, comparing the distribution in sample gaps between runs of the exact "naive" reservoir sampling with the fast geometric approximation:
 
