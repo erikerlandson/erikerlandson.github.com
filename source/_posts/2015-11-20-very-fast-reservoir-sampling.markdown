@@ -6,6 +6,8 @@ comments: true
 categories: [ computing, math, scala, sampling, random sampling, reservoir sampling, gap sampling ]
 ---
 
+In this post I will demonstrate how to do reservoir sampling orders of magnitude faster than the traditional "naive" reservoir sampling algorithm, using a fast high-fidelity approximation to the reservoir sampling-gap distribution.
+
 > The code I used to collect the data for this post can be viewed [here](https://github.com/erikerlandson/silex/blob/blog/reservoir/src/main/scala/com/redhat/et/silex/sample/reservoir/reservoir.scala).  I generated the plots using the [quantifind WISP](https://github.com/quantifind/wisp) project.
 
 In a [previous post](http://erikerlandson.github.io/blog/2014/09/11/faster-random-samples-with-gap-sampling/), I showed that random Bernoulli and Poisson sampling could be made much faster by modeling the _sampling gap distribution_ for the corresponding sampling distributions.  More recently, I also began exploring whether [reservoir sampling](https://en.wikipedia.org/wiki/Reservoir_sampling) might also be optimized using the gap sampling technique, by deriving the [reservoir sampling gap distribution](http://erikerlandson.github.io/blog/2015/08/17/the-reservoir-sampling-gap-distribution/).  For a sampling reservoir of size (R), starting at data element (j), the probability distribution of the sampling gap is:
@@ -38,7 +40,44 @@ This plot is also good news: we can see that deviation, as measured by D, remain
 
 The news is still good!  As reservoir size grows, the approximation only gets better: the D values get smaller as R increases, and remain asymptotically bounded as (j) increases.
 
-Now we have some numeric assurance that the geometric approximation is a good one, and stays good as reservoir size grows and sampling runs get longer.  However, we should also verify that an actual implementation of the approximation works as expected.  Following is a plot that shows two-sample D statistics, comparing the distribution in sample gaps between runs of the exact "naive" reservoir sampling with the fast geometric approximation:
+Now we have some numeric assurance that the geometric approximation is a good one, and stays good as reservoir size grows and sampling runs get longer.  However, we should also verify that an actual implementation of the approximation works as expected.  
+
+Here is pseudocode for an implementation of reservoir sampling using the fast geometric approximation:
+
+    // data is array to sample from
+    // R is the reservoir size
+    function reservoirFast(data: Array, R: Int) {
+      n = data.length
+      // Initialize reservoir with first R elements of data:
+      res = data[0 until R]
+      // Until this threshold, use traditional sampling.  This value may
+      // depend on performance characteristics of random number generation and/or
+      // numeric libraries:
+      t = 4 * R
+      j = 1 + R
+      while (j < n  &&  j <= t) {
+        k = randomInt(j) // random integer >= 0 and < j
+        if (k < R) res[k] = data[j]
+        j = j + 1
+      }
+      // Once gaps become significant, it pays to do gap sampling
+      while (j < n) {
+        // draw gap size (g) from geometric distribution with probability p = R/j
+        p = R / j
+        u = randomFloat() // random float > 0 and <= 1
+        g = floor(log(u) / log(1-p))
+        j = j + g
+        if (j < n) {
+          k = randomInt(R)
+          res[k] = data[j]
+        }
+        j = j + 1
+      }
+      // return the reservoir
+      return res
+    }
+
+Following is a plot that shows two-sample D statistics, comparing the distribution in sample gaps between runs of the exact "naive" reservoir sampling with the fast geometric approximation:
 
 ![Figure 6](/assets/images/reservoir2/D_naive_vs_fast.png "Figure 6")
 
