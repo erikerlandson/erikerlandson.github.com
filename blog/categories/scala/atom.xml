@@ -4,7 +4,7 @@
   <title><![CDATA[Category: scala | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/scala/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-11-22T13:11:55-07:00</updated>
+  <updated>2015-11-24T19:57:21-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,153 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[The 'prepare' operation considered harmful in Algebird aggregation]]></title>
+    <link href="http://erikerlandson.github.com/blog/2015/11/24/the-prepare-operation-considered-harmful-in-algebird/"/>
+    <updated>2015-11-24T16:32:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2015/11/24/the-prepare-operation-considered-harmful-in-algebird</id>
+    <content type="html"><![CDATA[<p>I want to make an argument that the Algebird <a href="http://twitter.github.io/algebird/#com.twitter.algebird.Aggregator">Aggregator</a> design, in particular its use of the <code>prepare</code> operation in a map-reduce context, has substantial inefficiencies, compared to an equivalent formulation that is more directly suited to taking advantage of Scala's <a href="http://www.scala-lang.org/api/current/index.html#scala.collection.Seq">aggregate method on collections</a> method.</p>
+
+<p>Consider the definition of aggregation in the Aggregator class:</p>
+
+<p><code>scala
+def apply(inputs: TraversableOnce[A]): C = present(reduce(inputs.map(prepare)))
+</code></p>
+
+<p>You can see that it is a standard map/reduce operation, where <code>reduce</code> is defined as a monoidal (or semigroup -- more on this later) operation. Under the hood, it boils down to an invocation of Scala's <code>reduceLeft</code> method.  The key thing to notice is that the role of <code>prepare</code> is to map a collection of data elements into the required monoids, which are then aggregated using that monoid's <code>plus</code> operation.  In other words, <code>prepare</code> converts data elements into "singleton" monoids each representing a data element.</p>
+
+<p>Now, if the monoid in question is simple, say some numeric type, this conversion is free, or nearly so.  For example, the conversion of an integer into the "integer monoid" is a no-op.  However, there are other kinds of "non-trivial" monoids, for which the conversion of a data element into its corresponding monoid may be costly.  In this post, I will be using the monoid defined by Scala Set[Int], where the monoid <code>plus</code> operation is set union, and of course the <code>zero</code> element is the empty set.</p>
+
+<p>Consider the process of defining an Algebird aggregator for the task of generating the set of unique elements in a data set.  The corresponding <code>prepare</code> operation is: <code>prepare(e: Int) = Set(e)</code>.  A monoid trait that encodes this idea might look like the following.  (the code I used in this post can be found <a href="https://gist.github.com/erikerlandson/d96dc553bc51e0eb5e4b">here</a>)</p>
+
+<p>```scala
+// an algebird-like monoid with the 'prepare' operation
+trait PreparedMonoid[M, E] {
+  val zero: M
+  def plus(m1: M, m2: M): M
+  def prepare(e: E): M
+}</p>
+
+<p>// a PreparedMonoid for a set of integers.  monoid operator is set union.
+object intSetPrepared extends PreparedMonoid[Set[Int], Int] {
+  val zero = Set.empty[Int]
+  def plus(m1: Set[Int], m2: Set[Int]) = m1 ++ m2
+  def prepare(e: Int) = Set(e)
+}</p>
+
+<p>implicit class SeqWithMapReduce<a href="seq:%20Seq[E]">E</a> {
+  // algebird map/reduce Aggregator model
+  def mrPrepared<a href="mon:%20PreparedMonoid[M,%20E]">M</a>: M = {</p>
+
+<pre><code>seq.map(mon.prepare).reduceLeft(mon.plus)
+</code></pre>
+
+<p>  }
+}
+```</p>
+
+<p>If we unpack the above code, as applied to <code>intSetPrepared</code>, we are instantiating a new Set object, containing a single value, for every single input data element.</p>
+
+<p>But there is a potentially better model of aggregation, exemplified by the Scala <code>aggregate</code> method.  This method does not use a <code>prepare</code> operation.  It uses a zero value and a monoidal operator, which the Scala docs refer to as <code>combop</code>, but it also uses an "update" operation, that defines how to update the monoid object, directly, with a single element, referred to as <code>seqop</code> in Scala's documentation.  This idea can also be encoded as a flavor of monoid, enhanced with an <code>update</code> method:</p>
+
+<p>```scala
+// an algebird-like monoid with 'update' operation
+trait UpdatedMonoid[M, E] {
+  val zero: M
+  def plus(m1: M, m2: M): M
+  def update(m: M, e: E): M
+}</p>
+
+<p>// an equivalent UpdatedMonoid for a set of integers
+object intSetUpdated extends UpdatedMonoid[Set[Int], Int] {
+  val zero = Set.empty[Int]
+  def plus(m1: Set[Int], m2: Set[Int]) = m1 ++ m2
+  def update(m: Set[Int], e: Int) = m + e
+}</p>
+
+<p>implicit class SeqWithMapReduceUpdated<a href="seq:%20Seq[E]">E</a> {
+  // map/reduce logic, taking advantage of scala 'aggregate'
+  def mrUpdatedAggregate<a href="mon:%20UpdatedMonoid[M,%20E]">M</a>: M = {</p>
+
+<pre><code>seq.aggregate(mon.zero)(mon.update, mon.plus)
+</code></pre>
+
+<p>  }
+}
+```</p>
+
+<p>This arrangement promises more efficiency when aggregating w.r.t. nontrivial monoids, by avoiding the construction of "singleton" monoids for each data element.  The following demo confirms that for the Set-based monoid, it is over 10 times faster:</p>
+
+<p>```scala
+scala> :load /home/eje/scala/prepare.scala
+Loading /home/eje/scala/prepare.scala...
+defined module prepare</p>
+
+<p>scala> import prepare.<em>
+import prepare.</em></p>
+
+<p>scala> val data = Vector.fill(1000000) { scala.util.Random.nextInt(10) }
+data: scala.collection.immutable.Vector[Int] = Vector(7, 9, 4, 2, 7,...</p>
+
+<p>// Verify that output is the same for both implementations:
+scala> data.mrPrepared(intSetPrepared)
+res0: Set[Int] = Set(0, 5, 1, 6, 9, 2, 7, 3, 8, 4)</p>
+
+<p>// results are the same
+scala> data.mrUpdatedAggregate(intSetUpdated)
+res1: Set[Int] = Set(0, 5, 1, 6, 9, 2, 7, 3, 8, 4)</p>
+
+<p>// Compare timings of prepare-based versus update-based aggregation
+// (benchmark values are returned in seconds)
+scala> benchmark(10) { data.mrPrepared(intSetPrepared) }
+res2: Double = 0.2957673056</p>
+
+<p>// update-based aggregation is 10 times faster
+scala> benchmark(10) { data.mrUpdatedAggregate(intSetUpdated) }
+res3: Double = 0.027041249300000004
+```</p>
+
+<p>It is also possible to apply Scala's <code>aggregate</code> to a monoid enhanced with <code>prepare</code>:</p>
+
+<p>```scala
+implicit class SeqWithMapReducePrepared<a href="seq:%20Seq[E]">E</a> {
+  // using 'aggregate' with prepared op
+  def mrPreparedAggregate<a href="mon:%20PreparedMonoid[M,%20E]">M</a>: M = {</p>
+
+<pre><code>seq.aggregate(mon.zero)((m, e) =&gt; mon.plus(m, mon.prepare(e)), mon.plus)
+</code></pre>
+
+<p>  }
+}
+```</p>
+
+<p>Although this turns out to be measurably faster than the literal map-reduce implementation, it is still not nearly as fast as the variation using <code>update</code>:</p>
+
+<p><code>scala
+scala&gt; benchmark(10) { data.mrPreparedAggregate(intSetPrepared) }
+res2: Double = 0.1754636707
+</code></p>
+
+<p>Readers familiar with Algebird may be wondering about my use of monoids above, when the <code>Aggregator</code> interface is actually based on semigroups.  This is important, since building on Scala's <code>aggregate</code> function requires a zero element that semigroups do not have.  Although I believe it might be worth considering changing <code>Aggregator</code> to use monoids, another sensible option is to change the internal logic for the subclass <code>AggregatorMonoid</code>, which does require a monoid, or possibly just define a new <code>AggregatorMonoidUpdated</code> subclass.</p>
+
+<p>A final note on compatability: note that any monoid enhanced with <code>prepare</code> can be converted into an equivalent monoid enhanced with <code>update</code>, as demonstrated by this factory function:</p>
+
+<p>```scala
+object UpdatedMonoid {
+  // create an UpdatedMonoid from a PreparedMonoid
+  def apply<a href="mon:%20PreparedMonoid[M,%20E]">M, E</a> = new UpdatedMonoid[M, E] {</p>
+
+<pre><code>val zero = mon.zero
+def plus(m1: M, m2: M) = mon.plus(m1, m2)
+def update(m: M, e: E) = mon.plus(m, mon.prepare(e))
+</code></pre>
+
+<p>  }
+}
+```</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Very Fast Reservoir Sampling]]></title>
@@ -868,142 +1015,6 @@ object example {
 <p><img class="left" src="/assets/images/parseq/all_1.png" title="Thread utilization improves at finer granularity" ></p>
 
 <p>I hope this short case study has demonstrated how easy it is to add multithreading to computations with Scala parallel sequences, and some considerations for making the best use of available threads.  Happy Parallel Programming!</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Hygienic Closures for Scala Function Serialization]]></title>
-    <link href="http://erikerlandson.github.com/blog/2015/03/31/hygienic-closures-for-scala-function-serialization/"/>
-    <updated>2015-03-31T06:06:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2015/03/31/hygienic-closures-for-scala-function-serialization</id>
-    <content type="html"><![CDATA[<p>In most use cases of Scala closures, what you see is what you get, but there are exceptions where looks can be deceiving and this can have a big impact on closure serialization.  Closure serialization is of more than academic interest.  Tools like Apache Spark cannot operate without serializing functions over the network.  In this post I'll describe some scenarios where closures include more than what is evident in the code, and then a technique for preventing unwanted inclusions.</p>
-
-<p>To establish a bit of context, consider this simple example that obtains a function and serializes it to disk, and which <em>does</em> behave as expected:</p>
-
-<pre><code>object Demo extends App {
-  def write[A](obj: A, fname: String) {
-    import java.io._
-    new ObjectOutputStream(new FileOutputStream(fname)).writeObject(obj)
-  }
-
-  object foo {
-    val v = 42
-    // The returned function includes 'v' in its closure
-    def f() = (x: Int) =&gt; v * x
-  }
-
-  // The function 'f' will serialize as expected
-  val f = foo.f
-  write(f, "/tmp/demo.f")
-}
-</code></pre>
-
-<p>When this app is compiled and run, it will serialize <code>f</code> to "/tmp/demo.f1", which of course includes the value of <code>v</code> as part of the closure for <code>f</code>.</p>
-
-<pre><code>$ scalac -d /tmp closures.scala
-$ scala -cp /tmp Demo
-$ ls /tmp/demo*
-/tmp/demo.f
-</code></pre>
-
-<p>Now, imagine you wanted to make a straightforward change, where <code>object foo</code> becomes <code>class foo</code>:</p>
-
-<pre><code>object Demo extends App {
-  def write[A](obj: A, fname: String) {
-    import java.io._
-    new ObjectOutputStream(new FileOutputStream(fname)).writeObject(obj)
-  }
-
-  // foo is a class instead of an object
-  class foo() {
-    val v = 42
-    // The returned function includes 'v' in its closure, but also a secret surprise
-    def f() = (x: Int) =&gt; v * x
-  }
-
-  // This will throw an exception!
-  val f = new foo().f
-  write(f, "/tmp/demo.f")
-}
-</code></pre>
-
-<p>It would be reasonable to expect that this minor variation behaves exactly as the previous one, but instead it throws an exception!</p>
-
-<pre><code>$ scalac -d /tmp closures.scala
-$ scala -cp /tmp Demo
-java.io.NotSerializableException: Demo$foo
-</code></pre>
-
-<p>If we look at the exception message, we see that it's complaining about not knowing how to serialize objects of class <code>foo</code>.  But we weren't including any values of <code>foo</code> in the closure for <code>f</code>, only a particular member 'v'!  What gives?  Scala is not very helpful with diagnosing this problem, but when a class member value shows up in a closure that is defined <em>inside</em> the class body, the <em>entire instance</em>, including any and all other member values, is included in the closure.  Presumably this is because a class may have any number of instances, and the compiler is including the entire instance in the closure to properly resolve the correct member value.</p>
-
-<p>One straightforward way to fix this is to simply make class <code>foo</code> serializable:</p>
-
-<pre><code>class foo() extends Serializable {
-  // ...
-}
-</code></pre>
-
-<p>If you make this change to the above code, the example with <code>class foo</code> now works correctly, but it is working by serializing the entire <code>foo</code> instance, not just the value of <code>v</code>.</p>
-
-<p>In many cases, this is not a problem and will work fine.  Serializing a few additional members may be inexpensive.  In other cases, however, it can be an impractical or impossible option.  For example, <code>foo</code> might include other very large members, which will be expensive or outright impossible to serialize:</p>
-
-<pre><code>class foo() extends Serializable {
-  val v = 42    // easy to serialize
-  val w = 4.5   // easy to serialize
-  val data = (1 to 1000000000).toList  // serialization landmine hiding in your closure
-
-  // The returned function includes all of 'foo' instance in its closure
-  def f() = (x: Int) =&gt; v * x
-}
-</code></pre>
-
-<p>A variation on the above problem is class members that are small or moderate in size, but serialized many times.  In this case, the serialization cost can become intractable via repetition of unwanted inclusions.</p>
-
-<p>Another potential problem is class members that are not serializable, and perhaps not under your control:</p>
-
-<pre><code>class foo() extends Serializable {
-  import some.class.NotSerializable
-
-  val v = 42                      // easy to serialize
-  val x = new NotSerializable     // I'll hide in your closure and fail to serialize
-
-  // The returned function includes all of 'foo' instance in its closure
-  def f() = (x: Int) =&gt; v * x
-}
-</code></pre>
-
-<p>There is a relatively painless way to decouple values from their parent instance, so that only desired values are included in a closure.  Passing desired values as parameters to a shim function whose job is to assemble the closure will prevent the parent instance from being pulled into the closure.  In the following example, a shim function named <code>closureFunction</code> is defined for this purpose:</p>
-
-<pre><code>object Demo extends App {
-  def write[A](obj: A, fname: String) {
-    import java.io._
-    new ObjectOutputStream(new FileOutputStream(fname)).writeObject(obj)
-  }
-
-  // apply a generator to create a function with safe decoupled closures
-  def closureFunction[E,D,R](enclosed: E)(gen: E =&gt; (D =&gt; R)) = gen(enclosed)
-
-  class NotSerializable {}
-
-  class foo() {
-    val v1 = 42
-    val v2 = 73
-    val n = new NotSerializable
-
-    // use shim function to enclose *only* the values of 'v1' and 'v2'
-    def f() = closureFunction((v1, v2)) { enclosed =&gt;
-      val (v1, v2) = enclosed
-      (x: Int) =&gt; (v1 + v2) * x   // Desired function, with 'v1' and 'v2' enclosed
-    }
-  }
-
-  // This will work!
-  val f = new foo().f
-  write(f, "/tmp/demo.f")
-}
-</code></pre>
-
-<p>Being aware of the scenarios where parent instances are pulled into closures, and how to keep your closures clean, can save some frustration and wasted time.  Happy programming!</p>
 ]]></content>
   </entry>
   

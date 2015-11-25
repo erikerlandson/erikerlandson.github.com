@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: performance | tool monkey]]></title>
+  <link href="http://erikerlandson.github.com/blog/categories/performance/atom.xml" rel="self"/>
+  <link href="http://erikerlandson.github.com/"/>
+  <updated>2015-11-24T19:57:21-07:00</updated>
+  <id>http://erikerlandson.github.com/</id>
+  <author>
+    <name><![CDATA[Erik Erlandson]]></name>
+    <email><![CDATA[erikerlandson@yahoo.com]]></email>
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[The 'prepare' operation considered harmful in Algebird aggregation]]></title>
+    <link href="http://erikerlandson.github.com/blog/2015/11/24/the-prepare-operation-considered-harmful-in-algebird/"/>
+    <updated>2015-11-24T16:32:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2015/11/24/the-prepare-operation-considered-harmful-in-algebird</id>
+    <content type="html"><![CDATA[<p>I want to make an argument that the Algebird <a href="http://twitter.github.io/algebird/#com.twitter.algebird.Aggregator">Aggregator</a> design, in particular its use of the <code>prepare</code> operation in a map-reduce context, has substantial inefficiencies, compared to an equivalent formulation that is more directly suited to taking advantage of Scala's <a href="http://www.scala-lang.org/api/current/index.html#scala.collection.Seq">aggregate method on collections</a> method.</p>
+
+<p>Consider the definition of aggregation in the Aggregator class:</p>
+
+<p><code>scala
+def apply(inputs: TraversableOnce[A]): C = present(reduce(inputs.map(prepare)))
+</code></p>
+
+<p>You can see that it is a standard map/reduce operation, where <code>reduce</code> is defined as a monoidal (or semigroup -- more on this later) operation. Under the hood, it boils down to an invocation of Scala's <code>reduceLeft</code> method.  The key thing to notice is that the role of <code>prepare</code> is to map a collection of data elements into the required monoids, which are then aggregated using that monoid's <code>plus</code> operation.  In other words, <code>prepare</code> converts data elements into "singleton" monoids each representing a data element.</p>
+
+<p>Now, if the monoid in question is simple, say some numeric type, this conversion is free, or nearly so.  For example, the conversion of an integer into the "integer monoid" is a no-op.  However, there are other kinds of "non-trivial" monoids, for which the conversion of a data element into its corresponding monoid may be costly.  In this post, I will be using the monoid defined by Scala Set[Int], where the monoid <code>plus</code> operation is set union, and of course the <code>zero</code> element is the empty set.</p>
+
+<p>Consider the process of defining an Algebird aggregator for the task of generating the set of unique elements in a data set.  The corresponding <code>prepare</code> operation is: <code>prepare(e: Int) = Set(e)</code>.  A monoid trait that encodes this idea might look like the following.  (the code I used in this post can be found <a href="https://gist.github.com/erikerlandson/d96dc553bc51e0eb5e4b">here</a>)</p>
+
+<p>```scala
+// an algebird-like monoid with the 'prepare' operation
+trait PreparedMonoid[M, E] {
+  val zero: M
+  def plus(m1: M, m2: M): M
+  def prepare(e: E): M
+}</p>
+
+<p>// a PreparedMonoid for a set of integers.  monoid operator is set union.
+object intSetPrepared extends PreparedMonoid[Set[Int], Int] {
+  val zero = Set.empty[Int]
+  def plus(m1: Set[Int], m2: Set[Int]) = m1 ++ m2
+  def prepare(e: Int) = Set(e)
+}</p>
+
+<p>implicit class SeqWithMapReduce<a href="seq:%20Seq[E]">E</a> {
+  // algebird map/reduce Aggregator model
+  def mrPrepared<a href="mon:%20PreparedMonoid[M,%20E]">M</a>: M = {</p>
+
+<pre><code>seq.map(mon.prepare).reduceLeft(mon.plus)
+</code></pre>
+
+<p>  }
+}
+```</p>
+
+<p>If we unpack the above code, as applied to <code>intSetPrepared</code>, we are instantiating a new Set object, containing a single value, for every single input data element.</p>
+
+<p>But there is a potentially better model of aggregation, exemplified by the Scala <code>aggregate</code> method.  This method does not use a <code>prepare</code> operation.  It uses a zero value and a monoidal operator, which the Scala docs refer to as <code>combop</code>, but it also uses an "update" operation, that defines how to update the monoid object, directly, with a single element, referred to as <code>seqop</code> in Scala's documentation.  This idea can also be encoded as a flavor of monoid, enhanced with an <code>update</code> method:</p>
+
+<p>```scala
+// an algebird-like monoid with 'update' operation
+trait UpdatedMonoid[M, E] {
+  val zero: M
+  def plus(m1: M, m2: M): M
+  def update(m: M, e: E): M
+}</p>
+
+<p>// an equivalent UpdatedMonoid for a set of integers
+object intSetUpdated extends UpdatedMonoid[Set[Int], Int] {
+  val zero = Set.empty[Int]
+  def plus(m1: Set[Int], m2: Set[Int]) = m1 ++ m2
+  def update(m: Set[Int], e: Int) = m + e
+}</p>
+
+<p>implicit class SeqWithMapReduceUpdated<a href="seq:%20Seq[E]">E</a> {
+  // map/reduce logic, taking advantage of scala 'aggregate'
+  def mrUpdatedAggregate<a href="mon:%20UpdatedMonoid[M,%20E]">M</a>: M = {</p>
+
+<pre><code>seq.aggregate(mon.zero)(mon.update, mon.plus)
+</code></pre>
+
+<p>  }
+}
+```</p>
+
+<p>This arrangement promises more efficiency when aggregating w.r.t. nontrivial monoids, by avoiding the construction of "singleton" monoids for each data element.  The following demo confirms that for the Set-based monoid, it is over 10 times faster:</p>
+
+<p>```scala
+scala> :load /home/eje/scala/prepare.scala
+Loading /home/eje/scala/prepare.scala...
+defined module prepare</p>
+
+<p>scala> import prepare.<em>
+import prepare.</em></p>
+
+<p>scala> val data = Vector.fill(1000000) { scala.util.Random.nextInt(10) }
+data: scala.collection.immutable.Vector[Int] = Vector(7, 9, 4, 2, 7,...</p>
+
+<p>// Verify that output is the same for both implementations:
+scala> data.mrPrepared(intSetPrepared)
+res0: Set[Int] = Set(0, 5, 1, 6, 9, 2, 7, 3, 8, 4)</p>
+
+<p>// results are the same
+scala> data.mrUpdatedAggregate(intSetUpdated)
+res1: Set[Int] = Set(0, 5, 1, 6, 9, 2, 7, 3, 8, 4)</p>
+
+<p>// Compare timings of prepare-based versus update-based aggregation
+// (benchmark values are returned in seconds)
+scala> benchmark(10) { data.mrPrepared(intSetPrepared) }
+res2: Double = 0.2957673056</p>
+
+<p>// update-based aggregation is 10 times faster
+scala> benchmark(10) { data.mrUpdatedAggregate(intSetUpdated) }
+res3: Double = 0.027041249300000004
+```</p>
+
+<p>It is also possible to apply Scala's <code>aggregate</code> to a monoid enhanced with <code>prepare</code>:</p>
+
+<p>```scala
+implicit class SeqWithMapReducePrepared<a href="seq:%20Seq[E]">E</a> {
+  // using 'aggregate' with prepared op
+  def mrPreparedAggregate<a href="mon:%20PreparedMonoid[M,%20E]">M</a>: M = {</p>
+
+<pre><code>seq.aggregate(mon.zero)((m, e) =&gt; mon.plus(m, mon.prepare(e)), mon.plus)
+</code></pre>
+
+<p>  }
+}
+```</p>
+
+<p>Although this turns out to be measurably faster than the literal map-reduce implementation, it is still not nearly as fast as the variation using <code>update</code>:</p>
+
+<p><code>scala
+scala&gt; benchmark(10) { data.mrPreparedAggregate(intSetPrepared) }
+res2: Double = 0.1754636707
+</code></p>
+
+<p>Readers familiar with Algebird may be wondering about my use of monoids above, when the <code>Aggregator</code> interface is actually based on semigroups.  This is important, since building on Scala's <code>aggregate</code> function requires a zero element that semigroups do not have.  Although I believe it might be worth considering changing <code>Aggregator</code> to use monoids, another sensible option is to change the internal logic for the subclass <code>AggregatorMonoid</code>, which does require a monoid, or possibly just define a new <code>AggregatorMonoidUpdated</code> subclass.</p>
+
+<p>A final note on compatability: note that any monoid enhanced with <code>prepare</code> can be converted into an equivalent monoid enhanced with <code>update</code>, as demonstrated by this factory function:</p>
+
+<p>```scala
+object UpdatedMonoid {
+  // create an UpdatedMonoid from a PreparedMonoid
+  def apply<a href="mon:%20PreparedMonoid[M,%20E]">M, E</a> = new UpdatedMonoid[M, E] {</p>
+
+<pre><code>val zero = mon.zero
+def plus(m1: M, m2: M) = mon.plus(m1, m2)
+def update(m: M, e: E) = mon.plus(m, mon.prepare(e))
+</code></pre>
+
+<p>  }
+}
+```</p>
+]]></content>
+  </entry>
+  
+</feed>

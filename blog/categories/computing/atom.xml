@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-11-22T13:11:55-07:00</updated>
+  <updated>2015-11-24T19:57:21-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,153 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[The 'prepare' operation considered harmful in Algebird aggregation]]></title>
+    <link href="http://erikerlandson.github.com/blog/2015/11/24/the-prepare-operation-considered-harmful-in-algebird/"/>
+    <updated>2015-11-24T16:32:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2015/11/24/the-prepare-operation-considered-harmful-in-algebird</id>
+    <content type="html"><![CDATA[<p>I want to make an argument that the Algebird <a href="http://twitter.github.io/algebird/#com.twitter.algebird.Aggregator">Aggregator</a> design, in particular its use of the <code>prepare</code> operation in a map-reduce context, has substantial inefficiencies, compared to an equivalent formulation that is more directly suited to taking advantage of Scala's <a href="http://www.scala-lang.org/api/current/index.html#scala.collection.Seq">aggregate method on collections</a> method.</p>
+
+<p>Consider the definition of aggregation in the Aggregator class:</p>
+
+<p><code>scala
+def apply(inputs: TraversableOnce[A]): C = present(reduce(inputs.map(prepare)))
+</code></p>
+
+<p>You can see that it is a standard map/reduce operation, where <code>reduce</code> is defined as a monoidal (or semigroup -- more on this later) operation. Under the hood, it boils down to an invocation of Scala's <code>reduceLeft</code> method.  The key thing to notice is that the role of <code>prepare</code> is to map a collection of data elements into the required monoids, which are then aggregated using that monoid's <code>plus</code> operation.  In other words, <code>prepare</code> converts data elements into "singleton" monoids each representing a data element.</p>
+
+<p>Now, if the monoid in question is simple, say some numeric type, this conversion is free, or nearly so.  For example, the conversion of an integer into the "integer monoid" is a no-op.  However, there are other kinds of "non-trivial" monoids, for which the conversion of a data element into its corresponding monoid may be costly.  In this post, I will be using the monoid defined by Scala Set[Int], where the monoid <code>plus</code> operation is set union, and of course the <code>zero</code> element is the empty set.</p>
+
+<p>Consider the process of defining an Algebird aggregator for the task of generating the set of unique elements in a data set.  The corresponding <code>prepare</code> operation is: <code>prepare(e: Int) = Set(e)</code>.  A monoid trait that encodes this idea might look like the following.  (the code I used in this post can be found <a href="https://gist.github.com/erikerlandson/d96dc553bc51e0eb5e4b">here</a>)</p>
+
+<p>```scala
+// an algebird-like monoid with the 'prepare' operation
+trait PreparedMonoid[M, E] {
+  val zero: M
+  def plus(m1: M, m2: M): M
+  def prepare(e: E): M
+}</p>
+
+<p>// a PreparedMonoid for a set of integers.  monoid operator is set union.
+object intSetPrepared extends PreparedMonoid[Set[Int], Int] {
+  val zero = Set.empty[Int]
+  def plus(m1: Set[Int], m2: Set[Int]) = m1 ++ m2
+  def prepare(e: Int) = Set(e)
+}</p>
+
+<p>implicit class SeqWithMapReduce<a href="seq:%20Seq[E]">E</a> {
+  // algebird map/reduce Aggregator model
+  def mrPrepared<a href="mon:%20PreparedMonoid[M,%20E]">M</a>: M = {</p>
+
+<pre><code>seq.map(mon.prepare).reduceLeft(mon.plus)
+</code></pre>
+
+<p>  }
+}
+```</p>
+
+<p>If we unpack the above code, as applied to <code>intSetPrepared</code>, we are instantiating a new Set object, containing a single value, for every single input data element.</p>
+
+<p>But there is a potentially better model of aggregation, exemplified by the Scala <code>aggregate</code> method.  This method does not use a <code>prepare</code> operation.  It uses a zero value and a monoidal operator, which the Scala docs refer to as <code>combop</code>, but it also uses an "update" operation, that defines how to update the monoid object, directly, with a single element, referred to as <code>seqop</code> in Scala's documentation.  This idea can also be encoded as a flavor of monoid, enhanced with an <code>update</code> method:</p>
+
+<p>```scala
+// an algebird-like monoid with 'update' operation
+trait UpdatedMonoid[M, E] {
+  val zero: M
+  def plus(m1: M, m2: M): M
+  def update(m: M, e: E): M
+}</p>
+
+<p>// an equivalent UpdatedMonoid for a set of integers
+object intSetUpdated extends UpdatedMonoid[Set[Int], Int] {
+  val zero = Set.empty[Int]
+  def plus(m1: Set[Int], m2: Set[Int]) = m1 ++ m2
+  def update(m: Set[Int], e: Int) = m + e
+}</p>
+
+<p>implicit class SeqWithMapReduceUpdated<a href="seq:%20Seq[E]">E</a> {
+  // map/reduce logic, taking advantage of scala 'aggregate'
+  def mrUpdatedAggregate<a href="mon:%20UpdatedMonoid[M,%20E]">M</a>: M = {</p>
+
+<pre><code>seq.aggregate(mon.zero)(mon.update, mon.plus)
+</code></pre>
+
+<p>  }
+}
+```</p>
+
+<p>This arrangement promises more efficiency when aggregating w.r.t. nontrivial monoids, by avoiding the construction of "singleton" monoids for each data element.  The following demo confirms that for the Set-based monoid, it is over 10 times faster:</p>
+
+<p>```scala
+scala> :load /home/eje/scala/prepare.scala
+Loading /home/eje/scala/prepare.scala...
+defined module prepare</p>
+
+<p>scala> import prepare.<em>
+import prepare.</em></p>
+
+<p>scala> val data = Vector.fill(1000000) { scala.util.Random.nextInt(10) }
+data: scala.collection.immutable.Vector[Int] = Vector(7, 9, 4, 2, 7,...</p>
+
+<p>// Verify that output is the same for both implementations:
+scala> data.mrPrepared(intSetPrepared)
+res0: Set[Int] = Set(0, 5, 1, 6, 9, 2, 7, 3, 8, 4)</p>
+
+<p>// results are the same
+scala> data.mrUpdatedAggregate(intSetUpdated)
+res1: Set[Int] = Set(0, 5, 1, 6, 9, 2, 7, 3, 8, 4)</p>
+
+<p>// Compare timings of prepare-based versus update-based aggregation
+// (benchmark values are returned in seconds)
+scala> benchmark(10) { data.mrPrepared(intSetPrepared) }
+res2: Double = 0.2957673056</p>
+
+<p>// update-based aggregation is 10 times faster
+scala> benchmark(10) { data.mrUpdatedAggregate(intSetUpdated) }
+res3: Double = 0.027041249300000004
+```</p>
+
+<p>It is also possible to apply Scala's <code>aggregate</code> to a monoid enhanced with <code>prepare</code>:</p>
+
+<p>```scala
+implicit class SeqWithMapReducePrepared<a href="seq:%20Seq[E]">E</a> {
+  // using 'aggregate' with prepared op
+  def mrPreparedAggregate<a href="mon:%20PreparedMonoid[M,%20E]">M</a>: M = {</p>
+
+<pre><code>seq.aggregate(mon.zero)((m, e) =&gt; mon.plus(m, mon.prepare(e)), mon.plus)
+</code></pre>
+
+<p>  }
+}
+```</p>
+
+<p>Although this turns out to be measurably faster than the literal map-reduce implementation, it is still not nearly as fast as the variation using <code>update</code>:</p>
+
+<p><code>scala
+scala&gt; benchmark(10) { data.mrPreparedAggregate(intSetPrepared) }
+res2: Double = 0.1754636707
+</code></p>
+
+<p>Readers familiar with Algebird may be wondering about my use of monoids above, when the <code>Aggregator</code> interface is actually based on semigroups.  This is important, since building on Scala's <code>aggregate</code> function requires a zero element that semigroups do not have.  Although I believe it might be worth considering changing <code>Aggregator</code> to use monoids, another sensible option is to change the internal logic for the subclass <code>AggregatorMonoid</code>, which does require a monoid, or possibly just define a new <code>AggregatorMonoidUpdated</code> subclass.</p>
+
+<p>A final note on compatability: note that any monoid enhanced with <code>prepare</code> can be converted into an equivalent monoid enhanced with <code>update</code>, as demonstrated by this factory function:</p>
+
+<p>```scala
+object UpdatedMonoid {
+  // create an UpdatedMonoid from a PreparedMonoid
+  def apply<a href="mon:%20PreparedMonoid[M,%20E]">M, E</a> = new UpdatedMonoid[M, E] {</p>
+
+<pre><code>val zero = mon.zero
+def plus(m1: M, m2: M) = mon.plus(m1, m2)
+def update(m: M, e: E) = mon.plus(m, mon.prepare(e))
+</code></pre>
+
+<p>  }
+}
+```</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Very Fast Reservoir Sampling]]></title>
@@ -681,57 +828,6 @@ object example {
 <p><img src="/assets/images/reservoir1/lemmaA.png" title="Lemma A" alt="Lemma A" /></p>
 
 <p><img src="/assets/images/reservoir1/lemmaAproof.png" title="Lemma A Proof" alt="Lemma A Proof" /></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Generalizing Kendall's Tau]]></title>
-    <link href="http://erikerlandson.github.com/blog/2015/08/14/generalizing-kendalls-tau/"/>
-    <updated>2015-08-14T14:35:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2015/08/14/generalizing-kendalls-tau</id>
-    <content type="html"><![CDATA[<p>Recently I have been applying <a href="https://en.wikipedia.org/wiki/Kendall_rank_correlation_coefficient">Kendall's Tau</a> as an evaluation metric to assess how well a regression model ranks input samples, with respect to a known correct ranking.</p>
-
-<p>The process of implementing the Kendall's Tau statistic, with my software engineer's hat on, caused me to reflect a bit on how it could be generalized beyond the traditional application of ranking numeric pairs.  In this post I'll discuss the generalization of Kendall's Tau to non-numeric data, and also generalizing from totally ordered data to partial orderings.</p>
-
-<h5>A Review of Kendall's Tau</h5>
-
-<p>I'll start with a brief review of Kendall's Tau.  For more depth, a good place to start is the Wikipedia article at the link above.</p>
-
-<p>Consider a sequence of (n) observations where each observation is a pair (x,y), where we wish to measure how well a ranking by x-values agrees with a ranking by the y-values.  Informally, Kendall's Tau (aka the Kendall Rank Correlation Coefficient) is the difference between number of observation-pairs (pairs of pairs, if you will) whose ordering <em>agrees</em> ("concordant" pairs) and the number of such pairs whose ordering <em>disagrees</em> ("discordant" pairs).  This difference is divided by the total number of observation pairs.</p>
-
-<p>The commonly-used formulation of Kendall's Tau is the "Tau-B" statistic, which accounts for observed pairs having tied values in either x or y as being neither concordant nor discordant:</p>
-
-<h6>Figure 1: Kendall's Tau-B</h6>
-
-<p><img src="/assets/images/kendalls_tau/figure_1.png" title="Kendall's Tau" alt="Kendall's Tau" /></p>
-
-<p>The formulation above has quadratic complexity, with respect to data size (n).  It is possible to rearrange this computation in a way that can be computed in (n)log(n) time[1]:</p>
-
-<h6>Figure 2: An (n)log(n) formulation of Kendall's Tau-B</h6>
-
-<p><img src="/assets/images/kendalls_tau/figure_2.png" title="Kendall's Tau" alt="Kendall's Tau" /></p>
-
-<p>The details of performing this computation can be found at [1] or on the <a href="https://en.wikipedia.org/wiki/Kendall_rank_correlation_coefficient#Algorithms">Wikipedia entry</a>.  For my purposes, I'll note that it requires two (n)log(n) sorts of the data, which becomes relevant below.</p>
-
-<h5>Generalizing to Non-Numeric Values</h5>
-
-<p>Generalizing Kendall's Tau to non-numeric values is mostly just making the observation that the definition of "concordant" and "discordant" pairs is purely based on comparing x-values and y-values (and, in the (n)log(n) formulation, performing sorts on the data).  From the software engineer's perspective this means that the computations are well defined on any data type with an ordering relation, which includes numeric types but also chars, strings, sequences of any element supporting an ordering, etc.  Significantly, most programming languages support the concept of defining ordering relations on arbitrary data types, which means that <em><em>Kendall's Tau can, in principle, be computed on literally any kind of data structure</em></em>, provided you supply it with a well defined ordering.  Furthermore, an examination of the algorithms shows that values of x and y need not even be of the same type, nor do they require the same ordering.</p>
-
-<h5>Generalizing to Partial Orderings</h5>
-
-<p>When I brought this observation up, my colleague <a href="http://chapeau.freevariable.com/">Will Benton</a> asked the very interesting question of whether it's also possible to compute Kendall's Tau on objects that have only a <em>partial ordering</em>.  It turns out that you <em><em>can</em></em> define Kendall's Tau on partially ordered data, by defining the case of two non-comparable x-values, or y-values, as another kind of tie.</p>
-
-<p>The big caveat with this definition is that the (n)log(n) optimization does not apply.  Firstly, the optimized algorithm relies heavily on (n)log(n) sorting, and there is no unique full sorting of elements that are only partially ordered.  Secondly, the formula's definition of the quantities n1, n2 and n3 is founded on the assumption that element equality is transitive; this is why you can count a number of tied values, t, and use t(t-1)/2 as the corresponding number of tied pairs.  But in a partial ordering, this assumption is violated. Consider the case where (a) &lt; (b), but (a) is non-comparable to (c) and (b) is also non-comparable to (c).  By our definition, (a) is tied with (c), and (c) is tied with (b), but transitivity is violated, as (a) &lt; (b).</p>
-
-<p>So how <em>can</em> we compute Tau in this case?  Consider (n1) and (n2), in Figure-1.  These values represent the number of pairs that were tied wrt (x) and (y), respectively.  We can't use the shortcut formulas for (n1) and (n2), but we can count them directly, pair by pair, simply by conducting the traditional quadratic iteration over pairs, and incrementing (n1) whenever two x-values are noncomparable, and incrementing (n2) whenever two y-values are non-comparable, just as we increment (nc) and (nd) to count concordant and discordant pairs.  With this modification, we can apply the formula in Figure-1 as-is.</p>
-
-<h5>Conclusions</h5>
-
-<p>I made these observations without any particular application in mind. However, my instincts as a software engineer tell me that making generalizations in this way often paves the way for new ideas, once the generalized concept is made available.  With luck, it will inspire either me or somebody else to apply Kendall's Tau in interesting new ways.</p>
-
-<h5>References</h5>
-
-<p>[1] Knight, W. (1966). "A Computer Method for Calculating Kendall's Tau with Ungrouped Data". Journal of the American Statistical Association 61 (314): 436–439. doi:10.2307/2282833. JSTOR 2282833.</p>
 ]]></content>
   </entry>
   

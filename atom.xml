@@ -4,7 +4,7 @@
   <title><![CDATA[tool monkey]]></title>
   <link href="http://erikerlandson.github.com/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2015-11-22T13:11:55-07:00</updated>
+  <updated>2015-11-24T19:57:21-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,224 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[The 'prepare' operation considered harmful in Algebird aggregation]]></title>
+    <link href="http://erikerlandson.github.com/blog/2015/11/24/the-prepare-operation-considered-harmful-in-algebird/"/>
+    <updated>2015-11-24T16:32:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2015/11/24/the-prepare-operation-considered-harmful-in-algebird</id>
+    <content type="html"><![CDATA[<p>I want to make an argument that the Algebird <a href="http://twitter.github.io/algebird/#com.twitter.algebird.Aggregator">Aggregator</a> design, in particular its use of the <code>prepare</code> operation in a map-reduce context, has substantial inefficiencies, compared to an equivalent formulation that is more directly suited to taking advantage of Scala&#8217;s <a href="http://www.scala-lang.org/api/current/index.html#scala.collection.Seq">aggregate method on collections</a> method.</p>
+
+<p>Consider the definition of aggregation in the Aggregator class:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">def</span> <span class="n">apply</span><span class="o">(</span><span class="n">inputs</span><span class="k">:</span> <span class="kt">TraversableOnce</span><span class="o">[</span><span class="kt">A</span><span class="o">])</span><span class="k">:</span> <span class="kt">C</span> <span class="o">=</span> <span class="n">present</span><span class="o">(</span><span class="n">reduce</span><span class="o">(</span><span class="n">inputs</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="n">prepare</span><span class="o">)))</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>You can see that it is a standard map/reduce operation, where <code>reduce</code> is defined as a monoidal (or semigroup &#8211; more on this later) operation. Under the hood, it boils down to an invocation of Scala&#8217;s <code>reduceLeft</code> method.  The key thing to notice is that the role of <code>prepare</code> is to map a collection of data elements into the required monoids, which are then aggregated using that monoid&#8217;s <code>plus</code> operation.  In other words, <code>prepare</code> converts data elements into &#8220;singleton&#8221; monoids each representing a data element.</p>
+
+<p>Now, if the monoid in question is simple, say some numeric type, this conversion is free, or nearly so.  For example, the conversion of an integer into the &#8220;integer monoid&#8221; is a no-op.  However, there are other kinds of &#8220;non-trivial&#8221; monoids, for which the conversion of a data element into its corresponding monoid may be costly.  In this post, I will be using the monoid defined by Scala Set[Int], where the monoid <code>plus</code> operation is set union, and of course the <code>zero</code> element is the empty set.</p>
+
+<p>Consider the process of defining an Algebird aggregator for the task of generating the set of unique elements in a data set.  The corresponding <code>prepare</code> operation is: <code>prepare(e: Int) = Set(e)</code>.  A monoid trait that encodes this idea might look like the following.  (the code I used in this post can be found <a href="https://gist.github.com/erikerlandson/d96dc553bc51e0eb5e4b">here</a>)</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="c1">// an algebird-like monoid with the &#39;prepare&#39; operation</span>
+</span><span class='line'><span class="k">trait</span> <span class="nc">PreparedMonoid</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>  <span class="k">val</span> <span class="n">zero</span><span class="k">:</span> <span class="kt">M</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">plus</span><span class="o">(</span><span class="n">m1</span><span class="k">:</span> <span class="kt">M</span><span class="o">,</span> <span class="n">m2</span><span class="k">:</span> <span class="kt">M</span><span class="o">)</span><span class="k">:</span> <span class="kt">M</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">prepare</span><span class="o">(</span><span class="n">e</span><span class="k">:</span> <span class="kt">E</span><span class="o">)</span><span class="k">:</span> <span class="kt">M</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// a PreparedMonoid for a set of integers.  monoid operator is set union.</span>
+</span><span class='line'><span class="k">object</span> <span class="nc">intSetPrepared</span> <span class="k">extends</span> <span class="nc">PreparedMonoid</span><span class="o">[</span><span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span>, <span class="kt">Int</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>  <span class="k">val</span> <span class="n">zero</span> <span class="k">=</span> <span class="nc">Set</span><span class="o">.</span><span class="n">empty</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">plus</span><span class="o">(</span><span class="n">m1</span><span class="k">:</span> <span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">],</span> <span class="n">m2</span><span class="k">:</span> <span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">])</span> <span class="k">=</span> <span class="n">m1</span> <span class="o">++</span> <span class="n">m2</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">prepare</span><span class="o">(</span><span class="n">e</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span> <span class="k">=</span> <span class="nc">Set</span><span class="o">(</span><span class="n">e</span><span class="o">)</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">implicit</span> <span class="k">class</span> <span class="nc">SeqWithMapReduce</span><span class="o">[</span><span class="kt">E</span><span class="o">](</span><span class="n">seq</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">E</span><span class="o">])</span> <span class="o">{</span>
+</span><span class='line'>  <span class="c1">// algebird map/reduce Aggregator model</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">mrPrepared</span><span class="o">[</span><span class="kt">M</span><span class="o">](</span><span class="n">mon</span><span class="k">:</span> <span class="kt">PreparedMonoid</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">])</span><span class="k">:</span> <span class="kt">M</span> <span class="o">=</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">seq</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="n">mon</span><span class="o">.</span><span class="n">prepare</span><span class="o">).</span><span class="n">reduceLeft</span><span class="o">(</span><span class="n">mon</span><span class="o">.</span><span class="n">plus</span><span class="o">)</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>If we unpack the above code, as applied to <code>intSetPrepared</code>, we are instantiating a new Set object, containing a single value, for every single input data element.</p>
+
+<p>But there is a potentially better model of aggregation, exemplified by the Scala <code>aggregate</code> method.  This method does not use a <code>prepare</code> operation.  It uses a zero value and a monoidal operator, which the Scala docs refer to as <code>combop</code>, but it also uses an &#8220;update&#8221; operation, that defines how to update the monoid object, directly, with a single element, referred to as <code>seqop</code> in Scala&#8217;s documentation.  This idea can also be encoded as a flavor of monoid, enhanced with an <code>update</code> method:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="c1">// an algebird-like monoid with &#39;update&#39; operation</span>
+</span><span class='line'><span class="k">trait</span> <span class="nc">UpdatedMonoid</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>  <span class="k">val</span> <span class="n">zero</span><span class="k">:</span> <span class="kt">M</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">plus</span><span class="o">(</span><span class="n">m1</span><span class="k">:</span> <span class="kt">M</span><span class="o">,</span> <span class="n">m2</span><span class="k">:</span> <span class="kt">M</span><span class="o">)</span><span class="k">:</span> <span class="kt">M</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">update</span><span class="o">(</span><span class="n">m</span><span class="k">:</span> <span class="kt">M</span><span class="o">,</span> <span class="n">e</span><span class="k">:</span> <span class="kt">E</span><span class="o">)</span><span class="k">:</span> <span class="kt">M</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// an equivalent UpdatedMonoid for a set of integers</span>
+</span><span class='line'><span class="k">object</span> <span class="nc">intSetUpdated</span> <span class="k">extends</span> <span class="nc">UpdatedMonoid</span><span class="o">[</span><span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span>, <span class="kt">Int</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>  <span class="k">val</span> <span class="n">zero</span> <span class="k">=</span> <span class="nc">Set</span><span class="o">.</span><span class="n">empty</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">plus</span><span class="o">(</span><span class="n">m1</span><span class="k">:</span> <span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">],</span> <span class="n">m2</span><span class="k">:</span> <span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">])</span> <span class="k">=</span> <span class="n">m1</span> <span class="o">++</span> <span class="n">m2</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">update</span><span class="o">(</span><span class="n">m</span><span class="k">:</span> <span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">],</span> <span class="n">e</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span> <span class="k">=</span> <span class="n">m</span> <span class="o">+</span> <span class="n">e</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">implicit</span> <span class="k">class</span> <span class="nc">SeqWithMapReduceUpdated</span><span class="o">[</span><span class="kt">E</span><span class="o">](</span><span class="n">seq</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">E</span><span class="o">])</span> <span class="o">{</span>
+</span><span class='line'>  <span class="c1">// map/reduce logic, taking advantage of scala &#39;aggregate&#39;</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">mrUpdatedAggregate</span><span class="o">[</span><span class="kt">M</span><span class="o">](</span><span class="n">mon</span><span class="k">:</span> <span class="kt">UpdatedMonoid</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">])</span><span class="k">:</span> <span class="kt">M</span> <span class="o">=</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">seq</span><span class="o">.</span><span class="n">aggregate</span><span class="o">(</span><span class="n">mon</span><span class="o">.</span><span class="n">zero</span><span class="o">)(</span><span class="n">mon</span><span class="o">.</span><span class="n">update</span><span class="o">,</span> <span class="n">mon</span><span class="o">.</span><span class="n">plus</span><span class="o">)</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>This arrangement promises more efficiency when aggregating w.r.t. nontrivial monoids, by avoiding the construction of &#8220;singleton&#8221; monoids for each data element.  The following demo confirms that for the Set-based monoid, it is over 10 times faster:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="k">:</span><span class="kt">load</span> <span class="kt">/home/eje/scala/prepare.scala</span>
+</span><span class='line'><span class="nc">Loading</span> <span class="o">/</span><span class="n">home</span><span class="o">/</span><span class="n">eje</span><span class="o">/</span><span class="n">scala</span><span class="o">/</span><span class="n">prepare</span><span class="o">.</span><span class="n">scala</span><span class="o">...</span>
+</span><span class='line'><span class="n">defined</span> <span class="n">module</span> <span class="n">prepare</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="k">import</span> <span class="nn">prepare._</span>
+</span><span class='line'><span class="k">import</span> <span class="nn">prepare._</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="k">val</span> <span class="n">data</span> <span class="k">=</span> <span class="nc">Vector</span><span class="o">.</span><span class="n">fill</span><span class="o">(</span><span class="mi">1000000</span><span class="o">)</span> <span class="o">{</span> <span class="n">scala</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="nc">Random</span><span class="o">.</span><span class="n">nextInt</span><span class="o">(</span><span class="mi">10</span><span class="o">)</span> <span class="o">}</span>
+</span><span class='line'><span class="n">data</span><span class="k">:</span> <span class="kt">scala.collection.immutable.Vector</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="nc">Vector</span><span class="o">(</span><span class="mi">7</span><span class="o">,</span> <span class="mi">9</span><span class="o">,</span> <span class="mi">4</span><span class="o">,</span> <span class="mi">2</span><span class="o">,</span> <span class="mi">7</span><span class="o">,...</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// Verify that output is the same for both implementations:</span>
+</span><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="n">data</span><span class="o">.</span><span class="n">mrPrepared</span><span class="o">(</span><span class="n">intSetPrepared</span><span class="o">)</span>
+</span><span class='line'><span class="n">res0</span><span class="k">:</span> <span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="nc">Set</span><span class="o">(</span><span class="mi">0</span><span class="o">,</span> <span class="mi">5</span><span class="o">,</span> <span class="mi">1</span><span class="o">,</span> <span class="mi">6</span><span class="o">,</span> <span class="mi">9</span><span class="o">,</span> <span class="mi">2</span><span class="o">,</span> <span class="mi">7</span><span class="o">,</span> <span class="mi">3</span><span class="o">,</span> <span class="mi">8</span><span class="o">,</span> <span class="mi">4</span><span class="o">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// results are the same</span>
+</span><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="n">data</span><span class="o">.</span><span class="n">mrUpdatedAggregate</span><span class="o">(</span><span class="n">intSetUpdated</span><span class="o">)</span>
+</span><span class='line'><span class="n">res1</span><span class="k">:</span> <span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="nc">Set</span><span class="o">(</span><span class="mi">0</span><span class="o">,</span> <span class="mi">5</span><span class="o">,</span> <span class="mi">1</span><span class="o">,</span> <span class="mi">6</span><span class="o">,</span> <span class="mi">9</span><span class="o">,</span> <span class="mi">2</span><span class="o">,</span> <span class="mi">7</span><span class="o">,</span> <span class="mi">3</span><span class="o">,</span> <span class="mi">8</span><span class="o">,</span> <span class="mi">4</span><span class="o">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// Compare timings of prepare-based versus update-based aggregation</span>
+</span><span class='line'><span class="c1">// (benchmark values are returned in seconds)</span>
+</span><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="n">benchmark</span><span class="o">(</span><span class="mi">10</span><span class="o">)</span> <span class="o">{</span> <span class="n">data</span><span class="o">.</span><span class="n">mrPrepared</span><span class="o">(</span><span class="n">intSetPrepared</span><span class="o">)</span> <span class="o">}</span>
+</span><span class='line'><span class="n">res2</span><span class="k">:</span> <span class="kt">Double</span> <span class="o">=</span> <span class="mf">0.2957673056</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// update-based aggregation is 10 times faster</span>
+</span><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="n">benchmark</span><span class="o">(</span><span class="mi">10</span><span class="o">)</span> <span class="o">{</span> <span class="n">data</span><span class="o">.</span><span class="n">mrUpdatedAggregate</span><span class="o">(</span><span class="n">intSetUpdated</span><span class="o">)</span> <span class="o">}</span>
+</span><span class='line'><span class="n">res3</span><span class="k">:</span> <span class="kt">Double</span> <span class="o">=</span> <span class="mf">0.027041249300000004</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>It is also possible to apply Scala&#8217;s <code>aggregate</code> to a monoid enhanced with <code>prepare</code>:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">implicit</span> <span class="k">class</span> <span class="nc">SeqWithMapReducePrepared</span><span class="o">[</span><span class="kt">E</span><span class="o">](</span><span class="n">seq</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">E</span><span class="o">])</span> <span class="o">{</span>
+</span><span class='line'>  <span class="c1">// using &#39;aggregate&#39; with prepared op</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">mrPreparedAggregate</span><span class="o">[</span><span class="kt">M</span><span class="o">](</span><span class="n">mon</span><span class="k">:</span> <span class="kt">PreparedMonoid</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">])</span><span class="k">:</span> <span class="kt">M</span> <span class="o">=</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">seq</span><span class="o">.</span><span class="n">aggregate</span><span class="o">(</span><span class="n">mon</span><span class="o">.</span><span class="n">zero</span><span class="o">)((</span><span class="n">m</span><span class="o">,</span> <span class="n">e</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="n">mon</span><span class="o">.</span><span class="n">plus</span><span class="o">(</span><span class="n">m</span><span class="o">,</span> <span class="n">mon</span><span class="o">.</span><span class="n">prepare</span><span class="o">(</span><span class="n">e</span><span class="o">)),</span> <span class="n">mon</span><span class="o">.</span><span class="n">plus</span><span class="o">)</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Although this turns out to be measurably faster than the literal map-reduce implementation, it is still not nearly as fast as the variation using <code>update</code>:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="n">benchmark</span><span class="o">(</span><span class="mi">10</span><span class="o">)</span> <span class="o">{</span> <span class="n">data</span><span class="o">.</span><span class="n">mrPreparedAggregate</span><span class="o">(</span><span class="n">intSetPrepared</span><span class="o">)</span> <span class="o">}</span>
+</span><span class='line'><span class="n">res2</span><span class="k">:</span> <span class="kt">Double</span> <span class="o">=</span> <span class="mf">0.1754636707</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Readers familiar with Algebird may be wondering about my use of monoids above, when the <code>Aggregator</code> interface is actually based on semigroups.  This is important, since building on Scala&#8217;s <code>aggregate</code> function requires a zero element that semigroups do not have.  Although I believe it might be worth considering changing <code>Aggregator</code> to use monoids, another sensible option is to change the internal logic for the subclass <code>AggregatorMonoid</code>, which does require a monoid, or possibly just define a new <code>AggregatorMonoidUpdated</code> subclass.</p>
+
+<p>A final note on compatability: note that any monoid enhanced with <code>prepare</code> can be converted into an equivalent monoid enhanced with <code>update</code>, as demonstrated by this factory function:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">object</span> <span class="nc">UpdatedMonoid</span> <span class="o">{</span>
+</span><span class='line'>  <span class="c1">// create an UpdatedMonoid from a PreparedMonoid</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">apply</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">](</span><span class="n">mon</span><span class="k">:</span> <span class="kt">PreparedMonoid</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">])</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">UpdatedMonoid</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">zero</span> <span class="k">=</span> <span class="n">mon</span><span class="o">.</span><span class="n">zero</span>
+</span><span class='line'>    <span class="k">def</span> <span class="n">plus</span><span class="o">(</span><span class="n">m1</span><span class="k">:</span> <span class="kt">M</span><span class="o">,</span> <span class="n">m2</span><span class="k">:</span> <span class="kt">M</span><span class="o">)</span> <span class="k">=</span> <span class="n">mon</span><span class="o">.</span><span class="n">plus</span><span class="o">(</span><span class="n">m1</span><span class="o">,</span> <span class="n">m2</span><span class="o">)</span>
+</span><span class='line'>    <span class="k">def</span> <span class="n">update</span><span class="o">(</span><span class="n">m</span><span class="k">:</span> <span class="kt">M</span><span class="o">,</span> <span class="n">e</span><span class="k">:</span> <span class="kt">E</span><span class="o">)</span> <span class="k">=</span> <span class="n">mon</span><span class="o">.</span><span class="n">plus</span><span class="o">(</span><span class="n">m</span><span class="o">,</span> <span class="n">mon</span><span class="o">.</span><span class="n">prepare</span><span class="o">(</span><span class="n">e</span><span class="o">))</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Very Fast Reservoir Sampling]]></title>
@@ -2785,180 +3003,6 @@ m_{n-1}
 <p><img src="http://erikerlandson.github.com/assets/images/rv_modulus_mean.png" title="An example demonstrating that E[X mod m] != E[X] mod m" alt="Random Variable Images" /></p>
 
 <p>As we see from the example above, the random variables X and Y have the same mean:  E[X] = E[Y] = 0.75, however E[X mod 1] = 0.75 while E[Y mod 1] = 0.5.  One implication is that computing the moments of the modulus of random variables must be on a per-distribution basis, perhaps via monte carlo methods.</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[A Demonstration of Negotiator-Side Resource Consumption]]></title>
-    <link href="http://erikerlandson.github.com/blog/2012/12/03/a-demonstration-of-negotiator-side-resource-consumption/"/>
-    <updated>2012-12-03T08:25:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2012/12/03/a-demonstration-of-negotiator-side-resource-consumption</id>
-    <content type="html"><![CDATA[<p>HTCondor supports a notion of aggregate compute resources known as partitionable slots (p-slots), which may be consumed by multiple jobs.   Historically, at most one job could be matched against such a slot in a single negotiation cycle, which limited the rate at which partitionable slot resources could be utilized.  More recently, the scheduler has been enhanced with logic to allow it to acquire multiple claims against a partitionable slot, which increases the p-slot utilization rate. However, as this potentially bypasses the negotiator&#8217;s accounting of global pool resources such as accounting group quotas and concurrency limits, it places some contraints on what jobs can can safely acquire multiple claims against any particular p-slot: for example, only other jobs on the same scheduler can be considered.  Additionally, candidate job requirements must match the requirements of the job that originally matched in the negotiator.  Another significant impact is that the negotiator is still forced to match an entire p-slot, which may have a large match cost (weight): these large match costs cause <a href="https://htcondor-wiki.cs.wisc.edu/index.cgi/tktview?tn=3013">accounting difficulties</a> when submitter shares and/or group quotas drop below the cost of a slot.  This particular problem is growing steadily larger, as machines with ever-larger numbers of cores and other resources appear in HTCondor pools.</p>
-
-<p>An alternative approach to scheduler-side resource consumption is to enhance the negotiator with the ability to match multiple jobs against a resource (p-slot) &#8211; negotiator-side resource consumption.   The advantages of negotiator-side consumption are that it places fewer limitations on what jobs can consume a given resource.  The negotiator already handles global resource accounting, and so jobs are not required to adhere to the same requirements expression to safely consume assets from the same resource.  Furthermore, jobs from any scheduler may be considered.  Each match is only charged the cost of resources consumed, and so p-slots with large amounts of resources do not cause difficulties with large match costs.   Another considerable benefit of this approach is that it facilitates the support of <a href="http://spinningmatt.wordpress.com/2012/11/13/no-longer-thinking-in-slots-thinking-in-aggregate-resources-and-consumption-policies/">configurable resource consumption policies</a></p>
-
-<p>I have developed a working draft of negotiator-side resource consumption on my HTCondor github fork, topic branch <a href="https://github.com/erikerlandson/htcondor/tree/V7_9-prototype-negside-pslot-splits">V7_9-prototype-negside-pslot-splits</a> which also implements support for configurable resource consumption policies.   I will briefly demonstrate this implementation and some of its advantages below.</p>
-
-<p>First I will demonstrate an example with a consumption policy that is essentially equivalent to HTCondor&#8217;s current default policies.  Consider this configuration:</p>
-
-<pre><code># spoof some cores
-NUM_CPUS = 10
-
-# configure an aggregate resource (p-slot) to consume
-SLOT_TYPE_1 = 100%
-SLOT_TYPE_1_PARTITIONABLE = True
-# declare multiple claims for negotiator to use
-# may also use global: NUM_CLAIMS
-SLOT_TYPE_1_NUM_CLAIMS = 20
-NUM_SLOTS_TYPE_1 = 1
-
-# turn off schedd-side resource splitting since we're demonstrating neg-side alternative
-CLAIM_PARTITIONABLE_LEFTOVERS = False
-
-# turn this off to demonstrate that consumption policy will handle this kind of logic
-MUST_MODIFY_REQUEST_EXPRS = False
-
-# configure a consumption policy.   This policy is modeled on
-# current 'modify-request-exprs' defaults:
-# "my" is resource ad, "target" is job ad
-STARTD_EXPRS = ConsumptionCpus, ConsumptionMemory, ConsumptionDisk
-ConsumptionCpus = quantize(target.RequestCpus, {1})
-ConsumptionMemory = quantize(target.RequestMemory, {128})
-ConsumptionDisk = quantize(target.RequestDisk, {1024})
-# swap doesn't seem to be actually supported in resource accounting
-
-# keep slot weights enabled for match costing
-NEGOTIATOR_USE_SLOT_WEIGHTS = True
-
-# weight used to derive match cost: W(before-consumption) - W(after-consumption)
-SlotWeight = Cpus
-
-# for simplicity, turn off preemption, caching, worklife
-CLAIM_WORKLIFE=0
-MAXJOBRETIREMENTTIME = 3600
-PREEMPT = False
-RANK = 0
-PREEMPTION_REQUIREMENTS = False
-NEGOTIATOR_CONSIDER_PREEMPTION = False
-NEGOTIATOR_MATCHLIST_CACHING = False
-
-# verbose logging
-ALL_DEBUG = D_FULLDEBUG
-
-# reduce daemon update latencies
-NEGOTIATOR_INTERVAL = 30
-SCHEDD_INTERVAL = 15
-</code></pre>
-
-<p>In the above configuration, we declare a typical aggregate (that is, partitionable) resource <code>SLOT_TYPE_1</code>, but then we also configure a <em>consumption policy</em>, by advertising <code>ConsumptionCpus</code>, <code>ConsumptionMemory</code> and <code>ConsumptionDisk</code>.  Note that these are defined with quantizing expressions currently used as default values for the <code>MODIFY_REQUEST_EXPRS</code> behavior.  The startd and the negotiatior will <em>both</em> use these expressions by examining the slot ads.</p>
-
-<p>Next, we submit 15 jobs.  Note that this more than the 10 cores advertised by the p-slot:</p>
-
-<pre><code>universe = vanilla
-cmd = /bin/sleep
-args = 60
-should_transfer_files = if_needed
-when_to_transfer_output = on_exit
-queue 15
-</code></pre>
-
-<p>If we watch the negotiator log, we will see that negotiator matches the 10 jobs supported by the p-slot on the next cycle (note that it uses slot1 each time):</p>
-
-<pre><code>$ tail -f NegotiatorLog | grep -e '\-\-\-\-\-'  -e 'matched
-12/03/12 11:53:10 ---------- Finished Negotiation Cycle ----------
-12/03/12 11:53:25 ---------- Started Negotiation Cycle ----------
-12/03/12 11:53:25       Successfully matched with slot1@rorschach
-12/03/12 11:53:25       Successfully matched with slot1@rorschach
-12/03/12 11:53:25       Successfully matched with slot1@rorschach
-12/03/12 11:53:25       Successfully matched with slot1@rorschach
-12/03/12 11:53:25       Successfully matched with slot1@rorschach
-12/03/12 11:53:25       Successfully matched with slot1@rorschach
-12/03/12 11:53:25       Successfully matched with slot1@rorschach
-12/03/12 11:53:25       Successfully matched with slot1@rorschach
-12/03/12 11:53:25       Successfully matched with slot1@rorschach
-12/03/12 11:53:25       Successfully matched with slot1@rorschach
-12/03/12 11:53:25 ---------- Finished Negotiation Cycle ----------
-</code></pre>
-
-<p>You can use <code>condor_q</code> to verify that the 10 jobs subsequently run.   The jobs run against 10 dynamic slots (d-slots) in the standard way:</p>
-
-<pre><code>$ ccdump condor_status Name TotalSlotCpus
-slot1@rorschach | 10
-slot1_10@rorschach | 1
-slot1_1@rorschach | 1
-slot1_2@rorschach | 1
-slot1_3@rorschach | 1
-slot1_4@rorschach | 1
-slot1_5@rorschach | 1
-slot1_6@rorschach | 1
-slot1_7@rorschach | 1
-slot1_8@rorschach | 1
-slot1_9@rorschach | 1
-</code></pre>
-
-<p>Next we consider altering the resource consumption policy.  As a simple example, suppose we wish to allocate memory more coarsely.  We could alter the configuration above by changing <code>ConsumptionMemory</code> to:</p>
-
-<pre><code>ConsumptionMemory = quantize(target.RequestMemory, {512})
-</code></pre>
-
-<p>Perhaps we then also want to express match cost in a memory-centric way, instead of the usual cpu-centric way:</p>
-
-<pre><code>SlotWeight = floor(Memory / 512)
-</code></pre>
-
-<p>Here it is worth noting that in this implementation of negotiator-side consumption, the cost of a match is defined as W(S) - W(S&#8217;), where W(S) is the weight of the slot <em>prior</em> to consuming resources from the match and consumption policy, and W(S`) is the weight evaluated for the slot <em>after</em> those resources are subtracted.  This modification enables multiple matches to be made against a single p-slot, and furthermore it paves the way to possible avenues for a <a href="http://erikerlandson.github.com/blog/2012/11/26/rethinking-the-semantics-of-group-quotas-and-slot-weights-computing-claim-capacity-from-consumption-policy/">better unit analysis of slot weights and accounting groups</a>.</p>
-
-<p>Continuing the example, if we re-run the example with this new consumption policy, we should see that memory limits reduce the number of jobs matched against <code>slot1</code> to 3:</p>
-
-<pre><code>$ tail -f NegotiatorLog | grep -e '\-\-\-\-\-'  -e 'matched'
-12/03/12 12:58:22 ---------- Finished Negotiation Cycle ----------
-12/03/12 12:58:37 ---------- Started Negotiation Cycle ----------
-12/03/12 12:58:37       Successfully matched with slot1@rorschach
-12/03/12 12:58:37       Successfully matched with slot1@rorschach
-12/03/12 12:58:37       Successfully matched with slot1@rorschach
-12/03/12 12:58:37 ---------- Finished Negotiation Cycle ----------
-</code></pre>
-
-<p>Examining the slot memory assets, we see that there is insufficient memory for a fourth match when our consumption policy sets the minimum at 512:</p>
-
-<pre><code>$ ccdump condor_status Name TotalSlotMemory
-slot1@rorschach | 1903
-slot1_1@rorschach | 512
-slot1_2@rorschach | 512
-slot1_3@rorschach | 512
-</code></pre>
-
-<p>As a final example, I&#8217;ll demonstrate the positive impact of negotiator side matching on interactions with accounting groups (or submitter shares).  Again returning to my original example, modify the configuration with a simple accounting group policy:</p>
-
-<pre><code>GROUP_NAMES = a
-GROUP_QUOTA_a = 1
-GROUP_ACCEPT_SURPLUS = False
-GROUP_AUTOREGROUP = False
-</code></pre>
-
-<p>Now submit 2 jobs against accounting group <code>a</code>:</p>
-
-<pre><code>universe = vanilla
-cmd = /bin/sleep
-args = 60
-should_transfer_files = if_needed
-when_to_transfer_output = on_exit
-+AccountingGroup="a.u"
-queue 2
-</code></pre>
-
-<p>We see that accounting groups are respected: one job runs, and it does not suffer from insufficient share to acquire resources from <code>slot1</code> <a href="https://htcondor-wiki.cs.wisc.edu/index.cgi/tktview?tn=3013">(GT3013)</a>, because match cost is computed using only the individual job&#8217;s impact on slot weight, instead of being required to match the entire p-slot:</p>
-
-<pre><code>$ tail -f ~/condor/local/log/NegotiatorLog | grep -e '\-\-\-\-\-' -e matched
-12/03/12 14:57:50 ---------- Finished Negotiation Cycle ----------
-12/03/12 14:58:08 ---------- Started Negotiation Cycle ----------
-12/03/12 14:58:08       Successfully matched with slot1@rorschach
-12/03/12 14:58:09 ---------- Finished Negotiation Cycle ----------
-
-$ ccdump condor_status Name TotalSlotCpus
-slot1@rorschach | 10
-slot1_1@rorschach | 1
-</code></pre>
 ]]></content>
   </entry>
   
