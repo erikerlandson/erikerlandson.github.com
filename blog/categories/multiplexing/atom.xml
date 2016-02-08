@@ -4,7 +4,7 @@
   <title><![CDATA[Category: multiplexing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/multiplexing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2016-02-08T13:54:16-07:00</updated>
+  <updated>2016-02-08T14:04:07-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -129,7 +129,7 @@ def muxPartitions<a href="f:%20(Int,%20Iterator[T]">U1 :ClassTag, U2 :ClassTag</
 }
 ```</p>
 
-<p>Suppose you wanted to run an input-validation filter on some data, and send the data that pass validation into one RDD, and data that failed into a second RDD, with data about the error that occurred.  Data validation is a potentially expensive operation.  With multiplexing, you can write the filter to operate in a single efficient pass to obtain both the valid stream and the stream of error-data:</p>
+<p>Suppose you wanted to run an input-validation filter on some data, and send the data that pass validation into one RDD, and data that failed into a second RDD, paired with information about the error that occurred.  Data validation is a potentially expensive operation.  With multiplexing, you can easily write the filter to operate in a single efficient pass to obtain both the valid stream and the stream of error-data:</p>
 
 <p>```scala
 def validate<a href="rdd:%20RDD[T],%20validator:%20T%20=>%20Boolean">T :ClassTag</a> = {
