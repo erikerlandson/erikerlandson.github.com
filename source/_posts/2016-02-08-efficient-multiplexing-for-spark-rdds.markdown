@@ -101,7 +101,7 @@ def flatMuxPartitions[U1 :ClassTag, U2 :ClassTag](f: (Int, Iterator[T]) => (Trav
 }
 ```
 
-Suppose you wanted to run an input-validation filter on some data, and send the data that pass validation into one RDD, and data that failed into a second RDD, with data about the error that occurred.  Data validation is a potentially expensive operation.  With multiplexing, you can write the filter to operate in a single efficient pass to obtain both the valid stream and the stream of error-data:
+Suppose you wanted to run an input-validation filter on some data, and send the data that pass validation into one RDD, and data that failed into a second RDD, paired with information about the error that occurred.  Data validation is a potentially expensive operation.  With multiplexing, you can easily write the filter to operate in a single efficient pass to obtain both the valid stream and the stream of error-data:
 
 ```scala
 def validate[T :ClassTag](rdd: RDD[T], validator: T => Boolean) = {
