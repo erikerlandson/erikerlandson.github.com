@@ -221,11 +221,17 @@
         <lastmod>2015-11-24T19:56:12-07:00</lastmod>
     </url>
     <url>
+        <loc>
+            http://erikerlandson.github.com/blog/2016/02/08/efficient-multiplexing-for-spark-rdds/
+        </loc>
+        <lastmod>2016-02-08T13:51:57-07:00</lastmod>
+    </url>
+    <url>
         <loc>http://erikerlandson.github.com/blog/archives/</loc>
-        <lastmod>2015-11-24T19:56:12-07:00</lastmod>
+        <lastmod>2016-02-08T13:51:57-07:00</lastmod>
     </url>
     <url>
         <loc>http://erikerlandson.github.com/</loc>
-        <lastmod>2015-11-24T19:56:12-07:00</lastmod>
+        <lastmod>2016-02-08T13:51:57-07:00</lastmod>
     </url>
 </urlset>

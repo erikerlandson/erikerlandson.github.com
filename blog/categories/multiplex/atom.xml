@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: multiplex | tool monkey]]></title>
+  <link href="http://erikerlandson.github.com/blog/categories/multiplex/atom.xml" rel="self"/>
+  <link href="http://erikerlandson.github.com/"/>
+  <updated>2016-02-08T13:54:16-07:00</updated>
+  <id>http://erikerlandson.github.com/</id>
+  <author>
+    <name><![CDATA[Erik Erlandson]]></name>
+    <email><![CDATA[erikerlandson@yahoo.com]]></email>
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Efficient Multiplexing for Spark RDDs]]></title>
+    <link href="http://erikerlandson.github.com/blog/2016/02/08/efficient-multiplexing-for-spark-rdds/"/>
+    <updated>2016-02-08T10:09:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2016/02/08/efficient-multiplexing-for-spark-rdds</id>
+    <content type="html"><![CDATA[<p>In this post I'm going to propose a new abstract operation on <a href="http://spark.apache.org/docs/latest/programming-guide.html#resilient-distributed-datasets-rdds">Spark RDDs</a> -- <strong>multiplexing</strong> -- that makes some categories of operations on RDDs both easier to program and in many cases much faster.</p>
+
+<p>My main working example will be the operation of splitting a collection of data elements into N randomly-selected subsamples.  This operation is quite common in machine learning, for the purpose of dividing data into a <a href="https://en.wikipedia.org/wiki/Test_set">training and testing set</a>, or the related task of <a href="https://en.wikipedia.org/wiki/Cross-validation_(statistics">creating folds for cross-validation</a>).</p>
+
+<p>Consider the current standard RDD method for accomplishing this task, <code>randomSplit()</code>.  This method takes a collection of N weights, and returns N output RDDs, each of which contains a randomly-sampled subset of the input, proportional to the corresponding weight.  The <code>randomSplit()</code> method generates the jth output by running a random number generator (RNG) for each input data element and accepting all elements which are in the corresponding jth (normalized) weight range.  As a diagram, the process looks like this at each RDD partition:</p>
+
+<p><img src="/assets/images/mux/randomsplit.png" title="Figure 1" alt="Figure 1" /></p>
+
+<p>The observation I want to draw attention to is that to produce the N output RDDs, it has to run a random sampling over every element in the input <em>for each output</em>.  So if you are splitting into 10 outputs (e.g. for a 10-fold cross-validation), you are re-sampling your input 10 times, the only difference being that each output is created using a different acceptance range for the RNG output.</p>
+
+<p>To see what this looks like in code, consider a simplified version of random splitting that just takes an integer <code>n</code> and always produces (n) equally-weighted outputs:</p>
+
+<p>```scala
+def splitSample<a href="rdd:%20RDD[T],%20n:%20Int,%20seed:%20Long%20=%2042">T :ClassTag</a>: Seq[RDD[T]] = {
+  Vector.tabulate(n) { j =></p>
+
+<pre><code>rdd.mapPartitions { data =&gt;
+  scala.util.Random.setSeed(seed)
+  data.filter { unused =&gt; scala.util.Random.nextInt(n) == j }
+}
+</code></pre>
+
+<p>  }
+}
+```</p>
+
+<p>(Note that for this method to operate correctly, the RNG seed must be set to the same value each time, or the data will not be correctly partitioned)</p>
+
+<p>While this approach to random splitting works fine, resampling the same data N times is somewhat wasteful.  However, it is possible to re-organize the computation so that the input data is sampled only once.  The idea is to run the RNG once per data element, and save the element into a randomly-chosen collection.  To make this work in the RDD compute model, all N output collections reside in a single row of an <em>intermediate</em> RDD -- a "manifold" RDD.  Each output RDD then takes its data from the corresponding collection in the manifold RDD, as in this diagram:</p>
+
+<p><img src="/assets/images/mux/multiplex.png" alt="Figure 2" /></p>
+
+<p>If you abstract the diagram above into a generalized operation, you end up with methods that might like the following:</p>
+
+<p>```scala
+def muxPartitions<a href="n:%20Int,%20f:%20(Int,%20Iterator[T]">U :ClassTag</a> => Seq[U],
+  persist: StorageLevel): Seq[RDD[U]] = {
+  val mux = self.mapPartitionsWithIndex { case (id, itr) =></p>
+
+<pre><code>Iterator.single(f(id, itr))
+</code></pre>
+
+<p>  }.persist(persist)
+  Vector.tabulate(n) { j => mux.mapPartitions { itr => Iterator.single(itr.next()(j)) } }
+}</p>
+
+<p>def flatMuxPartitions<a href="n:%20Int,%20f:%20(Int,%20Iterator[T]">U :ClassTag</a> => Seq[TraversableOnce[U]],
+  persist: StorageLevel): Seq[RDD[U]] = {
+  val mux = self.mapPartitionsWithIndex { case (id, itr) =></p>
+
+<pre><code>Iterator.single(f(id, itr))
+</code></pre>
+
+<p>  }.persist(persist)
+  Vector.tabulate(n) { j => mux.mapPartitions { itr => itr.next()(j).toIterator } }
+}
+```</p>
+
+<p>Here, the operation of sampling is generalized to any user-supplied function that maps RDD partition data into a sequence of objects that are computed in a single pass, and then multiplexed to the final user-visible outputs.  Note that these functions take a <code>StorageLevel</code> argument that can be used to control the caching level of the internal "manifold" RDD.  This typically defaults to <code>MEMORY_ONLY</code>, so that the computation can be saved and re-used for efficiency.</p>
+
+<p>An efficient split-sampling method based on multiplexing, as described above, might be written using <code>flatMuxPartitions</code> as follows:</p>
+
+<p>```scala
+def splitSampleMux<a href="rdd:%20RDD[T],%20n:%20Int,%0A%20%20persist:%20StorageLevel%20=%20MEMORY_ONLY,%0A%20%20seed:%20Long%20=%2042">T :ClassTag</a>: Seq[RDD[T]] =
+  rdd.flatMuxPartitions(n, (id: Int, data: Iterator[T]) => {</p>
+
+<pre><code>scala.util.Random.setSeed(id.toLong * seed)
+val samples = Vector.fill(n) { scala.collection.mutable.ArrayBuffer.empty[T] }
+data.foreach { e =&gt; samples(scala.util.Random.nextInt(n)) += e }
+samples
+</code></pre>
+
+<p>  }, persist)
+```</p>
+
+<p>To test whether multiplexed RDDs actually improve compute efficiency, I collected run-time data at various split values of <code>n</code> (from 1 to 10), for both the non-multiplexing logic (equivalent to the standard <code>randomSplit</code>) and the multiplexed version:</p>
+
+<p><img src="/assets/images/mux/benchmark.png" title="Figure 3" alt="Figure 3" /></p>
+
+<p>As the timing data above show, the computation required to run non-multiplexed version grows linearly with <code>n</code>, just as predicted.  The multiplexed version, by computing the (n) outputs in a single pass, takes a nearly constant amount of time regardless of how many samples the input is split into.</p>
+
+<p>There are other potential applications for multiplexed RDDs.  Consider tuple-based version of multiplexing:</p>
+
+<p>```scala
+def muxPartitions<a href="f:%20(Int,%20Iterator[T]">U1 :ClassTag, U2 :ClassTag</a> => (U1, U2),
+  persist: StorageLevel): (RDD[U1], RDD[U2]) = {
+  val mux = self.mapPartitionsWithIndex { case (id, itr) =></p>
+
+<pre><code>Iterator.single(f(id, itr))
+</code></pre>
+
+<p>  }.persist(persist)
+  val mux1 = mux.mapPartitions(itr => Iterator.single(itr.next.<em>1))
+  val mux2 = mux.mapPartitions(itr => Iterator.single(itr.next.</em>2))
+  (mux1, mux2)
+}</p>
+
+<p>def flatMuxPartitions<a href="f:%20(Int,%20Iterator[T]">U1 :ClassTag, U2 :ClassTag</a> => (TraversableOnce[U1], TraversableOnce[U2]),
+  persist: StorageLevel): (RDD[U1], RDD[U2]) = {
+  val mux = self.mapPartitionsWithIndex { case (id, itr) =></p>
+
+<pre><code>Iterator.single(f(id, itr))
+</code></pre>
+
+<p>  }.persist(persist)
+  val mux1 = mux.mapPartitions(itr => itr.next.<em>1.toIterator)
+  val mux2 = mux.mapPartitions(itr => itr.next.</em>2.toIterator)
+  (mux1, mux2)
+}
+```</p>
+
+<p>Suppose you wanted to run an input-validation filter on some data, and send the data that pass validation into one RDD, and data that failed into a second RDD, with data about the error that occurred.  Data validation is a potentially expensive operation.  With multiplexing, you can write the filter to operate in a single efficient pass to obtain both the valid stream and the stream of error-data:</p>
+
+<p>```scala
+def validate<a href="rdd:%20RDD[T],%20validator:%20T%20=>%20Boolean">T :ClassTag</a> = {
+  rdd.flatMuxPartitions((id: Int, data: Iterator[T]) => {</p>
+
+<pre><code>val valid = scala.collection.mutable.ArrayBuffer.empty[T]
+val bad = scala.collection.mutable.ArrayBuffer.empty[(T, Exception)]
+data.foreach { e =&gt;
+  try {
+    if (!validator(e)) throw new Exception("returned false")
+    valid += e
+  } catch {
+    case err: Exception =&gt; bad += (e, err)
+  }
+}
+(valid, bad)
+</code></pre>
+
+<p>  })
+}
+```</p>
+
+<p>RDD multiplexing is currently a <a href="https://github.com/willb/silex/pull/50">PR against the silex project</a>.  Happy multiplexing!</p>
+]]></content>
+  </entry>
+  
+</feed>
