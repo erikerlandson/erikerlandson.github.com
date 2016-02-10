@@ -75,9 +75,9 @@ To test whether multiplexed RDDs actually improve compute efficiency, I collecte
 
 ![Figure 3](/assets/images/mux/benchmark.png "Figure 3")
 
-As the timing data above show, the computation required to run non-multiplexed version grows linearly with `n`, just as predicted.  The multiplexed version, by computing the (n) outputs in a single pass, takes a nearly constant amount of time regardless of how many samples the input is split into.
+As the timing data above show, the computation required to run a non-multiplexed version grows linearly with `n`, just as predicted.  The multiplexed version, by computing the (n) outputs in a single pass, takes a nearly constant amount of time regardless of how many samples the input is split into.
 
-There are other potential applications for multiplexed RDDs.  Consider tuple-based version of multiplexing:
+There are other potential applications for multiplexed RDDs.  Consider the following tuple-based versions of multiplexing:
 
 ```scala
 def muxPartitions[U1 :ClassTag, U2 :ClassTag](f: (Int, Iterator[T]) => (U1, U2),
@@ -101,7 +101,7 @@ def flatMuxPartitions[U1 :ClassTag, U2 :ClassTag](f: (Int, Iterator[T]) => (Trav
 }
 ```
 
-Suppose you wanted to run an input-validation filter on some data, and send the data that pass validation into one RDD, and data that failed into a second RDD, paired with information about the error that occurred.  Data validation is a potentially expensive operation.  With multiplexing, you can easily write the filter to operate in a single efficient pass to obtain both the valid stream and the stream of error-data:
+Suppose you wanted to run an input-validation filter on some data, sending the data that pass validation into one RDD, and data that failed into a second RDD, paired with information about the error that occurred.  Data validation is a potentially expensive operation.  With multiplexing, you can easily write the filter to operate in a single efficient pass to obtain both the valid stream and the stream of error-data:
 
 ```scala
 def validate[T :ClassTag](rdd: RDD[T], validator: T => Boolean) = {
@@ -121,4 +121,6 @@ def validate[T :ClassTag](rdd: RDD[T], validator: T => Boolean) = {
 }
 ```
 
-RDD multiplexing is currently a [PR against the silex project](https://github.com/willb/silex/pull/50).  Happy multiplexing!
+RDD multiplexing is currently a [PR against the silex project](https://github.com/willb/silex/pull/50).  The code I used to run the timing experiments above is [saved for posterity here](https://github.com/erikerlandson/silex/blob/blog/muxrdd/src/main/scala/com/redhat/et/silex/sample/split.scala#L90).
+
+Happy multiplexing!
