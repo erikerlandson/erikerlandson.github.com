@@ -4,7 +4,7 @@
   <title><![CDATA[tool monkey]]></title>
   <link href="http://erikerlandson.github.com/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2016-02-08T14:04:07-07:00</updated>
+  <updated>2016-02-09T17:18:58-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -119,9 +119,9 @@
 
 <p><img src="http://erikerlandson.github.com/assets/images/mux/benchmark.png" title="Figure 3" alt="Figure 3" /></p>
 
-<p>As the timing data above show, the computation required to run non-multiplexed version grows linearly with <code>n</code>, just as predicted.  The multiplexed version, by computing the (n) outputs in a single pass, takes a nearly constant amount of time regardless of how many samples the input is split into.</p>
+<p>As the timing data above show, the computation required to run a non-multiplexed version grows linearly with <code>n</code>, just as predicted.  The multiplexed version, by computing the (n) outputs in a single pass, takes a nearly constant amount of time regardless of how many samples the input is split into.</p>
 
-<p>There are other potential applications for multiplexed RDDs.  Consider tuple-based version of multiplexing:</p>
+<p>There are other potential applications for multiplexed RDDs.  Consider the following tuple-based versions of multiplexing:</p>
 
 <figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -164,7 +164,7 @@
 </span></code></pre></td></tr></table></div></figure>
 
 
-<p>Suppose you wanted to run an input-validation filter on some data, and send the data that pass validation into one RDD, and data that failed into a second RDD, paired with information about the error that occurred.  Data validation is a potentially expensive operation.  With multiplexing, you can easily write the filter to operate in a single efficient pass to obtain both the valid stream and the stream of error-data:</p>
+<p>Suppose you wanted to run an input-validation filter on some data, sending the data that pass validation into one RDD, and data that failed into a second RDD, paired with information about the error that occurred.  Data validation is a potentially expensive operation.  With multiplexing, you can easily write the filter to operate in a single efficient pass to obtain both the valid stream and the stream of error-data:</p>
 
 <figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -199,7 +199,9 @@
 </span></code></pre></td></tr></table></div></figure>
 
 
-<p>RDD multiplexing is currently a <a href="https://github.com/willb/silex/pull/50">PR against the silex project</a>.  Happy multiplexing!</p>
+<p>RDD multiplexing is currently a <a href="https://github.com/willb/silex/pull/50">PR against the silex project</a>.  The code I used to run the timing experiments above is <a href="https://github.com/erikerlandson/silex/blob/blog/muxrdd/src/main/scala/com/redhat/et/silex/sample/split.scala#L90">saved for posterity here</a>.</p>
+
+<p>Happy multiplexing!</p>
 ]]></content>
   </entry>
   
