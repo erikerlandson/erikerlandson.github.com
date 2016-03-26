@@ -1,13 +1,13 @@
 ---
 layout: post
-title: "Computing Simplex Vertex Locations From Pairwise Vertex Distances"
+title: "Computing Simplex Vertex Locations From Pairwise Object Distances"
 date: 2016-03-26 16:22
 comments: true
 categories: [ computing, math, simplex, vertex, vertices, metric, metric space, distance ]
 ---
-Suppose I have a collection of (N) objects, and distances d(j,k) between each pair of objects (j) and (k).  These objects could be construed as vertices in an (N-1) dimensional [simplex](https://en.wikipedia.org/wiki/Simplex).  However, I have no knowledge about the nature of these objects, other than their pairwise distances.  In order to construct a simplex I need a way to assign spatial locations for each object, in vector space R^(N-1), starting with only the pairwise distance information for my objects.
+Suppose I have a collection of (N) objects, and distances d(j,k) between each pair of objects (j) and (k); that is, my objects are members of a [metric space](https://en.wikipedia.org/wiki/Metric_space).  I have no knowledge about my objects, beyond these pair-wise distances.  These objects could be construed as vertices in an (N-1) dimensional [simplex](https://en.wikipedia.org/wiki/Simplex).  However, since I have no spatial information about my objects, I first need a way to assign spatial locations to each object, in vector space R^(N-1), with only my object distances to work with.
 
-In this post I will derive the algorithm for assigning vertex locations in R^(N-1) for each of N objects, using only pairwise object distances.
+In this post I will derive an algorithm for assigning vertex locations in R^(N-1) for each of N objects, using only pairwise object distances.
 
 I will assume that N >= 2, since at least two object are required to define a pairwise distance.  The case N=2 is easy, as I can assign vertex 1 to the origin, and vertex 2 to the point d(1,2), to form a 1-simplex (i.e. a line segment) whose single edge is just the distance between the two objects.
 
