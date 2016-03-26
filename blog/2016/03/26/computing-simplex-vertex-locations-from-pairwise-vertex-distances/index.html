@@ -1,0 +1,312 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Computing Simplex Vertex Locations From Pairwise Vertex Distances - tool monkey</title>
+  <meta name="author" content="Erik Erlandson">
+
+  
+  <meta name="description" content="Suppose I have a collection of (N) objects, and distances d(j,k) between each pair of objects (j) and (k). These objects could be construed as &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://erikerlandson.github.com/blog/2016/03/26/computing-simplex-vertex-locations-from-pairwise-vertex-distances/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="tool monkey" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+
+  <!-- enables inclusion of MathJax LaTeX: http://greglus.com/blog/2011/11/29/integrate-MathJax-LaTeX-and-MathML-Markup-in-Octopress/ -->
+  <script type="text/javascript"
+    src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">tool monkey</a></h1>
+  
+    <h2>a many-angled blog</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:erikerlandson.github.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Computing Simplex Vertex Locations From Pairwise Vertex Distances</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2016-03-26T16:22:00-07:00" pubdate data-updated="true">Mar 26<span>th</span>, 2016</time>
+        
+        
+         | <a href="#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>Suppose I have a collection of (N) objects, and distances d(j,k) between each pair of objects (j) and (k).  These objects could be construed as vertices in an (N-1) dimensional <a href="https://en.wikipedia.org/wiki/Simplex">simplex</a>.  However, I have no knowledge about the nature of these objects, other than their pairwise distances.  In order to construct a simplex I need a way to assign spatial locations for each object, in vector space R<sup>(N-1),</sup> starting with only the pairwise distance information for my objects.</p>
+
+<p>In this post I will derive the algorithm for assigning vertex locations in R<sup>(N-1)</sup> for each of N objects, using only pairwise object distances.</p>
+
+<p>I will assume that N >= 2, since at least two object are required to define a pairwise distance.  The case N=2 is easy, as I can assign vertex 1 to the origin, and vertex 2 to the point d(0,1), to form a 1-simplex (i.e. a line segment) whose single edge is just the distance between the two objects.</p>
+
+<p>Next consider an arbitrary N, and suppose I have already added vertices 1 through k.  The next vertex (k+1) must obey the pairwise distance relations, as follows:</p>
+
+<p><img src="http://mathurl.com/jm56vxq.png" alt="figure 1" /></p>
+
+<p>Adding the new vertex (k+1) involves adding another dimension (k) to the simplex.  I define this new kth coordinate x(k) to be zero for the existing k vertices, as annotated above; only the new vertex (k+1) will have a non-zero kth coordinate.  Expanding the quadratic terms on the left yields the following form:</p>
+
+<p><img src="http://mathurl.com/jtm7dpq.png" alt="figure 2" /></p>
+
+<p>The squared terms for the coordinates of the new vertex (k+1) are inconvenient, however I can get rid of them by subtracting pairs of equations above.  For example, if I subtract equation 1 from the remaining k-1 equations, these squared terms disappear, leaving me with the following system of k-1 equations, which we can see is linear in the 1st k-1 coordinates of the new vertex.  Therefore, I know I&#8217;ll be able to solve for those coordintates.  I can solve for the remaining kth coordinate by plugging it into the first distance equation:</p>
+
+<p><img src="http://mathurl.com/haovm32.png" alt="figure 3" /></p>
+
+<p>To clarify matters, the equations above can be re-written as the following matrix equation, solveable by any linear systems library:</p>
+
+<p><img src="http://mathurl.com/h6qdtms.png" alt="figure 4" /></p>
+
+<p>This gives me a recusion relation for adding a new vertex (k+1), given that I have already added the first k vertices.  The basis case of adding the first two vertices was already described above.  And so I can iteratively add all my vertices one at a time by applying the recursion relation.</p>
+
+<p>As a corollary, assume that I have constructed a simplex having k vertices, as shown above, and I would like to assign a spatial location to a new object, (y), given its k distances to each vertex.  The corresponding distance relations are given by:</p>
+
+<p><img src="http://mathurl.com/zdw9uv8.png" alt="figure 5" /></p>
+
+<p>I can apply a derivation very similar to the one above, to obtain the following linear equation for the (k-1) coordinates of (y):</p>
+
+<p><img src="http://mathurl.com/zvr5jre.png" alt="figure 6" /></p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Erik Erlandson</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2016-03-26T16:22:00-07:00" pubdate data-updated="true">Mar 26<span>th</span>, 2016</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/computing/'>computing</a>, <a class='category' href='/blog/categories/distance/'>distance</a>, <a class='category' href='/blog/categories/math/'>math</a>, <a class='category' href='/blog/categories/metric/'>metric</a>, <a class='category' href='/blog/categories/metric-space/'>metric space</a>, <a class='category' href='/blog/categories/simplex/'>simplex</a>, <a class='category' href='/blog/categories/vertex/'>vertex</a>, <a class='category' href='/blog/categories/vertices/'>vertices</a>
+  
+</span>
+
+
+      <br>
+<a id="feedback"></a>Feedback • 
+ 
+    <script type="text/javascript" src="//platform.twitter.com/widgets.js"></script>
+    
+  <a href="https://twitter.com/intent/tweet?text=@manyangled%20re:%20http://erikerlandson.github.com/blog/2016/03/26/computing-simplex-vertex-locations-from-pairwise-vertex-distances/">Reply to this post on Twitter</a> • 
+ 
+<a href="mailto:erikerlandson@yahoo.com">Email the author</a>
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://erikerlandson.github.com/blog/2016/03/26/computing-simplex-vertex-locations-from-pairwise-vertex-distances/" data-via="manyangled" data-counturl="http://erikerlandson.github.com/blog/2016/03/26/computing-simplex-vertex-locations-from-pairwise-vertex-distances/" >Tweet</a>
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2016/02/08/efficient-multiplexing-for-spark-rdds/" title="Previous Post: Efficient Multiplexing for Spark RDDs">&laquo; Efficient Multiplexing for Spark RDDs</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>About The Author</h1>
+  <p>Erik is a senior software engineer on the <a href="http://www.redhat.com">Red Hat</a> Emerging Technologies Group.</p>
+</section>
+<section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2016/03/26/computing-simplex-vertex-locations-from-pairwise-vertex-distances/">Computing Simplex Vertex Locations From Pairwise Vertex Distances</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2016/02/08/efficient-multiplexing-for-spark-rdds/">Efficient Multiplexing for Spark RDDs</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/11/24/the-prepare-operation-considered-harmful-in-algebird/">The 'prepare' operation considered harmful in Algebird aggregation</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/11/20/very-fast-reservoir-sampling/">Very Fast Reservoir Sampling</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/09/26/a-library-of-binary-tree-algorithms-as-mixable-scala-traits/">A Library of Binary Tree Algorithms as Mixable Scala Traits</a>
+      </li>
+    
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/erikerlandson">@erikerlandson</a> on GitHub
+  
+  <script type="text/javascript">
+    $.domReady(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'erikerlandson',
+            count: 0,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+
+<section>
+  <h1>Latest Tweets</h1>
+  <ul id="tweets">
+    <li class="loading">Status updating...</li>
+  </ul>
+  <script type="text/javascript">
+    $.domReady(function(){
+      getTwitterFeed("manyangled", 4, true);
+    });
+  </script>
+  <script src="/javascripts/twitter.js" type="text/javascript"> </script>
+  
+    <a href="http://twitter.com/manyangled" class="twitter-follow-button" data-show-count="false">Follow @manyangled</a>
+  
+</section>
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2016 - Erik Erlandson -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+
+
+
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>

@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="In this post I&#8217;m going to propose a new abstract operation on Spark RDDs &#8211; multiplexing &#8211; that makes some categories of operations &hellip;">
+  <meta name="description" content="Suppose I have a collection of (N) objects, and distances d(j,k) between each pair of objects (j) and (k). These objects could be construed as &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,75 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2016/03/26/computing-simplex-vertex-locations-from-pairwise-vertex-distances/">Computing Simplex Vertex Locations From Pairwise Vertex Distances</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2016-03-26T16:22:00-07:00" pubdate data-updated="true">Mar 26<span>th</span>, 2016</time>
+        
+        
+         | <a href="/blog/2016/03/26/computing-simplex-vertex-locations-from-pairwise-vertex-distances/#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Suppose I have a collection of (N) objects, and distances d(j,k) between each pair of objects (j) and (k).  These objects could be construed as vertices in an (N-1) dimensional <a href="https://en.wikipedia.org/wiki/Simplex">simplex</a>.  However, I have no knowledge about the nature of these objects, other than their pairwise distances.  In order to construct a simplex I need a way to assign spatial locations for each object, in vector space R<sup>(N-1),</sup> starting with only the pairwise distance information for my objects.</p>
+
+<p>In this post I will derive the algorithm for assigning vertex locations in R<sup>(N-1)</sup> for each of N objects, using only pairwise object distances.</p>
+
+<p>I will assume that N >= 2, since at least two object are required to define a pairwise distance.  The case N=2 is easy, as I can assign vertex 1 to the origin, and vertex 2 to the point d(0,1), to form a 1-simplex (i.e. a line segment) whose single edge is just the distance between the two objects.</p>
+
+<p>Next consider an arbitrary N, and suppose I have already added vertices 1 through k.  The next vertex (k+1) must obey the pairwise distance relations, as follows:</p>
+
+<p><img src="http://mathurl.com/jm56vxq.png" alt="figure 1" /></p>
+
+<p>Adding the new vertex (k+1) involves adding another dimension (k) to the simplex.  I define this new kth coordinate x(k) to be zero for the existing k vertices, as annotated above; only the new vertex (k+1) will have a non-zero kth coordinate.  Expanding the quadratic terms on the left yields the following form:</p>
+
+<p><img src="http://mathurl.com/jtm7dpq.png" alt="figure 2" /></p>
+
+<p>The squared terms for the coordinates of the new vertex (k+1) are inconvenient, however I can get rid of them by subtracting pairs of equations above.  For example, if I subtract equation 1 from the remaining k-1 equations, these squared terms disappear, leaving me with the following system of k-1 equations, which we can see is linear in the 1st k-1 coordinates of the new vertex.  Therefore, I know I&#8217;ll be able to solve for those coordintates.  I can solve for the remaining kth coordinate by plugging it into the first distance equation:</p>
+
+<p><img src="http://mathurl.com/haovm32.png" alt="figure 3" /></p>
+
+<p>To clarify matters, the equations above can be re-written as the following matrix equation, solveable by any linear systems library:</p>
+
+<p><img src="http://mathurl.com/h6qdtms.png" alt="figure 4" /></p>
+
+<p>This gives me a recusion relation for adding a new vertex (k+1), given that I have already added the first k vertices.  The basis case of adding the first two vertices was already described above.  And so I can iteratively add all my vertices one at a time by applying the recursion relation.</p>
+
+<p>As a corollary, assume that I have constructed a simplex having k vertices, as shown above, and I would like to assign a spatial location to a new object, (y), given its k distances to each vertex.  The corresponding distance relations are given by:</p>
+
+<p><img src="http://mathurl.com/zdw9uv8.png" alt="figure 5" /></p>
+
+<p>I can apply a derivation very similar to the one above, to obtain the following linear equation for the (k-1) coordinates of (y):</p>
+
+<p><img src="http://mathurl.com/zvr5jre.png" alt="figure 6" /></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1986,204 +2055,6 @@ java.io.NotSerializableException: Demo$foo
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions/">Monadic &#8216;break&#8217; and &#8216;continue&#8217; for Scala Sequence Comprehensions</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2015-01-24T11:54:00-07:00" pubdate data-updated="true">Jan 24<span>th</span>, 2015</time>
-        
-        
-         | <a href="/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions/#feedback">Feedback</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Author&#8217;s note: I&#8217;ve since received some excellent feedback from the Scala community, which I included in some <a href="#notes">end notes</a>.</p>
-
-<p>Author&#8217;s note the 2nd: I later realized I could apply an implicit conversion and mediator class to preserve the traditional ordering: the code has been updated with that approach.</p>
-
-<p>Author&#8217;s note the 3rd: This concept has been submitted to the Scala project as JIRA <a href="https://issues.scala-lang.org/browse/SI-9120">SI-9120</a> (PR <a href="https://github.com/scala/scala/pull/4275">#4275</a>)</p>
-
-<p>Scala <a href="http://docs.scala-lang.org/tutorials/tour/sequence-comprehensions.html">sequence comprehensions</a> are an excellent functional programming idiom for looping in Scala.  However, sequence comprehensions encompass much more than just looping &#8211; they represent a powerful syntax for manipulating <em>all</em> monadic structures<a href="#ref1">[1]</a>.</p>
-
-<p>The <code>break</code> and <code>continue</code> looping constructs are a popular framework for cleanly representing multiple loop halting and continuation conditions at differing stages in the execution flow.  Although there is no native support for <code>break</code> or <code>continue</code> in Scala control constructs, it is possible to implement them in a clean and idiomatic way for sequence comprehensions.</p>
-
-<p>In this post I will describe a lightweight and easy-to-use implementation of <code>break</code> and <code>continue</code> for use in Scala sequence comprehensions (aka <code>for</code> statements).  The entire implementation is as follows:</p>
-
-<pre><code>object BreakableGenerators {
-  import scala.language.implicitConversions
-
-  type Generator[+A] = Iterator[A]
-  type BreakableGenerator[+A] = BreakableIterator[A]
-
-  // Generates a new breakable generator from any traversable object.
-  def breakable[A](t1: TraversableOnce[A]): Generator[BreakableGenerator[A]] =
-    List(new BreakableIterator(t1.toIterator)).iterator
-
-  // Mediates boolean expression with 'break' and 'continue' invocations
-  case class BreakableGuardCondition(cond: Boolean) {
-    // Break the looping over one or more breakable generators, if 'cond' 
-    // evaluates to true.
-    def break(b: BreakableGenerator[_], bRest: BreakableGenerator[_]*): Boolean = {
-      if (cond) {
-        b.break
-        for (x &lt;- bRest) { x.break }
-      }
-      !cond
-    }
-
-    // Continue to next iteration of enclosing generator if 'cond' 
-    // evaluates to true.
-    def continue: Boolean = !cond
-  }
-
-  // implicit conversion of boolean values to breakable guard condition mediary
-  implicit def toBreakableGuardCondition(cond: Boolean) =
-    BreakableGuardCondition(cond)
-
-  // An iterator that can be halted via its 'break' method.  Not invoked directly
-  class BreakableIterator[+A](itr: Iterator[A]) extends Iterator[A] {
-    private var broken = false
-    private[BreakableGenerators] def break { broken = true }
-
-    def hasNext = !broken &amp;&amp; itr.hasNext
-    def next = itr.next
-  }
-}
-</code></pre>
-
-<p>The approach is based on a simple subclass of <code>Iterator</code> &#8211; <code>BreakableIterator</code> &#8211; that can be halted by &#8216;breaking&#8217; it.  The function <code>breakable(&lt;traversable-object&gt;)</code> returns an Iterator over a single <code>BreakableIterator</code> object.  Iterators are monad-like structures in that they implement <code>map</code> and <code>flatMap</code>, and so its output can be used with <code>&lt;-</code> at the start of a <code>for</code> construct in the usual way.  Note that this means the result of the <code>for</code> statement will also be an Iterator.</p>
-
-<p>Whenever the boolean expression for an <code>if</code> guard is followed by either <code>break</code> or <code>continue</code>, it is implicitly converted to a &#8220;breakable guard condition&#8221; that supports those methods.  The function <code>break</code> accepts one or more instances of <code>BreakableIterator</code>.  If it evaluates to <code>true</code>, the loops embodied by the given iterators are immediately halted via the associated <code>if</code> guard, and the iterators are halted via their <code>break</code> method.  The <code>continue</code> function is mostly syntactic sugar for a standard <code>if</code> guard, simply with the condition inverted.</p>
-
-<p>Here is a simple example of <code>break</code> and <code>continue</code> in use:</p>
-
-<pre><code>object Main {
-  import BreakableGenerators._
-
-  def main(args: Array[String]) {
-
-    val r = for (
-      // generate a breakable sequence from some sequential input
-      loop &lt;- breakable(1 to 1000);
-      // iterate over the breakable sequence
-      j &lt;- loop;
-      // print out at each iteration
-      _ = { println(s"iteration j= $j") };
-      // continue to next iteration when 'j' is even
-      if { j % 2 == 0 } continue;
-      // break out of the loop when 'j' exceeds 5
-      if { j &gt; 5 } break(loop)
-    ) yield {
-      j
-    }
-    println(s"result= ${r.toList}")
-  }
-}
-</code></pre>
-
-<p>We can see from the resulting output that <code>break</code> and <code>continue</code> function in the usual way.  The <code>continue</code> clause ignores all subsequent code when <code>j</code> is even.  The <code>break</code> clause halts the loop when it sees its first value > 5, which is 7.  Only odd values &lt;= 5 are output from the <code>yield</code> statement:</p>
-
-<pre><code>$ scalac -d /home/eje/class monadic_break.scala
-$ scala -classpath /home/eje/class Main
-iteration j= 1
-iteration j= 2
-iteration j= 3
-iteration j= 4
-iteration j= 5
-iteration j= 6
-iteration j= 7
-result= List(1, 3, 5)
-</code></pre>
-
-<p>Breakable iterators can be nested in the way one would expect.  The following example shows an inner breakable loop nested inside an outer one:</p>
-
-<pre><code>object Main {
-  import BreakableGenerators._
-
-  def main(args: Array[String]) {
-    val r = for (
-      outer &lt;- breakable(1 to 7);
-      j &lt;- outer;
-      _ = { println(s"outer  j= $j") };
-      if { j % 2 == 0 } continue;
-      inner &lt;- breakable(List("a", "b", "c", "d", "e"));
-      k &lt;- inner;
-      _ = { println(s"    inner  j= $j  k= $k") };
-      if { k == "d" } break(inner);
-      if { j == 5  &amp;&amp;  k == "c" } break(inner, outer)
-    ) yield {
-      (j, k)
-    }
-    println(s"result= ${r.toList}")
-  }
-}
-</code></pre>
-
-<p>The output demonstrates that the inner loop breaks whenever <code>k=="d"</code>, and so <code>"e"</code> is never present in the <code>yield</code> result.  When <code>j==5</code> and <code>k=="c"</code>, both the inner and outer loops are broken, and so we see that there is no <code>(5,"c")</code> pair in the result, nor does the outer loop ever iterate over 6 or 7:</p>
-
-<pre><code>$ scalac -d /home/eje/class monadic_break.scala
-$ scala -classpath /home/eje/class Main
-outer  j= 1
-    inner  j= 1  k= a
-    inner  j= 1  k= b
-    inner  j= 1  k= c
-    inner  j= 1  k= d
-outer  j= 2
-outer  j= 3
-    inner  j= 3  k= a
-    inner  j= 3  k= b
-    inner  j= 3  k= c
-    inner  j= 3  k= d
-outer  j= 4
-outer  j= 5
-    inner  j= 5  k= a
-    inner  j= 5  k= b
-    inner  j= 5  k= c
-result= List((1,a), (1,b), (1,c), (3,a), (3,b), (3,c), (5,a), (5,b))
-</code></pre>
-
-<p>Using <code>break</code> and <code>continue</code> with <code>BreakableIterator</code> for sequence comprehensions is that easy.  Enjoy!</p>
-
-<p><a name="notesname" id="notes"></a></p>
-
-<h5>Notes</h5>
-
-<p>The helpful community on freenode #scala made some excellent observations:</p>
-
-<p>1: Iterators in Scala are not strictly monadic &#8211; it would be more accurate to say they&#8217;re &#8220;things with a flatMap and map method, also they can use filter or withFilter sometimes.&#8221;  However, I personally still prefer to think of them as &#8220;monadic in spirit if not law.&#8221;</p>
-
-<p>2: The <code>break</code> function, as described in this post, is not truly functional in the sense of referential transparency, as the invocation <code>if break(loop) { condition }</code> involves a side-effect on the variable <code>loop</code>.  I would say that it does maintain &#8220;scoped functionality.&#8221;  That is, the break in non-referential transparency is scoped by the variables in question.  The <code>for</code> statement containing them is referentially transparent with respect to its inputs (provided no other code is breaking referential transparency, of course).</p>
-
-<h5>References</h5>
-
-<p><a name="ref1name" id="ref1">[1] </a><em><a href="http://www.manning.com/bjarnason/">Functional Programming in Scala</a></em>, Paul Chiusano and Runar Bjarnason, (section 6.6)</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/2/">&larr; Older</a>
@@ -2203,6 +2074,10 @@ result= List((1,a), (1,b), (1,c), (3,a), (3,b), (3,c), (5,a), (5,b))
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2016/03/26/computing-simplex-vertex-locations-from-pairwise-vertex-distances/">Computing Simplex Vertex Locations From Pairwise Vertex Distances</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2016/02/08/efficient-multiplexing-for-spark-rdds/">Efficient Multiplexing for Spark RDDs</a>
       </li>
     
@@ -2216,10 +2091,6 @@ result= List((1,a), (1,b), (1,c), (3,a), (3,b), (3,c), (5,a), (5,b))
     
       <li class="post">
         <a href="/blog/2015/09/26/a-library-of-binary-tree-algorithms-as-mixable-scala-traits/">A Library of Binary Tree Algorithms as Mixable Scala Traits</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2015/08/18/lightweight-non-negative-numerics-for-better-scala-type-signatures/">Lightweight Non-Negative Numerics for Better Scala Type Signatures</a>
       </li>
     
   </ul>
