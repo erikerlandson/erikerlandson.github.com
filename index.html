@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="Suppose I have a collection of (N) objects, and distances d(j,k) between each pair of objects (j) and (k). These objects could be construed as &hellip;">
+  <meta name="description" content="Suppose I have a collection of (N) objects, and distances d(j,k) between each pair of objects (j) and (k); that is, my objects are members of a &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -74,7 +74,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2016/03/26/computing-simplex-vertex-locations-from-pairwise-vertex-distances/">Computing Simplex Vertex Locations From Pairwise Vertex Distances</a></h1>
+      <h1 class="entry-title"><a href="/blog/2016/03/26/computing-simplex-vertex-locations-from-pairwise-vertex-distances/">Computing Simplex Vertex Locations From Pairwise Object Distances</a></h1>
     
     
       <p class="meta">
@@ -100,9 +100,9 @@
   </header>
 
 
-  <div class="entry-content"><p>Suppose I have a collection of (N) objects, and distances d(j,k) between each pair of objects (j) and (k).  These objects could be construed as vertices in an (N-1) dimensional <a href="https://en.wikipedia.org/wiki/Simplex">simplex</a>.  However, I have no knowledge about the nature of these objects, other than their pairwise distances.  In order to construct a simplex I need a way to assign spatial locations for each object, in vector space R<sup>(N-1),</sup> starting with only the pairwise distance information for my objects.</p>
+  <div class="entry-content"><p>Suppose I have a collection of (N) objects, and distances d(j,k) between each pair of objects (j) and (k); that is, my objects are members of a <a href="https://en.wikipedia.org/wiki/Metric_space">metric space</a>.  I have no knowledge about my objects, beyond these pair-wise distances.  These objects could be construed as vertices in an (N-1) dimensional <a href="https://en.wikipedia.org/wiki/Simplex">simplex</a>.  However, since I have no spatial information about my objects, I first need a way to assign spatial locations to each object, in vector space R<sup>(N-1),</sup> with only my object distances to work with.</p>
 
-<p>In this post I will derive the algorithm for assigning vertex locations in R<sup>(N-1)</sup> for each of N objects, using only pairwise object distances.</p>
+<p>In this post I will derive an algorithm for assigning vertex locations in R<sup>(N-1)</sup> for each of N objects, using only pairwise object distances.</p>
 
 <p>I will assume that N >= 2, since at least two object are required to define a pairwise distance.  The case N=2 is easy, as I can assign vertex 1 to the origin, and vertex 2 to the point d(1,2), to form a 1-simplex (i.e. a line segment) whose single edge is just the distance between the two objects.</p>
 
@@ -2074,7 +2074,7 @@ java.io.NotSerializableException: Demo$foo
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/2016/03/26/computing-simplex-vertex-locations-from-pairwise-vertex-distances/">Computing Simplex Vertex Locations From Pairwise Vertex Distances</a>
+        <a href="/blog/2016/03/26/computing-simplex-vertex-locations-from-pairwise-vertex-distances/">Computing Simplex Vertex Locations From Pairwise Object Distances</a>
       </li>
     
       <li class="post">
