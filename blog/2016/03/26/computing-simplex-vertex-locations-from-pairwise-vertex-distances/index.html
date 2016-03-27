@@ -101,7 +101,7 @@
 
 <p>In this post I will derive an algorithm for assigning vertex locations in R<sup>(N-1)</sup> for each of N objects, using only pairwise object distances.</p>
 
-<p>I will assume that N >= 2, since at least two object are required to define a pairwise distance.  The case N=2 is easy, as I can assign vertex 1 to the origin, and vertex 2 to the point d(1,2), to form a 1-simplex (i.e. a line segment) whose single edge is just the distance between the two objects.</p>
+<p>I will assume that N >= 2, since at least two object are required to define a pairwise distance.  The case N=2 is easy, as I can assign vertex 1 to the origin, and vertex 2 to the point d(1,2), to form a 1-simplex (i.e. a line segment) whose single edge is just the distance between the two objects.  I will also assume that my N objects are distinct; that is, each pair has a non-zero distance.</p>
 
 <p>Next consider an arbitrary N, and suppose I have already added vertices 1 through k.  The next vertex (k+1) must obey the pairwise distance relations, as follows:</p>
 
@@ -111,7 +111,7 @@
 
 <p><img src="http://mathurl.com/jtm7dpq.png" alt="figure 2" /></p>
 
-<p>The squared terms for the coordinates of the new vertex (k+1) are inconvenient, however I can get rid of them by subtracting pairs of equations above.  For example, if I subtract equation 1 from the remaining k-1 equations (2 through k), these squared terms disappear, leaving me with the following system of k-1 equations, which we can see is linear in the 1st k-1 coordinates of the new vertex.  Therefore, I know I&#8217;ll be able to solve for those coordintates.  I can solve for the remaining kth coordinate by plugging it into the first distance equation:</p>
+<p>The squared terms for the coordinates of the new vertex (k+1) are inconvenient, however I can get rid of them by subtracting pairs of equations above.  For example, if I subtract equation 1 from the remaining k-1 equations (2 through k), these squared terms disappear, leaving me with the following system of k-1 equations, which we can see is linear in the 1st k-1 coordinates of the new vertex.  Therefore, I know I&#8217;ll be able to solve for those coordinates.  I can solve for the remaining kth coordinate by plugging it into the first distance equation:</p>
 
 <p><img src="http://mathurl.com/haovm32.png" alt="figure 3" /></p>
 
