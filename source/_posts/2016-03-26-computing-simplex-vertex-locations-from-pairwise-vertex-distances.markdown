@@ -9,7 +9,7 @@ Suppose I have a collection of (N) objects, and distances d(j,k) between each pa
 
 In this post I will derive an algorithm for assigning vertex locations in R^(N-1) for each of N objects, using only pairwise object distances.
 
-I will assume that N >= 2, since at least two object are required to define a pairwise distance.  The case N=2 is easy, as I can assign vertex 1 to the origin, and vertex 2 to the point d(1,2), to form a 1-simplex (i.e. a line segment) whose single edge is just the distance between the two objects.
+I will assume that N >= 2, since at least two object are required to define a pairwise distance.  The case N=2 is easy, as I can assign vertex 1 to the origin, and vertex 2 to the point d(1,2), to form a 1-simplex (i.e. a line segment) whose single edge is just the distance between the two objects.  I will also assume that my N objects are distinct; that is, each pair has a non-zero distance.
 
 Next consider an arbitrary N, and suppose I have already added vertices 1 through k.  The next vertex (k+1) must obey the pairwise distance relations, as follows:
 
@@ -19,7 +19,7 @@ Adding the new vertex (k+1) involves adding another dimension (k) to the simplex
 
 ![figure 2](http://mathurl.com/jtm7dpq.png)
 
-The squared terms for the coordinates of the new vertex (k+1) are inconvenient, however I can get rid of them by subtracting pairs of equations above.  For example, if I subtract equation 1 from the remaining k-1 equations (2 through k), these squared terms disappear, leaving me with the following system of k-1 equations, which we can see is linear in the 1st k-1 coordinates of the new vertex.  Therefore, I know I'll be able to solve for those coordintates.  I can solve for the remaining kth coordinate by plugging it into the first distance equation:
+The squared terms for the coordinates of the new vertex (k+1) are inconvenient, however I can get rid of them by subtracting pairs of equations above.  For example, if I subtract equation 1 from the remaining k-1 equations (2 through k), these squared terms disappear, leaving me with the following system of k-1 equations, which we can see is linear in the 1st k-1 coordinates of the new vertex.  Therefore, I know I'll be able to solve for those coordinates.  I can solve for the remaining kth coordinate by plugging it into the first distance equation:
 
 ![figure 3](http://mathurl.com/haovm32.png)
 
