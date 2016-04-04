@@ -4,7 +4,7 @@
   <title><![CDATA[Category: spark | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/spark/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2016-03-27T15:02:59-07:00</updated>
+  <updated>2016-04-04T13:49:03-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -299,7 +299,9 @@ java.io.NotSerializableException: Demo$foo
     <link href="http://erikerlandson.github.com/blog/2014/09/11/faster-random-samples-with-gap-sampling/"/>
     <updated>2014-09-11T07:57:00-07:00</updated>
     <id>http://erikerlandson.github.com/blog/2014/09/11/faster-random-samples-with-gap-sampling</id>
-    <content type="html"><![CDATA[<p>Generating a random sample of a collection is, logically, a O(np) operation, where (n) is the sample size and (p) is the sampling probability.  For example, extracting a random sample, without replacement, from an array might look like this in pseudocode:</p>
+    <content type="html"><![CDATA[<blockquote><p>Update (April 4, 2016): my colleague <a href="http://rnowling.github.io/">RJ Nowling</a> ran across a <a href="http://www.ittc.ku.edu/~jsv/Papers/Vit87.RandomSampling.pdf">paper by J.S. Vitter</a> that shows Vitter developed the trick of accelerating sampling with a sampling-gap distribution in 1987 -- I re-invented Vitter's wheel 30 years after the fact!  I'm surprised it never caught on, as it is not much harder to implement than the naive version.</p></blockquote>
+
+<p>Generating a random sample of a collection is, logically, a O(np) operation, where (n) is the sample size and (p) is the sampling probability.  For example, extracting a random sample, without replacement, from an array might look like this in pseudocode:</p>
 
 <pre><code>sample(data: array, p: real) {
     n = length(data)

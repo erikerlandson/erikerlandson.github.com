@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="Generating a random sample of a collection is, logically, a O(np) operation, where (n) is the sample size and (p) is the sampling probability. For &hellip;">
+  <meta name="description" content="Update (April 4, 2016): my colleague RJ Nowling ran across a paper by J.S. Vitter that shows Vitter developed the trick of accelerating sampling with &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -97,7 +97,9 @@
   </header>
 
 
-<div class="entry-content"><p>Generating a random sample of a collection is, logically, a O(np) operation, where (n) is the sample size and (p) is the sampling probability.  For example, extracting a random sample, without replacement, from an array might look like this in pseudocode:</p>
+<div class="entry-content"><blockquote><p>Update (April 4, 2016): my colleague <a href="http://rnowling.github.io/">RJ Nowling</a> ran across a <a href="http://www.ittc.ku.edu/~jsv/Papers/Vit87.RandomSampling.pdf">paper by J.S. Vitter</a> that shows Vitter developed the trick of accelerating sampling with a sampling-gap distribution in 1987 &#8211; I re-invented Vitter&#8217;s wheel 30 years after the fact!  I&#8217;m surprised it never caught on, as it is not much harder to implement than the naive version.</p></blockquote>
+
+<p>Generating a random sample of a collection is, logically, a O(np) operation, where (n) is the sample size and (p) is the sampling probability.  For example, extracting a random sample, without replacement, from an array might look like this in pseudocode:</p>
 
 <pre><code>sample(data: array, p: real) {
     n = length(data)
