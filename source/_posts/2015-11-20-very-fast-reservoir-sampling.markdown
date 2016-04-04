@@ -10,6 +10,8 @@ In this post I will demonstrate how to do reservoir sampling orders of magnitude
 
 > The code I used to collect the data for this post can be viewed [here](https://github.com/erikerlandson/silex/blob/blog/reservoir/src/main/scala/com/redhat/et/silex/sample/reservoir/reservoir.scala).  I generated the plots using the [quantifind WISP](https://github.com/quantifind/wisp) project.
 
+> Update (April 4, 2016): my colleague [RJ Nowling](http://rnowling.github.io/) ran across a [paper by J.S. Vitter](http://www.ittc.ku.edu/~jsv/Papers/Vit87.RandomSampling.pdf) that shows Vitter developed the trick of accelerating sampling with a sampling-gap distribution in 1987 -- I re-invented Vitter's wheel 30 years after the fact!  I'm surprised it never caught on, as it is not much harder to implement than the naive version.
+
 In a [previous post](http://erikerlandson.github.io/blog/2014/09/11/faster-random-samples-with-gap-sampling/), I showed that random Bernoulli and Poisson sampling could be made much faster by modeling the _sampling gap distribution_ for the corresponding sampling distributions.  More recently, I also began exploring whether [reservoir sampling](https://en.wikipedia.org/wiki/Reservoir_sampling) might also be optimized using the gap sampling technique, by deriving the [reservoir sampling gap distribution](http://erikerlandson.github.io/blog/2015/08/17/the-reservoir-sampling-gap-distribution/).  For a sampling reservoir of size (R), starting at data element (j), the probability distribution of the sampling gap is:
 
 ![Figure 1](/assets/images/reservoir1/figure6.png "Figure 1")

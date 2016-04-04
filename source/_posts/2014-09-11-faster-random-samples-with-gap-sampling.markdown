@@ -5,6 +5,9 @@ date: 2014-09-11 07:57
 comments: true
 categories: [ computing, scala, spark, sampling, random sampling ]
 ---
+
+> Update (April 4, 2016): my colleague [RJ Nowling](http://rnowling.github.io/) ran across a [paper by J.S. Vitter](http://www.ittc.ku.edu/~jsv/Papers/Vit87.RandomSampling.pdf) that shows Vitter developed the trick of accelerating sampling with a sampling-gap distribution in 1987 -- I re-invented Vitter's wheel 30 years after the fact!  I'm surprised it never caught on, as it is not much harder to implement than the naive version.
+
 Generating a random sample of a collection is, logically, a O(np) operation, where (n) is the sample size and (p) is the sampling probability.  For example, extracting a random sample, without replacement, from an array might look like this in pseudocode:
 
     sample(data: array, p: real) {
