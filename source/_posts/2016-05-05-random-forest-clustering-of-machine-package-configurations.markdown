@@ -33,21 +33,21 @@ A Random Forest is an [ensemble learning model](https://en.wikipedia.org/wiki/En
 
 Random Forest Clustering begins by training a Random Forest to distinguish between the data to be clustered, and a corresponding _synthetic_ data set created by sampling from the [marginal](https://en.wikipedia.org/wiki/Marginal_distribution) distributions of each [feature](https://en.wikipedia.org/wiki/Feature_vector).  If the data has well defined clusters in the [joint feature space](https://en.wikipedia.org/wiki/Joint_probability_distribution) (a common scenario), then the model can identify these clusters as standing out from the more homogeneous distribution of synthetic data.  A simple example of what this looks like in 2 dimensional data is displayed in Figure 1, where the dark red dots are the data to be clustered, and the lighter pink dots represent synthetic data generated from the marginal distributions:
 
-![Figure 1](assets/images/rfc_machines/demo1_both.png)
+![Figure 1](/assets/images/rfc_machines/demo1_both.png)
 
 Each interior decision node, in each tree of a Random Forest, typically divides the space of feature vectors in half: the half-space <= some threshold, and the half-space > that threshold.  The result is that the model learned for our data can be visualized as rectilinear regions of space.  In this simple example, these regions can be plotted directly over the data, and show that the Random Forest did indeed learn the location of the data clusters against the background of synthetic data:
 
-![Figure 2](assets/images/rfc_machines/demo1_rules.png)
+![Figure 2](/assets/images/rfc_machines/demo1_rules.png)
 
 Once this model has been trained, the actual data to be clustered are evaluated against this model.  Each data element navigates the interior decision nodes and eventually arrives at a leaf-node of each tree in the Random Forest ensemble, as illustrated in the following schematic:
 
-![Figure 3](assets/images/rfc_machines/eval_leafs.png)
+![Figure 3](/assets/images/rfc_machines/eval_leafs.png)
 
 A key insight of Random Forest Clustering is that if two objects (or, their feature vectors) are similar, then they are likely to arrive at the same leaf nodes more often than not.  As the figure above suggests, it means we can cluster objects by their corresponding vectors of leaf nodes, _instead_ of their raw feature vectors.
 
 If we map the points in our toy example to leaf ids in this way, and then cluster the results, we obtain the following two clusters, which correspond well with the structure of the data:
 
-![Figure 4](assets/images/rfc_machines/demo1_clust.png)
+![Figure 4](/assets/images/rfc_machines/demo1_clust.png)
 
 A note on clustering leaf ids.  A leaf id is just that -- an identifier -- and in that respect a vector of leaf ids has no _algebra_; it is not meaningful to take an average of such identifiers, any more than it would be meaningful to take the average of people's names.  Pragmatically, what this means is that the popular [k-means clustering algorithm](https://en.wikipedia.org/wiki/K-means_clustering) _cannot_ be applied to this problem.
 
