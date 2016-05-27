@@ -30,11 +30,11 @@ A consistent methodology has a couple advantages contributing to user experience
 
 Test statistics have another appealing property: many are "aware" of sample size in a way that captures the idea that the smaller the sample size, the larger the difference between populations should be to conclude a given significance.  For one example, consider [Welch's t-test](https://en.wikipedia.org/wiki/Welch's_t-test#Statistical_test), the two-sample variation of the t distribution that applies well to comparing left and right sub populations of candidate decision tree splits:
 
-![Figure 1](http://mathurl.com/jvyfp7y.png)
+![Figure 1](assets/images/pval_halting/figure_1.png)
 
 Visualizing the effects of sample sizes n1 and n2 on these equations directly is a bit tricky, but assuming equal sample sizes and variances allows the equations to be simplified quite a bit, so that we can observe the effect of sample size:
 
-![Figure 2](http://mathurl.com/z5hojxg.png)
+![Figure 2](assets/images/pval_halting/figure_2.png)
 
 These simplified equations show clearly that (all else remaining equal) as sample size grows smaller, the measured t-statistic correspondingly grows smaller (proportional to sqrt(n)), and furthermore the corresponding variance of the t distribution to be applied grows larger.  For any given shift in left and right sub-populations, each of these trends yields a larger (i.e. weaker) p-value.   This behavior is desirable for a split quality metric.  The less data there is at a given candidate split, the less confidence there _should_ be in split quality.  Put another way: we would like to require a larger difference before a split is measured as being good quality when we have less data to work with, and that is exactly the behavior the t-test provides us.
 
