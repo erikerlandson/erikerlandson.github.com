@@ -36,7 +36,7 @@ Visualizing the effects of sample sizes n1 and n2 on these equations directly is
 
 ![Figure 2](http://mathurl.com/z5hojxg.png)
 
-These simplified equations show clearly that (all else remaining equal) as sample size grows smaller, the measured t-statistic correspondingly grows smaller (proportional to sqrt(n)), and furthermore the corresponding variance of the t distribution to be applied grows larger.  For any given shift in left and right sub-populations, each of these trends yields a smaller p-value.   This behavior is desirable for a split quality metric.  The less data there is at a given candidate split, the less confidence there _should_ be in split quality.  Put another way: we would like to require a larger difference before a split is measured as being good quality when we have less data to work with, and that is exactly the behavior the t-test provides us.
+These simplified equations show clearly that (all else remaining equal) as sample size grows smaller, the measured t-statistic correspondingly grows smaller (proportional to sqrt(n)), and furthermore the corresponding variance of the t distribution to be applied grows larger.  For any given shift in left and right sub-populations, each of these trends yields a larger (i.e. weaker) p-value.   This behavior is desirable for a split quality metric.  The less data there is at a given candidate split, the less confidence there _should_ be in split quality.  Put another way: we would like to require a larger difference before a split is measured as being good quality when we have less data to work with, and that is exactly the behavior the t-test provides us.
 
 <a name="results"></a>
 #####Training Results
