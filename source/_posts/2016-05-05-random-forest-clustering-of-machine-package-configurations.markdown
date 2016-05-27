@@ -6,10 +6,6 @@ comments: true
 categories: [ computing, learning models, machine learning, random forests, decision trees, clustering, apache spark ]
 ---
 
-<head><style type="text/css">
-.gist {max-height:500px; overflow:auto}
-</style></head>
-
 In this post I am going to describe some results I obtained for [clustering](https://en.wikipedia.org/wiki/Cluster_analysis) machines by which [RPM packages](https://en.wikipedia.org/wiki/RPM_Package_Manager) that were installed on them.  The clustering technique I used was [Random Forest Clustering](https://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm#unsup).
 
 <a name="data"></a>
@@ -184,3 +180,7 @@ I will conclude with another useful feature of Random Forest Models, which is th
 Lastly I'll note that full histogram length was 186; in other words, of the nearly 4400 installed packages, the Random Forest model used only 186 of them -- a tiny fraction!  A nice illustration of Random Forest Clustering performing in the face of [high dimensionality](#payoff)!
 
 <script src="https://gist.github.com/erikerlandson/184d202560c628c0383c5050d9f4be24.js?file=histogram"></script>
+
+<head><style type="text/css">
+.gist {max-height:500px; overflow:auto}
+</style></head>
