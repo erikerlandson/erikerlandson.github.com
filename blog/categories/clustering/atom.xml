@@ -4,7 +4,7 @@
   <title><![CDATA[Category: clustering | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/clustering/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2016-05-26T14:43:25-07:00</updated>
+  <updated>2016-05-27T15:42:53-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -18,11 +18,7 @@
     <link href="http://erikerlandson.github.com/blog/2016/05/05/random-forest-clustering-of-machine-package-configurations/"/>
     <updated>2016-05-05T15:05:00-07:00</updated>
     <id>http://erikerlandson.github.com/blog/2016/05/05/random-forest-clustering-of-machine-package-configurations</id>
-    <content type="html"><![CDATA[<p><head><style type="text/css">
-.gist {max-height:500px; overflow:auto}
-</style></head></p>
-
-<p>In this post I am going to describe some results I obtained for <a href="https://en.wikipedia.org/wiki/Cluster_analysis">clustering</a> machines by which <a href="https://en.wikipedia.org/wiki/RPM_Package_Manager">RPM packages</a> that were installed on them.  The clustering technique I used was <a href="https://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm#unsup">Random Forest Clustering</a>.</p>
+    <content type="html"><![CDATA[<p>In this post I am going to describe some results I obtained for <a href="https://en.wikipedia.org/wiki/Cluster_analysis">clustering</a> machines by which <a href="https://en.wikipedia.org/wiki/RPM_Package_Manager">RPM packages</a> that were installed on them.  The clustering technique I used was <a href="https://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm#unsup">Random Forest Clustering</a>.</p>
 
 <p><a name="data"></a></p>
 
@@ -219,6 +215,10 @@ val outlierStr = outliers.collect
 
 <script src="https://gist.github.com/erikerlandson/184d202560c628c0383c5050d9f4be24.js?file=histogram"></script>
 
+
+<p><head><style type="text/css">
+.gist {max-height:500px; overflow:auto}
+</style></head></p>
 ]]></content>
   </entry>
   
