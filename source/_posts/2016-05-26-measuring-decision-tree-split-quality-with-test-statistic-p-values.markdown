@@ -152,70 +152,73 @@ TreeEnsembleModel classifier with 1 trees
 
 
 scala> println(rf.trees(0).toDebugString)
-DecisionTreeModel classifier of depth 11 with 39 nodes
-  If (feature 1 in {1.0})
-   Predict: 1.0
-  Else (feature 1 not in {1.0})
-   If (feature 5 in {1.0})
-    If (feature 14 <= 0.0)
+DecisionTreeModel classifier of depth 11 with 41 nodes
+  If (feature 4 in {1.0})
+   If (feature 12 in {1.0})
+    If (feature 11 in {1.0})
      Predict: 1.0
-    Else (feature 14 > 0.0)
-     If (feature 11 <= 0.0)
-      Predict: 1.0
-     Else (feature 11 > 0.0)
-      Predict: 1.0
-   Else (feature 5 not in {1.0})
+    Else (feature 11 not in {1.0})
+     Predict: 1.0
+   Else (feature 12 not in {1.0})
+    Predict: 1.0
+  Else (feature 4 not in {1.0})
+   If (feature 1 in {1.0})
+    If (feature 12 in {1.0})
+     Predict: 1.0
+    Else (feature 12 not in {1.0})
+     Predict: 1.0
+   Else (feature 1 not in {1.0})
     If (feature 0 in {1.0})
-     If (feature 13 <= 0.0)
-      Predict: 1.0
-     Else (feature 13 > 0.0)
-      Predict: 1.0
-    Else (feature 0 not in {1.0})
-     If (feature 2 in {1.0})
-      Predict: 1.0
-     Else (feature 2 not in {1.0})
-      If (feature 7 in {1.0})
+     If (feature 10 in {0.0})
+      If (feature 14 in {1.0})
        Predict: 1.0
-      Else (feature 7 not in {1.0})
-       If (feature 3 in {1.0})
-        If (feature 13 <= 0.0)
+      Else (feature 14 not in {1.0})
+       Predict: 1.0
+     Else (feature 10 not in {0.0})
+      If (feature 14 in {0.0})
+       Predict: 1.0
+      Else (feature 14 not in {0.0})
+       Predict: 1.0
+    Else (feature 0 not in {1.0})
+     If (feature 6 in {1.0})
+      Predict: 1.0
+     Else (feature 6 not in {1.0})
+      If (feature 3 in {1.0})
+       Predict: 1.0
+      Else (feature 3 not in {1.0})
+       If (feature 7 in {1.0})
+        If (feature 13 in {1.0})
          Predict: 1.0
-        Else (feature 13 > 0.0)
-         If (feature 14 <= 0.0)
-          Predict: 1.0
-         Else (feature 14 > 0.0)
-          Predict: 1.0
-       Else (feature 3 not in {1.0})
-        If (feature 4 in {1.0})
+        Else (feature 13 not in {1.0})
          Predict: 1.0
-        Else (feature 4 not in {1.0})
+       Else (feature 7 not in {1.0})
+        If (feature 2 in {1.0})
+         Predict: 1.0
+        Else (feature 2 not in {1.0})
          If (feature 8 in {1.0})
-          If (feature 14 <= 0.0)
-           Predict: 1.0
-          Else (feature 14 > 0.0)
-           If (feature 10 <= 0.0)
-            Predict: 1.0
-           Else (feature 10 > 0.0)
-            Predict: 1.0
+          Predict: 1.0
          Else (feature 8 not in {1.0})
           If (feature 9 in {1.0})
-           If (feature 11 <= 0.0)
-            Predict: 1.0
-           Else (feature 11 > 0.0)
-            If (feature 13 <= 0.0)
+           If (feature 11 in {1.0})
+            If (feature 13 in {1.0})
              Predict: 1.0
-            Else (feature 13 > 0.0)
+            Else (feature 13 not in {1.0})
+             Predict: 1.0
+           Else (feature 11 not in {1.0})
+            If (feature 12 in {1.0})
+             Predict: 1.0
+            Else (feature 12 not in {1.0})
              Predict: 1.0
           Else (feature 9 not in {1.0})
-           If (feature 6 in {1.0})
+           If (feature 5 in {1.0})
             Predict: 1.0
-           Else (feature 6 not in {1.0})
+           Else (feature 5 not in {1.0})
             Predict: 0.0
 
 scala> 
 ```
 
-The first observation is that the resulting tree has nearly twice as many nodes as the tree trained using the chi-squared policy.  Worse, it is using the noise features -- its quality measure is yielding many more false positives.  The entropy-based model is less parsimonious and will also have performance problems since the model has included very noisy features.
+The first observation is that **the resulting tree using entropy as a split quality measure is twice the size of the tree trained using the chi-squared policy.**  Worse, it is using the noise features -- its quality measure is yielding many more false positives.  The entropy-based model is less parsimonious and will also have performance problems since the model has included very noisy features.
 
 Lastly, I ran a similar training using the "gini" impurity measure, and a 0.015 quality threshold (again, hopefully optimal value that I had to run multiple experiments to identify).  Its quality is better than the entropy-based measure, but this model is still substantially larger than the chi-squared model, and it still uses some noise features:
 
@@ -235,57 +238,53 @@ gain= 0.0158
 rf: org.apache.spark.mllib.tree.model.RandomForestModel = 
 TreeEnsembleModel classifier with 1 trees
 
-
 scala> println(rf.trees(0).toDebugString)
-DecisionTreeModel classifier of depth 12 with 33 nodes
+DecisionTreeModel classifier of depth 12 with 31 nodes
   If (feature 6 in {1.0})
    Predict: 1.0
   Else (feature 6 not in {1.0})
-   If (feature 2 in {1.0})
+   If (feature 3 in {1.0})
     Predict: 1.0
-   Else (feature 2 not in {1.0})
-    If (feature 5 in {1.0})
-     If (feature 13 <= 0.0)
-      Predict: 1.0
-     Else (feature 13 > 0.0)
-      Predict: 1.0
-    Else (feature 5 not in {1.0})
+   Else (feature 3 not in {1.0})
+    If (feature 1 in {1.0})
+     Predict: 1.0
+    Else (feature 1 not in {1.0})
      If (feature 8 in {1.0})
       Predict: 1.0
      Else (feature 8 not in {1.0})
-      If (feature 9 in {1.0})
-       If (feature 13 <= 0.0)
+      If (feature 2 in {1.0})
+       If (feature 14 in {0.0})
         Predict: 1.0
-       Else (feature 13 > 0.0)
+       Else (feature 14 not in {0.0})
         Predict: 1.0
-      Else (feature 9 not in {1.0})
-       If (feature 4 in {1.0})
+      Else (feature 2 not in {1.0})
+       If (feature 5 in {1.0})
         Predict: 1.0
-       Else (feature 4 not in {1.0})
-        If (feature 1 in {1.0})
-         If (feature 12 <= 0.0)
-          Predict: 1.0
-         Else (feature 12 > 0.0)
-          Predict: 1.0
-        Else (feature 1 not in {1.0})
-         If (feature 3 in {1.0})
-          Predict: 1.0
-         Else (feature 3 not in {1.0})
-          If (feature 7 in {1.0})
-           If (feature 11 <= 0.0)
+       Else (feature 5 not in {1.0})
+        If (feature 7 in {1.0})
+         Predict: 1.0
+        Else (feature 7 not in {1.0})
+         If (feature 0 in {1.0})
+          If (feature 12 in {1.0})
+           If (feature 10 in {0.0})
             Predict: 1.0
-           Else (feature 11 > 0.0)
+           Else (feature 10 not in {0.0})
             Predict: 1.0
-          Else (feature 7 not in {1.0})
-           If (feature 0 in {1.0})
-            If (feature 13 <= 0.0)
+          Else (feature 12 not in {1.0})
+           Predict: 1.0
+         Else (feature 0 not in {1.0})
+          If (feature 9 in {1.0})
+           Predict: 1.0
+          Else (feature 9 not in {1.0})
+           If (feature 4 in {1.0})
+            If (feature 10 in {0.0})
              Predict: 1.0
-            Else (feature 13 > 0.0)
-             If (feature 14 <= 0.0)
+            Else (feature 10 not in {0.0})
+             If (feature 14 in {0.0})
               Predict: 1.0
-             Else (feature 14 > 0.0)
+             Else (feature 14 not in {0.0})
               Predict: 1.0
-           Else (feature 0 not in {1.0})
+           Else (feature 4 not in {1.0})
             Predict: 0.0
 
 scala>
