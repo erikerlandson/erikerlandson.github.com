@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2016-06-01T07:12:58-07:00</updated>
+  <updated>2016-06-01T07:23:42-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -43,11 +43,11 @@
 
 <p>Test statistics have another appealing property: many are "aware" of sample size in a way that captures the idea that the smaller the sample size, the larger the difference between populations should be to conclude a given significance.  For one example, consider <a href="https://en.wikipedia.org/wiki/Welch's_t-test#Statistical_test">Welch's t-test</a>, the two-sample variation of the t distribution that applies well to comparing left and right sub populations of candidate decision tree splits:</p>
 
-<p><img src="assets/images/pval_halting/figure_1.png" alt="Figure 1" /></p>
+<p><img src="/assets/images/pval_halting/figure_1.png" alt="Figure 1" /></p>
 
 <p>Visualizing the effects of sample sizes n1 and n2 on these equations directly is a bit tricky, but assuming equal sample sizes and variances allows the equations to be simplified quite a bit, so that we can observe the effect of sample size:</p>
 
-<p><img src="assets/images/pval_halting/figure_2.png" alt="Figure 2" /></p>
+<p><img src="/assets/images/pval_halting/figure_2.png" alt="Figure 2" /></p>
 
 <p>These simplified equations show clearly that (all else remaining equal) as sample size grows smaller, the measured t-statistic correspondingly grows smaller (proportional to sqrt(n)), and furthermore the corresponding variance of the t distribution to be applied grows larger.  For any given shift in left and right sub-populations, each of these trends yields a larger (i.e. weaker) p-value.   This behavior is desirable for a split quality metric.  <strong>The less data there is at a given candidate split, the less confidence there <em>should</em> be in split quality.</strong>  Put another way: we would like to require a larger difference before a split is measured as being good quality when we have less data to work with, and that is exactly the behavior the t-test provides us.</p>
 
