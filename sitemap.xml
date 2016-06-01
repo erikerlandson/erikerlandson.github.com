@@ -239,11 +239,17 @@
         <lastmod>2016-05-26T15:42:37-07:00</lastmod>
     </url>
     <url>
+        <loc>
+            http://erikerlandson.github.com/blog/2016/05/26/measuring-decision-tree-split-quality-with-test-statistic-p-values/
+        </loc>
+        <lastmod>2016-06-01T07:12:38-07:00</lastmod>
+    </url>
+    <url>
         <loc>http://erikerlandson.github.com/</loc>
-        <lastmod>2016-05-26T15:42:37-07:00</lastmod>
+        <lastmod>2016-06-01T07:12:38-07:00</lastmod>
     </url>
     <url>
         <loc>http://erikerlandson.github.com/blog/archives/</loc>
-        <lastmod>2016-05-26T15:42:37-07:00</lastmod>
+        <lastmod>2016-06-01T07:12:38-07:00</lastmod>
     </url>
 </urlset>

@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2016-05-27T15:42:53-07:00</updated>
+  <updated>2016-06-01T07:12:58-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,333 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Measuring Decision Tree Split Quality with Test Statistic P-Values]]></title>
+    <link href="http://erikerlandson.github.com/blog/2016/05/26/measuring-decision-tree-split-quality-with-test-statistic-p-values/"/>
+    <updated>2016-05-26T14:39:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2016/05/26/measuring-decision-tree-split-quality-with-test-statistic-p-values</id>
+    <content type="html"><![CDATA[<p>When training a <a href="https://en.wikipedia.org/wiki/Decision_tree_learning">decision tree</a> learning model (or an <a href="https://en.wikipedia.org/wiki/Random_forest">ensemble</a> of such models) it is often nice to have a policy for deciding when a tree node can no longer be usefully split.  There are a variety possibilities.  For example, halting when node population size becomes smaller than some threshold is a simple and effective policy.  Another approach is to halt when some measure of node purity fails to increase by some minimum threshold.  <strong>The underlying concept is to have some measure of split <em>quality</em>, and to halt when no candidate split has sufficient quality.</strong></p>
+
+<p>In this post I am going to discuss some advantages to one of my favorite approaches to measuring split quality, which is to use a <a href="https://en.wikipedia.org/wiki/Statistical_significance">test statistic significance</a> -- aka "p-value" -- of the null hypothesis that the left and right sub-populations are the same after the split.  The idea is that if a split is of good quality, then it ought to have caused the sub-populations to the left and right of the split to be <em>meaningfully different</em>.  That is to say: the null hypothesis (that they are the same) should be <em>rejected</em> with high confidence, i.e. a small p-value.  What constitutes "small" is always context dependent, but popular p-values from applied statistics are 0.05, 0.01, 0.005, etc.</p>
+
+<p>The remainder of this post is organized in the following sections:</p>
+
+<p><a href="#consistency">Consistency</a> <br>
+<a href="#awareness">Awareness of Sample Sizes</a> <br>
+<a href="#results">Training Results</a> <br>
+<a href="#conclusion">Conclusion</a> <br></p>
+
+<p><a name="consistency"></a></p>
+
+<h5>Consistency</h5>
+
+<p>Test statistic p-values have some appealing properties as a split quality measure.  The test statistic methodology has the advantage of working essentially the same way regardless of the particular test being used.  We begin with two sample populations; in our case, these are the left and right sub-populations created by a candidate split.  We want to assess whether these two populations have the same distribution (the null hypothesis) or different distributions.  We measure some test statistic 'S' (<a href="https://en.wikipedia.org/wiki/Student's_t-test">Student's t</a>, <a href="https://en.wikipedia.org/wiki/Chi-squared_test#Example_chi-squared_test_for_categorical_data">Chi-Squared</a>, etc).  We then compute the probability that |S| >= the value we actually measured.  This probability is commonly referred to as the p-value.  The smaller the p-value, the less likely it is that our two populations are the same.  <strong>In our case, we can interpret this as: a smaller p-value indicates a better quality split.</strong></p>
+
+<p>This consistent methodology has a couple advantages contributing to user experience (UX).  If all measures of split quality work in the same way, then there is a lower cognitive load to move between measures once the user understands the common pattern of use.  A second advantage is better "unit analysis."  Since all such quality measures take the form of p-values, there is no risk of a chosen quality measure getting mis-aligned with a corresponding quality threshold.  They are all probabilities, on the interval [0,1], and "smaller threshold" always means "higher threshold of split quality."   By way of comparison, if an application is measuring <a href="https://en.wikipedia.org/wiki/Entropy_%28information_theory%29">entropy</a> and then switches to using <a href="https://en.wikipedia.org/wiki/Decision_tree_learning#Gini_impurity">Gini impurity</a>, these measures are in differing units and care has to be taken that the correct quality threshold is used in each case or the model training policy will be broken.  Switching between differing statistical tests does not come with the same risk.  <strong>A p-value quality threshold will have the same semantic regardless of which statistical test is being applied:</strong> probability that left and right sub-populations are the same, given the particular statistic being measured.</p>
+
+<p><a name="awareness"></a></p>
+
+<h5>Awareness of Sample Size</h5>
+
+<p>Test statistics have another appealing property: many are "aware" of sample size in a way that captures the idea that the smaller the sample size, the larger the difference between populations should be to conclude a given significance.  For one example, consider <a href="https://en.wikipedia.org/wiki/Welch's_t-test#Statistical_test">Welch's t-test</a>, the two-sample variation of the t distribution that applies well to comparing left and right sub populations of candidate decision tree splits:</p>
+
+<p><img src="assets/images/pval_halting/figure_1.png" alt="Figure 1" /></p>
+
+<p>Visualizing the effects of sample sizes n1 and n2 on these equations directly is a bit tricky, but assuming equal sample sizes and variances allows the equations to be simplified quite a bit, so that we can observe the effect of sample size:</p>
+
+<p><img src="assets/images/pval_halting/figure_2.png" alt="Figure 2" /></p>
+
+<p>These simplified equations show clearly that (all else remaining equal) as sample size grows smaller, the measured t-statistic correspondingly grows smaller (proportional to sqrt(n)), and furthermore the corresponding variance of the t distribution to be applied grows larger.  For any given shift in left and right sub-populations, each of these trends yields a larger (i.e. weaker) p-value.   This behavior is desirable for a split quality metric.  <strong>The less data there is at a given candidate split, the less confidence there <em>should</em> be in split quality.</strong>  Put another way: we would like to require a larger difference before a split is measured as being good quality when we have less data to work with, and that is exactly the behavior the t-test provides us.</p>
+
+<p><a name="results"></a></p>
+
+<h5>Training Results</h5>
+
+<p>These propreties are pleasing, but it remains to show that test statistics can actually improve decision tree training in practice.  In the following sections I will compare the effects of training with test statstics with other split quality policies based on entropy and gini index.</p>
+
+<p>To conduct these experiments, I modified a <a href="https://github.com/erikerlandson/spark/blob/pval_halting/mllib/src/main/scala/org/apache/spark/mllib/tree/impurity/ChiSquared.scala">local copy</a> of Apache Spark with the <a href="https://en.wikipedia.org/wiki/Chi-squared_test#Example_chi-squared_test_for_categorical_data">Chi-Squared</a> test statistic for comparing categorical distributions.  The demo script, which I ran in <code>spark-shell</code>, can be viewed <a href="https://github.com/erikerlandson/spark/blob/pval_halting/pval_demo">here</a>.</p>
+
+<p>I generated an example data set that represents a two-class learning problem, where labels may be 0 or 1.  Each sample has 10 clean binary features, such that if the bit is 1, the probability of the label is 90% 1 and 10% 0.  There are 5 noise features, also binary, which are completely random.   There are 50 samples of each clean feature being on, for a total of 500 samples.   There are also 500 samples where all clean features are 0 and the corresponding labels are 90% 0 and 10% 1.  The total number of samples in the data set is 1000.  The shape of the data is illustrated by the following table:</p>
+
+<p><code>
+truth |     features 0 - 9 (one on at a time)     |   random noise
+------+-------------------------------------------+--------------
+90% 1 | 1   0   0   0   0   0   0   0   0   0   0 | 1   0   0   1   0
+90% 1 |  ... 50 samples with feature 0 'on' ...   |   ... noise ...
+90% 1 | 0   1   0   0   0   0   0   0   0   0   0 | 0   1   1   0   0
+90% 1 |  ... 50 samples with feature 1 'on' ...   |   ... noise ...
+90% 1 |  ... 50 samples with feature 2 'on' ...   |   ... noise ...
+90% 1 |  ... 50 samples with feature 3 'on' ...   |   ... noise ...
+90% 1 |  ... 50 samples with feature 4 'on' ...   |   ... noise ...
+90% 1 |  ... 50 samples with feature 5 'on' ...   |   ... noise ...
+90% 1 |  ... 50 samples with feature 6 'on' ...   |   ... noise ...
+90% 1 |  ... 50 samples with feature 7 'on' ...   |   ... noise ...
+90% 1 |  ... 50 samples with feature 8 'on' ...   |   ... noise ...
+90% 1 |  ... 50 samples with feature 9 'on' ...   |   ... noise ...
+90% 0 | 0   0   0   0   0   0   0   0   0   0   0 | 1   1   0   0   1
+90% 0 |  ... 500 samples with all 'off  ...       |   ... noise ...
+</code></p>
+
+<p>For the first run I use my customized chi-squared statistic as the split quality measure.  I used a p-value threshold of 0.01 -- that is, I would like my chi-squared test to conclude that the probability of left and right split populations are the same is &lt;= 0.01, or that split will not be used.  Note, this means I can expect that around 1% of the time, it will conclude a split was good, when it was just luck.  This is a reasonable false-positive rate; random forests are by nature robust to noise, including noise in their own split decisions:</p>
+
+<p>```
+scala> :load pval_demo
+Loading pval_demo...
+defined module demo</p>
+
+<p>scala> val rf = demo.train("chisquared", 0.01, noise = 0.1)
+  pval= 1.578e-09
+gain= 20.2669
+  pval= 1.578e-09
+gain= 20.2669
+  pval= 1.578e-09
+gain= 20.2669
+  pval= 9.140e-09
+gain= 18.5106</p>
+
+<p>... more tree p-value demo output ...</p>
+
+<p>  pval= 0.7429
+gain= 0.2971
+  pval= 0.9287
+gain= 0.0740
+  pval= 0.2699
+gain= 1.3096
+rf: org.apache.spark.mllib.tree.model.RandomForestModel =
+TreeEnsembleModel classifier with 1 trees</p>
+
+<p>scala> println(rf.trees(0).toDebugString)
+DecisionTreeModel classifier of depth 10 with 21 nodes
+  If (feature 5 in {1.0})
+   Predict: 1.0
+  Else (feature 5 not in {1.0})
+   If (feature 6 in {1.0})</p>
+
+<pre><code>Predict: 1.0
+</code></pre>
+
+<p>   Else (feature 6 not in {1.0})</p>
+
+<pre><code>If (feature 0 in {1.0})
+ Predict: 1.0
+Else (feature 0 not in {1.0})
+ If (feature 1 in {1.0})
+  Predict: 1.0
+ Else (feature 1 not in {1.0})
+  If (feature 2 in {1.0})
+   Predict: 1.0
+  Else (feature 2 not in {1.0})
+   If (feature 8 in {1.0})
+    Predict: 1.0
+   Else (feature 8 not in {1.0})
+    If (feature 3 in {1.0})
+     Predict: 1.0
+    Else (feature 3 not in {1.0})
+     If (feature 4 in {1.0})
+      Predict: 1.0
+     Else (feature 4 not in {1.0})
+      If (feature 7 in {1.0})
+       Predict: 1.0
+      Else (feature 7 not in {1.0})
+       If (feature 9 in {1.0})
+        Predict: 1.0
+       Else (feature 9 not in {1.0})
+        Predict: 0.0
+</code></pre>
+
+<p>scala>
+```</p>
+
+<p>The first thing to observe is that <strong>the resulting decision tree used exactly the 10 clean features 0 through 9, and none of the five noise features.</strong>   The tree splits off each of the clean features to obtain an optimally accurate leaf-node (one with 90% 1s and 10% 0s).  A second observation is that the p-values shown in the demo output are extremely small (i.e. strong) values -- around 1e-9 (one part in a billion) -- for good-quality splits.  We can also see "weak" p-values with magnitudes such as 0.7, 0.2, etc.  These are poor quality splits on the noise features that it rejects and does not use in the tree, exactly as we hope to see.</p>
+
+<p>Next, I will show a similar run with the standard available "entropy" quality measure, and a minimum gain threshold of 0.035, which is a value I had to determine by trial and error, as what kind of entropy gains one can expect to see, and where to cut them off, is somewhat unintuitive and likely to be very data dependent.</p>
+
+<p>```
+scala> val rf = demo.train("entropy", 0.035, noise = 0.1)
+  impurity parent= 0.9970, left= 0.3274 (  50), right= 0.9997 ( 950) weighted= 0.9661
+gain= 0.0310
+  impurity parent= 0.9970, left= 0.1414 (  50), right= 0.9998 ( 950) weighted= 0.9569
+gain= 0.0402
+  impurity parent= 0.9970, left= 0.3274 (  50), right= 0.9997 ( 950) weighted= 0.9661
+gain= 0.0310</p>
+
+<p>... more demo output ...</p>
+
+<p>rf: org.apache.spark.mllib.tree.model.RandomForestModel =
+TreeEnsembleModel classifier with 1 trees</p>
+
+<p>scala> println(rf.trees(0).toDebugString)
+DecisionTreeModel classifier of depth 11 with 41 nodes
+  If (feature 4 in {1.0})
+   If (feature 12 in {1.0})</p>
+
+<pre><code>If (feature 11 in {1.0})
+ Predict: 1.0
+Else (feature 11 not in {1.0})
+ Predict: 1.0
+</code></pre>
+
+<p>   Else (feature 12 not in {1.0})</p>
+
+<pre><code>Predict: 1.0
+</code></pre>
+
+<p>  Else (feature 4 not in {1.0})
+   If (feature 1 in {1.0})</p>
+
+<pre><code>If (feature 12 in {1.0})
+ Predict: 1.0
+Else (feature 12 not in {1.0})
+ Predict: 1.0
+</code></pre>
+
+<p>   Else (feature 1 not in {1.0})</p>
+
+<pre><code>If (feature 0 in {1.0})
+ If (feature 10 in {0.0})
+  If (feature 14 in {1.0})
+   Predict: 1.0
+  Else (feature 14 not in {1.0})
+   Predict: 1.0
+ Else (feature 10 not in {0.0})
+  If (feature 14 in {0.0})
+   Predict: 1.0
+  Else (feature 14 not in {0.0})
+   Predict: 1.0
+Else (feature 0 not in {1.0})
+ If (feature 6 in {1.0})
+  Predict: 1.0
+ Else (feature 6 not in {1.0})
+  If (feature 3 in {1.0})
+   Predict: 1.0
+  Else (feature 3 not in {1.0})
+   If (feature 7 in {1.0})
+    If (feature 13 in {1.0})
+     Predict: 1.0
+    Else (feature 13 not in {1.0})
+     Predict: 1.0
+   Else (feature 7 not in {1.0})
+    If (feature 2 in {1.0})
+     Predict: 1.0
+    Else (feature 2 not in {1.0})
+     If (feature 8 in {1.0})
+      Predict: 1.0
+     Else (feature 8 not in {1.0})
+      If (feature 9 in {1.0})
+       If (feature 11 in {1.0})
+        If (feature 13 in {1.0})
+         Predict: 1.0
+        Else (feature 13 not in {1.0})
+         Predict: 1.0
+       Else (feature 11 not in {1.0})
+        If (feature 12 in {1.0})
+         Predict: 1.0
+        Else (feature 12 not in {1.0})
+         Predict: 1.0
+      Else (feature 9 not in {1.0})
+       If (feature 5 in {1.0})
+        Predict: 1.0
+       Else (feature 5 not in {1.0})
+        Predict: 0.0
+</code></pre>
+
+<p>scala>
+```</p>
+
+<p>The first observation is that <strong>the resulting tree using entropy as a split quality measure is twice the size of the tree trained using the chi-squared policy.</strong>  Worse, it is using the noise features -- its quality measure is yielding many more false positives.  The entropy-based model is less parsimonious and will also have performance problems since the model has included very noisy features.</p>
+
+<p>Lastly, I ran a similar training using the "gini" impurity measure, and a 0.015 quality threshold (again, hopefully optimal value that I had to run multiple experiments to identify).  Its quality is better than the entropy-based measure, but this model is still substantially larger than the chi-squared model, and it still uses some noise features:</p>
+
+<p>```
+scala> val rf = demo.train("gini", 0.015, noise = 0.1)
+  impurity parent= 0.4999, left= 0.2952 (  50), right= 0.4987 ( 950) weighted= 0.4885
+gain= 0.0113
+  impurity parent= 0.4999, left= 0.2112 (  50), right= 0.4984 ( 950) weighted= 0.4840
+gain= 0.0158
+  impurity parent= 0.4999, left= 0.1472 (  50), right= 0.4981 ( 950) weighted= 0.4806
+gain= 0.0193
+  impurity parent= 0.4999, left= 0.2112 (  50), right= 0.4984 ( 950) weighted= 0.4840
+gain= 0.0158</p>
+
+<p>... more demo output ...</p>
+
+<p>rf: org.apache.spark.mllib.tree.model.RandomForestModel =
+TreeEnsembleModel classifier with 1 trees</p>
+
+<p>scala> println(rf.trees(0).toDebugString)
+DecisionTreeModel classifier of depth 12 with 31 nodes
+  If (feature 6 in {1.0})
+   Predict: 1.0
+  Else (feature 6 not in {1.0})
+   If (feature 3 in {1.0})</p>
+
+<pre><code>Predict: 1.0
+</code></pre>
+
+<p>   Else (feature 3 not in {1.0})</p>
+
+<pre><code>If (feature 1 in {1.0})
+ Predict: 1.0
+Else (feature 1 not in {1.0})
+ If (feature 8 in {1.0})
+  Predict: 1.0
+ Else (feature 8 not in {1.0})
+  If (feature 2 in {1.0})
+   If (feature 14 in {0.0})
+    Predict: 1.0
+   Else (feature 14 not in {0.0})
+    Predict: 1.0
+  Else (feature 2 not in {1.0})
+   If (feature 5 in {1.0})
+    Predict: 1.0
+   Else (feature 5 not in {1.0})
+    If (feature 7 in {1.0})
+     Predict: 1.0
+    Else (feature 7 not in {1.0})
+     If (feature 0 in {1.0})
+      If (feature 12 in {1.0})
+       If (feature 10 in {0.0})
+        Predict: 1.0
+       Else (feature 10 not in {0.0})
+        Predict: 1.0
+      Else (feature 12 not in {1.0})
+       Predict: 1.0
+     Else (feature 0 not in {1.0})
+      If (feature 9 in {1.0})
+       Predict: 1.0
+      Else (feature 9 not in {1.0})
+       If (feature 4 in {1.0})
+        If (feature 10 in {0.0})
+         Predict: 1.0
+        Else (feature 10 not in {0.0})
+         If (feature 14 in {0.0})
+          Predict: 1.0
+         Else (feature 14 not in {0.0})
+          Predict: 1.0
+       Else (feature 4 not in {1.0})
+        Predict: 0.0
+</code></pre>
+
+<p>scala>
+```</p>
+
+<p><a name="conclusion"></a></p>
+
+<h5>Conclusion</h5>
+
+<p>In this post I have discussed some advantages of using test statstics and p-values as split quality metrics for decision tree training:</p>
+
+<ul>
+<li>Consistency</li>
+<li>Awareness of sample size</li>
+<li>Higher quality model training</li>
+</ul>
+
+
+<p>I believe they are a useful tool for improved training of decision tree models!  Happy computing!</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Random Forest Clustering of Machine Package Configurations in Apache Spark]]></title>
@@ -550,113 +877,6 @@ def update(m: M, e: E) = mon.plus(m, mon.prepare(e))
 <p>  }
 }
 ```</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Very Fast Reservoir Sampling]]></title>
-    <link href="http://erikerlandson.github.com/blog/2015/11/20/very-fast-reservoir-sampling/"/>
-    <updated>2015-11-20T11:27:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2015/11/20/very-fast-reservoir-sampling</id>
-    <content type="html"><![CDATA[<p>In this post I will demonstrate how to do reservoir sampling orders of magnitude faster than the traditional "naive" reservoir sampling algorithm, using a fast high-fidelity approximation to the reservoir sampling-gap distribution.</p>
-
-<blockquote><p>The code I used to collect the data for this post can be viewed <a href="https://github.com/erikerlandson/silex/blob/blog/reservoir/src/main/scala/com/redhat/et/silex/sample/reservoir/reservoir.scala">here</a>.  I generated the plots using the <a href="https://github.com/quantifind/wisp">quantifind WISP</a> project.</p>
-
-<p>Update (April 4, 2016): my colleague <a href="http://rnowling.github.io/">RJ Nowling</a> ran across a <a href="http://www.ittc.ku.edu/~jsv/Papers/Vit87.RandomSampling.pdf">paper by J.S. Vitter</a> that shows Vitter developed the trick of accelerating sampling with a sampling-gap distribution in 1987 -- I re-invented Vitter's wheel 30 years after the fact!  I'm surprised it never caught on, as it is not much harder to implement than the naive version.</p></blockquote>
-
-<p>In a <a href="http://erikerlandson.github.io/blog/2014/09/11/faster-random-samples-with-gap-sampling/">previous post</a>, I showed that random Bernoulli and Poisson sampling could be made much faster by modeling the <em>sampling gap distribution</em> for the corresponding sampling distributions.  More recently, I also began exploring whether <a href="https://en.wikipedia.org/wiki/Reservoir_sampling">reservoir sampling</a> might also be optimized using the gap sampling technique, by deriving the <a href="http://erikerlandson.github.io/blog/2015/08/17/the-reservoir-sampling-gap-distribution/">reservoir sampling gap distribution</a>.  For a sampling reservoir of size (R), starting at data element (j), the probability distribution of the sampling gap is:</p>
-
-<p><img src="/assets/images/reservoir1/figure6.png" title="Figure 1" alt="Figure 1" /></p>
-
-<p>Modeling a sampling gap distribution is a powerful tool for optimizing a sampling algorithm, but it presupposes that you can actually draw values from that distribution substantially faster than just applying a random process to drawing each data element.  I was unable to come up with a "direct" algorithm for drawing samples from P(k) above (I suspect none exists), however I also know the CDF F(k), so it <em>is</em> possible to apply <a href="https://en.wikipedia.org/wiki/Inverse_transform_sampling">inversion sampling</a>, which runs in logarithmic time w.r.t the desired accuracy.  Although its logarithmic cost effectively guarantees that it will be a net efficiency win for sufficiently large (j), it still involves a substantial number of computations to yield its samples, and it seems unlikely to be competitive with straight "naive" reservoir sampling over many real-world data sizes, where (j) may never grow very large.</p>
-
-<p>Well, if exact computations are too expensive, we can always look for a fast approximation.  Consider the original "first principles" formula for the sampling gap P(k):</p>
-
-<p><img src="/assets/images/reservoir2/figure2.png" title="Figure 2" alt="Figure 2" /></p>
-
-<p>As the figure above alludes to, if (j) is relatively large compared to (k), then values (j+1),(j+2)...(j+k) are all going to be effectively "close" to (j), and so we can replace them all with (j) as an approximation.  Note that the resulting approximation is just the PMF of the <a href="https://en.wikipedia.org/wiki/Geometric_distribution">geometric distribution</a>, with probability of success p=(R/j), and we already saw how to efficiently draw values from a geometric distribution from our experience with Bernoulli sampling.</p>
-
-<p>Do we have any reason to hope that this approximation will be useful?  For reasons that are similar to those for Bernoulli gap sampling, it will only be efficient to employ gap sampling when the probability (R/j) becomes small enough.  From our experiences with Bernoulli sampling that is <em>at least</em> j>=2R.  So, we have some assurance that (j) itself will be never be <em>very</em> small.  What about (k)?  Note that a geometric distribution "favors" smaller values of (k) -- that is, small values of (k) have the highest probabilities.  In fact, the smaller that (j) is, the larger the probability (R/j) is, and so the more likely that (k) values that are small relative to (j) will be the frequent ones.  It is also promising that the true distribution for P(k) <em>also</em> favors smaller values of (k) (in fact it favors them even a bit more strongly than the approximation).</p>
-
-<p>Although it is encouraging, it is also clear that my argument above is limited to heuristic hand-waving.  What does this approximation really <em>look</em> like, compared to the true distribution?  Fortunately, it is easy to plot both distributions numerically, since we now know the formulas for both:</p>
-
-<p><img src="/assets/images/reservoir2/CDFs_R=10.png" title="Figure 3" alt="Figure 3" /></p>
-
-<p>The plot above shows that, in fact, the geometric approximation is a <em>surprisingly good</em> approximation to the true distribution!  Furthermore, the approximation remains good as both (j) and (k) grow larger.</p>
-
-<p>Our numeric eye-balling looks quite promising.  Is there an effective way to <em>measure</em> how good this approximation is?  One useful measure is the <a href="https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test">Kolmogorov-Smirnov D statistic</a>, which is just the maximum absolute error between two cumulative distributions.  Here is a plot of the D statistic for reservoir size R=10, as (j) varies across several magnitudes:</p>
-
-<p><img src="/assets/images/reservoir2/R=10.png" title="Figure 4" alt="Figure 4" /></p>
-
-<p>This plot is also good news: we can see that deviation, as measured by D, remains bounded at a small value (less than 0.0262).  As this is for the specific value R=10, we also want to know how things change as reservoir size changes:</p>
-
-<p><img src="/assets/images/reservoir2/R=all.png" title="Figure 5" alt="Figure 5" /></p>
-
-<p>The news is still good!  As reservoir size grows, the approximation only gets better: the D values get smaller as R increases, and remain asymptotically bounded as (j) increases.</p>
-
-<p>Now we have some numeric assurance that the geometric approximation is a good one, and stays good as reservoir size grows and sampling runs get longer.  However, we should also verify that an actual implementation of the approximation works as expected.</p>
-
-<p>Here is pseudocode for an implementation of reservoir sampling using the fast geometric approximation:</p>
-
-<pre><code>// data is array to sample from
-// R is the reservoir size
-function reservoirFast(data: Array, R: Int) {
-  n = data.length
-  // Initialize reservoir with first R elements of data:
-  res = data[0 until R]
-  // Until this threshold, use traditional sampling.  This value may
-  // depend on performance characteristics of random number generation and/or
-  // numeric libraries:
-  t = 4 * R
-  j = 1 + R
-  while (j &lt; n  &amp;&amp;  j &lt;= t) {
-    k = randomInt(j) // random integer &gt;= 0 and &lt; j
-    if (k &lt; R) res[k] = data[j]
-    j = j + 1
-  }
-  // Once gaps become significant, it pays to do gap sampling
-  while (j &lt; n) {
-    // draw gap size (g) from geometric distribution with probability p = R/j
-    p = R / j
-    u = randomFloat() // random float &gt; 0 and &lt;= 1
-    g = floor(log(u) / log(1-p))
-    j = j + g
-    if (j &lt; n) {
-      k = randomInt(R)
-      res[k] = data[j]
-    }
-    j = j + 1
-  }
-  // return the reservoir
-  return res
-}
-</code></pre>
-
-<p>Following is a plot that shows two-sample D statistics, comparing the distribution in sample gaps between runs of the exact "naive" reservoir sampling with the fast geometric approximation:</p>
-
-<p><img src="/assets/images/reservoir2/D_naive_vs_fast.png" title="Figure 6" alt="Figure 6" /></p>
-
-<p>As expected, the measured difference in sampling characteristics between naive and fast approximation are small, confirming the numeric predictions.</p>
-
-<p>Since the point of this exercise was to achieve faster random sampling, it remains to measure what kind of speed improvements the fast approximation provides.  As a point of reference, here is a plot of run times for reservoir sampling over 10<sup>8</sup> integers:</p>
-
-<p><img src="/assets/images/reservoir2/naive_sample_time_vs_R.png" title="Figure 7" alt="Figure 7" /></p>
-
-<p>As expected, sample time remains constant at around 1.5 seconds, regardless of reservoir size, since the naive algorithm always samples from its RNG per each sample.</p>
-
-<p>Compare this to the corresponding plot for the fast geometric approximation:</p>
-
-<p><img src="/assets/images/reservoir2/gap_sample_times_vs_R.png" title="Figure 8" alt="Figure 8" /></p>
-
-<p>Firstly, we see that the sampling times are <em>much faster</em>, as originally anticipated in my <a href="http://erikerlandson.github.io/blog/2015/08/17/the-reservoir-sampling-gap-distribution/">previous post</a> -- in the neighborhood of 3 orders of magnitude faster.  Secondly, we see that the sampling times do increase as a linear function of reservoir size.  Based on our experience with Bernoulli gap sampling, this is expected; the sampling probabilities are given by (R/j), and therefore the amount of sampling is proportional to R.</p>
-
-<p>Another property anticipated in my previous post was that the efficiency of gap sampling should continue to increase as the amount of data sampled grows; the sampling probability being (R/j), the probability of sampling decreases as j gets larger, and so the corresponding gap sizes grow.  The following plot verifies this property, holding reservoir size R constant, and increasing the data size:</p>
-
-<p><img src="/assets/images/reservoir2/gap_sampling_efficiency.png" title="Figure 9" alt="Figure 9" /></p>
-
-<p>The sampling time (per million elements) decreases as the sample size grows, as predicted by the formula.</p>
-
-<p>In conclusion, I have demonstrated that a geometric distribution can be used as a high quality approximation to the true sampling gap distribution for reservoir sampling, which allows reservoir sampling to be performed much faster than the naive algorithm while still retaining sampling quality.</p>
 ]]></content>
   </entry>
   
