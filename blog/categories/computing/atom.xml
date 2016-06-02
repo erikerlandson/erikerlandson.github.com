@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2016-06-01T07:23:42-07:00</updated>
+  <updated>2016-06-01T17:04:25-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -19,6 +19,8 @@
     <updated>2016-05-26T14:39:00-07:00</updated>
     <id>http://erikerlandson.github.com/blog/2016/05/26/measuring-decision-tree-split-quality-with-test-statistic-p-values</id>
     <content type="html"><![CDATA[<p>When training a <a href="https://en.wikipedia.org/wiki/Decision_tree_learning">decision tree</a> learning model (or an <a href="https://en.wikipedia.org/wiki/Random_forest">ensemble</a> of such models) it is often nice to have a policy for deciding when a tree node can no longer be usefully split.  There are a variety possibilities.  For example, halting when node population size becomes smaller than some threshold is a simple and effective policy.  Another approach is to halt when some measure of node purity fails to increase by some minimum threshold.  <strong>The underlying concept is to have some measure of split <em>quality</em>, and to halt when no candidate split has sufficient quality.</strong></p>
+
+<blockquote><p>update -- there is now an Apache Spark <a href="https://issues.apache.org/jira/browse/SPARK-15699">JIRA</a> and a <a href="https://github.com/apache/spark/pull/13440">pull request</a> for this feature</p></blockquote>
 
 <p>In this post I am going to discuss some advantages to one of my favorite approaches to measuring split quality, which is to use a <a href="https://en.wikipedia.org/wiki/Statistical_significance">test statistic significance</a> -- aka "p-value" -- of the null hypothesis that the left and right sub-populations are the same after the split.  The idea is that if a split is of good quality, then it ought to have caused the sub-populations to the left and right of the split to be <em>meaningfully different</em>.  That is to say: the null hypothesis (that they are the same) should be <em>rejected</em> with high confidence, i.e. a small p-value.  What constitutes "small" is always context dependent, but popular p-values from applied statistics are 0.05, 0.01, 0.005, etc.</p>
 
