@@ -11,6 +11,8 @@ When training a [decision tree](https://en.wikipedia.org/wiki/Decision_tree_lear
 
 In this post I am going to discuss some advantages to one of my favorite approaches to measuring split quality, which is to use a [test statistic significance](https://en.wikipedia.org/wiki/Statistical_significance) -- aka "p-value" -- of the null hypothesis that the left and right sub-populations are the same after the split.  The idea is that if a split is of good quality, then it ought to have caused the sub-populations to the left and right of the split to be _meaningfully different_.  That is to say: the null hypothesis (that they are the same) should be _rejected_ with high confidence, i.e. a small p-value.  What constitutes "small" is always context dependent, but popular p-values from applied statistics are 0.05, 0.01, 0.005, etc.
 
+> update -- there is now an Apache Spark [JIRA](https://issues.apache.org/jira/browse/SPARK-15699) and a [pull request](https://github.com/apache/spark/pull/13440) for this feature
+
 The remainder of this post is organized in the following sections:
 
 [Consistency](#consistency) <br>
