@@ -3,7 +3,7 @@ layout: post
 title: "Exploring the Effects of Dimensionality on a PDF of Distances"
 date: 2016-06-08 20:56
 comments: true
-published: false
+published: true
 categories: [ computing, math, probability, density, PDF, dimensionality ]
 ---
 
