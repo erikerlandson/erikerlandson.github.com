@@ -42,6 +42,8 @@ In my experiments, I am using multivariate Gaussians of mean **0**<sub>d</sub> a
 
 ![Figure 4](/assets/images/dist_dist/gwwv5a5.png)
 
+This form is in fact the [generalized gamma distribution](https://en.wikipedia.org/wiki/Generalized_gamma_distribution), with scale parameter <nobr>a=2<sup>1/2</sup>,</nobr> shape parameter p=2, and free shape parameter (d) representing the dimensionality in this context.
+
 I can verify that this PDF is correct by plotting it against randomly sampled data at differing dimensions:
 
 ![Figure 5](/assets/images/dist_dist/figure3.png)
