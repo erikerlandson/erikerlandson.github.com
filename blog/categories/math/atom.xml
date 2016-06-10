@@ -4,7 +4,7 @@
   <title><![CDATA[Category: math | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/math/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2016-06-10T10:45:49-07:00</updated>
+  <updated>2016-06-10T13:33:38-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -52,6 +52,8 @@
 <p>In my experiments, I am using multivariate Gaussians of mean <strong>0</strong><sub>d</sub> and unit covariance matrix <strong>I</strong><sub>d</sub>, and so the form for f(r;d) becomes:</p>
 
 <p><img src="/assets/images/dist_dist/gwwv5a5.png" alt="Figure 4" /></p>
+
+<p>This form is in fact the <a href="https://en.wikipedia.org/wiki/Generalized_gamma_distribution">generalized gamma distribution</a>, with scale parameter <nobr>a=2<sup>1/2</sup>,</nobr> shape parameter p=2, and free shape parameter (d) representing the dimensionality in this context.</p>
 
 <p>I can verify that this PDF is correct by plotting it against randomly sampled data at differing dimensions:</p>
 
