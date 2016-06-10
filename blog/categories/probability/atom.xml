@@ -4,7 +4,7 @@
   <title><![CDATA[Category: probability | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/probability/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2016-06-10T10:44:34-07:00</updated>
+  <updated>2016-06-10T10:45:49-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,54 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Exploring the Effects of Dimensionality on a PDF of Distances]]></title>
+    <link href="http://erikerlandson.github.com/blog/2016/06/08/exploring-the-effects-of-dimensionality-on-a-pdf-of-distances/"/>
+    <updated>2016-06-08T20:56:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2016/06/08/exploring-the-effects-of-dimensionality-on-a-pdf-of-distances</id>
+    <content type="html"><![CDATA[<p>Every so often I'm reminded that the effects of changing dimensionality on objects and processes can be surprisingly counterintuitive.  Recently I ran across a great example of this, while I working on a model for the distribution of distances in spaces of varying dimension.</p>
+
+<p>Suppose that I draw some values from a classic one-dimensional Gaussian, with zero mean and unit variance, but that I am actually interested in their corresponding distances from center.  Knowing that my Gaussian is centered on the origin, I can rephrase that as: the distribution of magnitudes of values drawn from that Gaussian.  I can simulate this process by actually samping Gaussian values and taking their absolute value.  When I do, I get the following result:</p>
+
+<p><img src="/assets/images/dist_dist/figure1.png" alt="Figure 1" /></p>
+
+<p>It's easy to see -- and intuitive -- that the resulting distribution is a <a href="https://en.wikipedia.org/wiki/Half-normal_distribution">half-Gaussian</a>, as I confirmed by overlaying the histogrammed samples above with a half-Gaussian PDF (displayed in green).</p>
+
+<p>I wanted to generalize this basic idea into some arbitrary dimensionality, (d), where I draw d-vectors from an <a href="https://en.wikipedia.org/wiki/Multivariate_normal_distribution">d-dimensional Gaussian</a> (again, centered on the origin with unit variances). When I take the magnitudes of these sampled d-vectors, what will the probability distribution of <em>their</em> magnitudes look like?</p>
+
+<p>My intuitive assumption was that these magnitudes would <em>also</em> follow a half-Gaussian distribution.  After all, every multivariate Gaussian is densest at its mean, just like the univariate case I examined above.  In fact I was so confident in this assumption that I built my initial modeling around it.  Great confusion ensued, when I saw how poorly my models were working on my higher-dimensional data!</p>
+
+<p>Eventually it occurred to me to do the obvious thing and generate some visualizations from higher dimensional data.  For example, here is the correponding plot generated from a bivariate Gaussian (d=2):</p>
+
+<p><a name="figure2"></a>
+<img src="/assets/images/dist_dist/figure2.png" alt="Figure 2" /></p>
+
+<p>Surprise -- the distribution at d=2 is <em>not even close to half-Gaussian!</em>.  My intuitions couldn't have been more misleading!</p>
+
+<p>Where did I go wrong?</p>
+
+<p>I'll start by observing what happens when I take a multi-dimensional PDF of vectors in (d) dimensions and project it down to a one-dimensional PDF of the corresponding vector magnitudes. To keep things simple, I will be assuming a multi-dimensional PDF <nobr>f<sub>r</sub>(<strong>x</strong><sub>d</sub>)</nobr> that is (1) centered on the origin, and (2) is radially symmetric; the pdf value is the same for all points at a given distance from the origin.  For example, any multivariate Gaussian with <strong>0</strong><sub>d</sub> mean and <strong>I</strong><sub>d</sub> for a covariance matrix satisfies these two assumptions.  With this in mind, you can see that the process of projecting from vectors in <strong>R</strong><sub>d</sub> to their distance from <strong>0</strong><sub>d</sub> (their magnitude) is equivalent to summing all densities <nobr>f<sub>r</sub>(<strong>x</strong><sub>d</sub>)</nobr> along the surface of "d-sphere" radius (r) to obtain a pdf f(r) in distance space.  With assumption (2) we can simplify that integration to just <nobr>f(r)=A<sub>d</sub>(r)f'(r)</nobr>, where f'(r) defines the value of <nobr>f<sub>r</sub>(<strong>x</strong>)</nobr> for all <strong>x</strong> with magnitude of (r), and A<sub>d</sub>(r) is the surface area of a d-sphere with radius (r):</p>
+
+<p><img src="/assets/images/dist_dist/ztrlusa.png" alt="Figure 3" /></p>
+
+<p>The key observation is that this term is a <em>polynomial</em> function of radius (r), with degree (d-1).  When d=1, it is simply a constant multiplier and so we get the half-Gaussian distribution we expect, but when <nobr>d >= 2</nobr>, the term is zero at r=0, and grows with radius.  Hence we see the in the <a href="#figure2">d=2 plot above</a> that the density begins at zero, then grows with radius until the decreasing gaussian density gradually drives it back toward zero again.</p>
+
+<p>The above ideas can be expressed compactly as follows:</p>
+
+<p><img src="/assets/images/dist_dist/jukgy85.png" alt="Figure 4" /></p>
+
+<p>In my experiments, I am using multivariate Gaussians of mean <strong>0</strong><sub>d</sub> and unit covariance matrix <strong>I</strong><sub>d</sub>, and so the form for f(r;d) becomes:</p>
+
+<p><img src="/assets/images/dist_dist/gwwv5a5.png" alt="Figure 4" /></p>
+
+<p>I can verify that this PDF is correct by plotting it against randomly sampled data at differing dimensions:</p>
+
+<p><img src="/assets/images/dist_dist/figure3.png" alt="Figure 5" /></p>
+
+<p>This plot demonstrates both that the PDF expression is correct for varying dimensionalities and also illustrates how the shape of the PDF evolves as dimensionality changes.  For me, it was a great example of challenging my intuitions and learning something completely unexpected about the interplay of distances and dimension.</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[The Reservoir Sampling Gap Distribution]]></title>

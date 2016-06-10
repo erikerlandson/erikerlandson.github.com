@@ -4,7 +4,7 @@
   <title><![CDATA[Category: math | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/math/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2016-06-10T10:44:34-07:00</updated>
+  <updated>2016-06-10T10:45:49-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,54 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Exploring the Effects of Dimensionality on a PDF of Distances]]></title>
+    <link href="http://erikerlandson.github.com/blog/2016/06/08/exploring-the-effects-of-dimensionality-on-a-pdf-of-distances/"/>
+    <updated>2016-06-08T20:56:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2016/06/08/exploring-the-effects-of-dimensionality-on-a-pdf-of-distances</id>
+    <content type="html"><![CDATA[<p>Every so often I'm reminded that the effects of changing dimensionality on objects and processes can be surprisingly counterintuitive.  Recently I ran across a great example of this, while I working on a model for the distribution of distances in spaces of varying dimension.</p>
+
+<p>Suppose that I draw some values from a classic one-dimensional Gaussian, with zero mean and unit variance, but that I am actually interested in their corresponding distances from center.  Knowing that my Gaussian is centered on the origin, I can rephrase that as: the distribution of magnitudes of values drawn from that Gaussian.  I can simulate this process by actually samping Gaussian values and taking their absolute value.  When I do, I get the following result:</p>
+
+<p><img src="/assets/images/dist_dist/figure1.png" alt="Figure 1" /></p>
+
+<p>It's easy to see -- and intuitive -- that the resulting distribution is a <a href="https://en.wikipedia.org/wiki/Half-normal_distribution">half-Gaussian</a>, as I confirmed by overlaying the histogrammed samples above with a half-Gaussian PDF (displayed in green).</p>
+
+<p>I wanted to generalize this basic idea into some arbitrary dimensionality, (d), where I draw d-vectors from an <a href="https://en.wikipedia.org/wiki/Multivariate_normal_distribution">d-dimensional Gaussian</a> (again, centered on the origin with unit variances). When I take the magnitudes of these sampled d-vectors, what will the probability distribution of <em>their</em> magnitudes look like?</p>
+
+<p>My intuitive assumption was that these magnitudes would <em>also</em> follow a half-Gaussian distribution.  After all, every multivariate Gaussian is densest at its mean, just like the univariate case I examined above.  In fact I was so confident in this assumption that I built my initial modeling around it.  Great confusion ensued, when I saw how poorly my models were working on my higher-dimensional data!</p>
+
+<p>Eventually it occurred to me to do the obvious thing and generate some visualizations from higher dimensional data.  For example, here is the correponding plot generated from a bivariate Gaussian (d=2):</p>
+
+<p><a name="figure2"></a>
+<img src="/assets/images/dist_dist/figure2.png" alt="Figure 2" /></p>
+
+<p>Surprise -- the distribution at d=2 is <em>not even close to half-Gaussian!</em>.  My intuitions couldn't have been more misleading!</p>
+
+<p>Where did I go wrong?</p>
+
+<p>I'll start by observing what happens when I take a multi-dimensional PDF of vectors in (d) dimensions and project it down to a one-dimensional PDF of the corresponding vector magnitudes. To keep things simple, I will be assuming a multi-dimensional PDF <nobr>f<sub>r</sub>(<strong>x</strong><sub>d</sub>)</nobr> that is (1) centered on the origin, and (2) is radially symmetric; the pdf value is the same for all points at a given distance from the origin.  For example, any multivariate Gaussian with <strong>0</strong><sub>d</sub> mean and <strong>I</strong><sub>d</sub> for a covariance matrix satisfies these two assumptions.  With this in mind, you can see that the process of projecting from vectors in <strong>R</strong><sub>d</sub> to their distance from <strong>0</strong><sub>d</sub> (their magnitude) is equivalent to summing all densities <nobr>f<sub>r</sub>(<strong>x</strong><sub>d</sub>)</nobr> along the surface of "d-sphere" radius (r) to obtain a pdf f(r) in distance space.  With assumption (2) we can simplify that integration to just <nobr>f(r)=A<sub>d</sub>(r)f'(r)</nobr>, where f'(r) defines the value of <nobr>f<sub>r</sub>(<strong>x</strong>)</nobr> for all <strong>x</strong> with magnitude of (r), and A<sub>d</sub>(r) is the surface area of a d-sphere with radius (r):</p>
+
+<p><img src="/assets/images/dist_dist/ztrlusa.png" alt="Figure 3" /></p>
+
+<p>The key observation is that this term is a <em>polynomial</em> function of radius (r), with degree (d-1).  When d=1, it is simply a constant multiplier and so we get the half-Gaussian distribution we expect, but when <nobr>d >= 2</nobr>, the term is zero at r=0, and grows with radius.  Hence we see the in the <a href="#figure2">d=2 plot above</a> that the density begins at zero, then grows with radius until the decreasing gaussian density gradually drives it back toward zero again.</p>
+
+<p>The above ideas can be expressed compactly as follows:</p>
+
+<p><img src="/assets/images/dist_dist/jukgy85.png" alt="Figure 4" /></p>
+
+<p>In my experiments, I am using multivariate Gaussians of mean <strong>0</strong><sub>d</sub> and unit covariance matrix <strong>I</strong><sub>d</sub>, and so the form for f(r;d) becomes:</p>
+
+<p><img src="/assets/images/dist_dist/gwwv5a5.png" alt="Figure 4" /></p>
+
+<p>I can verify that this PDF is correct by plotting it against randomly sampled data at differing dimensions:</p>
+
+<p><img src="/assets/images/dist_dist/figure3.png" alt="Figure 5" /></p>
+
+<p>This plot demonstrates both that the PDF expression is correct for varying dimensionalities and also illustrates how the shape of the PDF evolves as dimensionality changes.  For me, it was a great example of challenging my intuitions and learning something completely unexpected about the interplay of distances and dimension.</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Measuring Decision Tree Split Quality with Test Statistic P-Values]]></title>
@@ -569,57 +617,6 @@ function reservoirFast(data: Array, R: Int) {
 <p><img src="/assets/images/reservoir1/lemmaA.png" title="Lemma A" alt="Lemma A" /></p>
 
 <p><img src="/assets/images/reservoir1/lemmaAproof.png" title="Lemma A Proof" alt="Lemma A Proof" /></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Generalizing Kendall's Tau]]></title>
-    <link href="http://erikerlandson.github.com/blog/2015/08/14/generalizing-kendalls-tau/"/>
-    <updated>2015-08-14T14:35:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2015/08/14/generalizing-kendalls-tau</id>
-    <content type="html"><![CDATA[<p>Recently I have been applying <a href="https://en.wikipedia.org/wiki/Kendall_rank_correlation_coefficient">Kendall's Tau</a> as an evaluation metric to assess how well a regression model ranks input samples, with respect to a known correct ranking.</p>
-
-<p>The process of implementing the Kendall's Tau statistic, with my software engineer's hat on, caused me to reflect a bit on how it could be generalized beyond the traditional application of ranking numeric pairs.  In this post I'll discuss the generalization of Kendall's Tau to non-numeric data, and also generalizing from totally ordered data to partial orderings.</p>
-
-<h5>A Review of Kendall's Tau</h5>
-
-<p>I'll start with a brief review of Kendall's Tau.  For more depth, a good place to start is the Wikipedia article at the link above.</p>
-
-<p>Consider a sequence of (n) observations where each observation is a pair (x,y), where we wish to measure how well a ranking by x-values agrees with a ranking by the y-values.  Informally, Kendall's Tau (aka the Kendall Rank Correlation Coefficient) is the difference between number of observation-pairs (pairs of pairs, if you will) whose ordering <em>agrees</em> ("concordant" pairs) and the number of such pairs whose ordering <em>disagrees</em> ("discordant" pairs).  This difference is divided by the total number of observation pairs.</p>
-
-<p>The commonly-used formulation of Kendall's Tau is the "Tau-B" statistic, which accounts for observed pairs having tied values in either x or y as being neither concordant nor discordant:</p>
-
-<h6>Figure 1: Kendall's Tau-B</h6>
-
-<p><img src="/assets/images/kendalls_tau/figure_1.png" title="Kendall's Tau" alt="Kendall's Tau" /></p>
-
-<p>The formulation above has quadratic complexity, with respect to data size (n).  It is possible to rearrange this computation in a way that can be computed in (n)log(n) time[1]:</p>
-
-<h6>Figure 2: An (n)log(n) formulation of Kendall's Tau-B</h6>
-
-<p><img src="/assets/images/kendalls_tau/figure_2.png" title="Kendall's Tau" alt="Kendall's Tau" /></p>
-
-<p>The details of performing this computation can be found at [1] or on the <a href="https://en.wikipedia.org/wiki/Kendall_rank_correlation_coefficient#Algorithms">Wikipedia entry</a>.  For my purposes, I'll note that it requires two (n)log(n) sorts of the data, which becomes relevant below.</p>
-
-<h5>Generalizing to Non-Numeric Values</h5>
-
-<p>Generalizing Kendall's Tau to non-numeric values is mostly just making the observation that the definition of "concordant" and "discordant" pairs is purely based on comparing x-values and y-values (and, in the (n)log(n) formulation, performing sorts on the data).  From the software engineer's perspective this means that the computations are well defined on any data type with an ordering relation, which includes numeric types but also chars, strings, sequences of any element supporting an ordering, etc.  Significantly, most programming languages support the concept of defining ordering relations on arbitrary data types, which means that <em><em>Kendall's Tau can, in principle, be computed on literally any kind of data structure</em></em>, provided you supply it with a well defined ordering.  Furthermore, an examination of the algorithms shows that values of x and y need not even be of the same type, nor do they require the same ordering.</p>
-
-<h5>Generalizing to Partial Orderings</h5>
-
-<p>When I brought this observation up, my colleague <a href="http://chapeau.freevariable.com/">Will Benton</a> asked the very interesting question of whether it's also possible to compute Kendall's Tau on objects that have only a <em>partial ordering</em>.  It turns out that you <em><em>can</em></em> define Kendall's Tau on partially ordered data, by defining the case of two non-comparable x-values, or y-values, as another kind of tie.</p>
-
-<p>The big caveat with this definition is that the (n)log(n) optimization does not apply.  Firstly, the optimized algorithm relies heavily on (n)log(n) sorting, and there is no unique full sorting of elements that are only partially ordered.  Secondly, the formula's definition of the quantities n1, n2 and n3 is founded on the assumption that element equality is transitive; this is why you can count a number of tied values, t, and use t(t-1)/2 as the corresponding number of tied pairs.  But in a partial ordering, this assumption is violated. Consider the case where (a) &lt; (b), but (a) is non-comparable to (c) and (b) is also non-comparable to (c).  By our definition, (a) is tied with (c), and (c) is tied with (b), but transitivity is violated, as (a) &lt; (b).</p>
-
-<p>So how <em>can</em> we compute Tau in this case?  Consider (n1) and (n2), in Figure-1.  These values represent the number of pairs that were tied wrt (x) and (y), respectively.  We can't use the shortcut formulas for (n1) and (n2), but we can count them directly, pair by pair, simply by conducting the traditional quadratic iteration over pairs, and incrementing (n1) whenever two x-values are noncomparable, and incrementing (n2) whenever two y-values are non-comparable, just as we increment (nc) and (nd) to count concordant and discordant pairs.  With this modification, we can apply the formula in Figure-1 as-is.</p>
-
-<h5>Conclusions</h5>
-
-<p>I made these observations without any particular application in mind. However, my instincts as a software engineer tell me that making generalizations in this way often paves the way for new ideas, once the generalized concept is made available.  With luck, it will inspire either me or somebody else to apply Kendall's Tau in interesting new ways.</p>
-
-<h5>References</h5>
-
-<p>[1] Knight, W. (1966). "A Computer Method for Calculating Kendall's Tau with Ungrouped Data". Journal of the American Statistical Association 61 (314): 436–439. doi:10.2307/2282833. JSTOR 2282833.</p>
 ]]></content>
   </entry>
   
