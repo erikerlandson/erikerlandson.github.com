@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="Suppose you want to add random sampling to a database query, but your database does not support it. One known technique is to add a field, say &#8220 &hellip;">
+  <meta name="description" content="I&#8217;ve been fooling around with an anonymized data set on the side. Although this can be frustrating in its own way, it occurred to me that it &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,47 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2012/05/20/the-joy-of-anonymized-data/">The Joy of Anonymized Data</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-05-20T11:31:00-07:00" pubdate data-updated="true">May 20<span>th</span>, 2012</time>
+        
+        
+         | <a href="/blog/2012/05/20/the-joy-of-anonymized-data/#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>I&#8217;ve been fooling around with an <a href="https://github.com/erikerlandson/ratorade/tree/master/data">anonymized data set</a> on the side.  Although this can be frustrating in its own way, it occurred to me that it <em>does</em> have the advantage of forcing me to see the data in the same way my algorithms see it: that is, the data is just some anonymous strings, values and identifiers.  To the code, strings like &#8220;120 minute IPA&#8221; or &#8220;Dogfish Head Brewery&#8221; have no more significance than &#8220;Beer-12&#8221; or &#8220;Brewer-5317&#8221;, and the anonymous identifiers remove any subconscious or conscious tendencies of mine to impart more meaning to an identifier string than is present to the algorithms.</p>
+
+<p>On the other hand, having anonymous identifiers prevents me from drawing any actual inspirations for utilizing semantics that <em>might</em> genuinely be leveragable by an algorithm.  However, my current goal is to produce tools that are generically useful across data domains.  In that respect, I think developing on anonymized data could actually be helping.  Time will tell.</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -323,6 +364,10 @@ $ callgrind_annotate --inclusive=yes --tree=calling callgrind.out.2671 &gt; mktp
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2016/06/15/computing-derivatives-of-the-gamma-function/">Computing Derivatives of the Gamma Function</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2016/06/08/exploring-the-effects-of-dimensionality-on-a-pdf-of-distances/">Exploring the Effects of Dimensionality on a PDF of Distances</a>
       </li>
     
@@ -336,10 +381,6 @@ $ callgrind_annotate --inclusive=yes --tree=calling callgrind.out.2671 &gt; mktp
     
       <li class="post">
         <a href="/blog/2016/03/26/computing-simplex-vertex-locations-from-pairwise-vertex-distances/">Computing Simplex Vertex Locations From Pairwise Object Distances</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2016/02/08/efficient-multiplexing-for-spark-rdds/">Efficient Multiplexing for Spark RDDs</a>
       </li>
     
   </ul>

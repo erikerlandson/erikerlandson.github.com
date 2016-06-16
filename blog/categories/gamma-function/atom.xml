@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: gamma function | tool monkey]]></title>
+  <link href="http://erikerlandson.github.com/blog/categories/gamma-function/atom.xml" rel="self"/>
+  <link href="http://erikerlandson.github.com/"/>
+  <updated>2016-06-15T19:55:05-07:00</updated>
+  <id>http://erikerlandson.github.com/</id>
+  <author>
+    <name><![CDATA[Erik Erlandson]]></name>
+    <email><![CDATA[erikerlandson@yahoo.com]]></email>
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Computing Derivatives of the Gamma Function]]></title>
+    <link href="http://erikerlandson.github.com/blog/2016/06/15/computing-derivatives-of-the-gamma-function/"/>
+    <updated>2016-06-15T16:37:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2016/06/15/computing-derivatives-of-the-gamma-function</id>
+    <content type="html"><![CDATA[<p>In this post I'll describe a simple algorithm to compute the kth derivatives of the <a href="https://en.wikipedia.org/wiki/Gamma_function">Gamma function</a>.</p>
+
+<p>I'll start by showing a simple recursion relation that makes it easy to compute these derivatives, and then gives its derivation.  The kth derivative of Gamma(x) can be computed as follows:</p>
+
+<p><img src="http://mathurl.com/hvqtl52.png" alt="Equation 1" /></p>
+
+<p>The recursive formula for the D<sub>k</sub> functions has an easy inductive proof:</p>
+
+<p><img src="http://mathurl.com/h79ued9.png" alt="Equation 2" /></p>
+
+<p>Computing the next value D<sub>k</sub> requires knowledge of D<sub>k-1</sub> but also derivative D'<sub>k-1</sub>.  Fortunately we can derive a corresponding formula for D'<sub>k</sub> as a function of D<sub>k-1</sub> and D'<sub>k-1</sub>:</p>
+
+<p><img src="http://mathurl.com/gqk2lex.png" alt="Equation 3" /></p>
+
+<p>This gives us the means to compute the kth derivative of the Gamma function.</p>
+]]></content>
+  </entry>
+  
+</feed>
