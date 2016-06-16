@@ -4,7 +4,7 @@
   <title><![CDATA[tool monkey]]></title>
   <link href="http://erikerlandson.github.com/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2016-06-15T19:59:31-07:00</updated>
+  <updated>2016-06-16T08:36:39-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,29 +12,6 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
-  
-  <entry>
-    <title type="html"><![CDATA[Computing Derivatives of the Gamma Function]]></title>
-    <link href="http://erikerlandson.github.com/blog/2016/06/15/computing-derivatives-of-the-gamma-function/"/>
-    <updated>2016-06-15T16:37:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2016/06/15/computing-derivatives-of-the-gamma-function</id>
-    <content type="html"><![CDATA[<p>In this post I&#8217;ll describe a simple algorithm to compute the kth derivatives of the <a href="https://en.wikipedia.org/wiki/Gamma_function">Gamma function</a>.</p>
-
-<p>I&#8217;ll start by showing a simple recursion relation that makes it easy to compute these derivatives, and then gives its derivation.  The kth derivative of Gamma(x) can be computed as follows:</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/dgamma/hvqtl52.png" alt="Equation 1" /></p>
-
-<p>The recursive formula for the D<sub>k</sub> functions has an easy inductive proof:</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/dgamma/h79ued9.png" alt="Equation 2" /></p>
-
-<p>Computing the next value D<sub>k</sub> requires knowledge of D<sub>k-1</sub> but also derivative D&#8217;<sub>k-1</sub>.  Fortunately we can derive a corresponding formula for D&#8217;<sub>k</sub> as a function of D<sub>k-1</sub> and D&#8217;<sub>k-1</sub>:</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/dgamma/gqk2lex.png" alt="Equation 3" /></p>
-
-<p>This gives us the means to compute the kth derivative of the Gamma function.</p>
-]]></content>
-  </entry>
   
   <entry>
     <title type="html"><![CDATA[Exploring the Effects of Dimensionality on a PDF of Distances]]></title>
@@ -3220,6 +3197,53 @@ scala&gt;
 </code></pre>
 
 <p>In this post, I have described the Promise RDD, an RDD subclass that can be used to encapsulate computations in the lazy transform formalism that would otherwise require non-lazy actions.  As an example, I have outlined a lazy transform implementation of <code>drop</code> that uses PromiseRDD.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Some Implications of Supporting the Scala drop Method for Spark RDDs]]></title>
+    <link href="http://erikerlandson.github.com/blog/2014/07/27/some-implications-of-supporting-the-scala-drop-method-for-spark-rdds/"/>
+    <updated>2014-07-27T17:08:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2014/07/27/some-implications-of-supporting-the-scala-drop-method-for-spark-rdds</id>
+    <content type="html"><![CDATA[<p>In Scala, sequence data types support the <code>drop</code> method for skipping (aka &#8220;dropping&#8221;) the first elements of the sequence:</p>
+
+<pre><code>// drop the first element of a list
+scala&gt; List(1, 2, 3).drop(1)
+res1: List[Int] = List(2, 3)
+</code></pre>
+
+<p>Spark RDDs also support various standard sequence methods, for example <code>filter</code>, as they are logically a sequence of row objects.  One might suppose that <code>drop</code> could be a useful sequence method for RDDs, as it would support useful idioms like:</p>
+
+<pre><code>// Use drop (hypothetically) to skip the header of a text file:
+val data = sparkContext.textFile("data.txt").drop(1)
+</code></pre>
+
+<p>Implementing <code>drop</code> for RDDs is possible, and in fact can be done with a <a href="https://github.com/erikerlandson/spark/compare/erikerlandson:rdd_drop_blogpost_base...rdd_drop_blogpost">small amount of code</a>, however it comes at the price of an impact to the RDD lazy computing model.</p>
+
+<p>To see why, recall that RDDs are composed of partitions, and so in order to drop the first (n) rows of an RDD, one must first identify the partition that contains the (n-1),(n) row boundary.  In the resulting RDD, this partition will be the first one to contain any data.  Identifying this &#8220;boundary&#8221; partition cannot have a closed-form solution, because partition sizes are not in general equal;  the partition interface does not even support the concept of a <code>count</code> method.  In order to obtain the size of a partition, one is forced to actually compute its contents.  The diagram below illustrates one example of why this is so &#8211; the contents of the partitions in the filtered RDD on the right cannot be known without actually running the filter on the parent RDD:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/rdd_drop/rdd-drop-1.png" alt="image" /></p>
+
+<p>Given all this, the structure of a <code>drop</code> implementation is to compute the first partition, find its length, and see if it contains the requested (n-1),(n) boundary.  If not, compute the next partition, and so on, until the boundary partition is identified.  All prior partitions are ignored in the result.  All subsequent partitions are passed on with no change.  The boundary partition is passed through its own <code>drop</code> to eliminate rows up to (n).</p>
+
+<p>The code implementing the concept described above can be viewed here:
+<a href="https://github.com/erikerlandson/spark/compare/erikerlandson:rdd_drop_blogpost_base...rdd_drop_blogpost">https://github.com/erikerlandson/spark/compare/erikerlandson:rdd_drop_blogpost_base&#8230;rdd_drop_blogpost</a></p>
+
+<p>The following diagram illustrates the relation between input and output partitions in a call to <code>drop</code>:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/rdd_drop/rdd-drop-2.png" alt="image" /></p>
+
+<p>Arguably, this represents a potential subversion of the RDD lazy compute model, as it forces the computation of at least one (and possibly more) partitions.  It behaves like a &#8220;partial action&#8221;, instead of a transform, but an action that returns another RDD.</p>
+
+<p>In many cases, the impact of this might be relatively small.  For example, dropping the first few rows in a text file is likely to only force computation of a single partition, and it is a partition that will eventually be computed anyway.  Furthermore, such a use case is generally not inside a tight loop.</p>
+
+<p>However, it is not hard to construct cases where computing even the first partition of one RDD recursively forces the computation of <em>all</em> the partitions in its parents, as in this example:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/rdd_drop/rdd-drop-3.png" alt="image" /></p>
+
+<p>Whether the benefits of supporting <code>drop</code> for RDDs outweigh the costs is an open question.  It is likely to depend on whether or not the Spark community yields any compelling use cases for <code>drop</code>, and whether a transform that behaves like a &#8220;partial action&#8221; is considered an acceptable addition to the RDD formalism.</p>
+
+<p>RDD support for <code>drop</code> has been proposed as issue <a href="https://issues.apache.org/jira/browse/SPARK-2315">SPARK-2315</a>, with corresponding pull request <a href="https://github.com/apache/spark/pull/1254/">1254</a>.</p>
 ]]></content>
   </entry>
   
