@@ -3,7 +3,7 @@ layout: post
 title: "Computing Derivatives of the Gamma Function"
 date: 2016-06-15 16:37
 comments: true
-published: false
+published: true
 categories: [ computing, math, gamma function, digamma function, trigamma function, polygamma function, derivative ]
 ---
 
