@@ -257,11 +257,17 @@
         <lastmod>2016-07-07T20:40:29-07:00</lastmod>
     </url>
     <url>
+        <loc>
+            http://erikerlandson.github.com/blog/2016/07/09/approximating-a-pdf-of-distances-with-a-gamma-distribution/
+        </loc>
+        <lastmod>2016-07-10T13:11:51-07:00</lastmod>
+    </url>
+    <url>
         <loc>http://erikerlandson.github.com/</loc>
-        <lastmod>2016-07-07T20:40:29-07:00</lastmod>
+        <lastmod>2016-07-10T13:11:51-07:00</lastmod>
     </url>
     <url>
         <loc>http://erikerlandson.github.com/blog/archives/</loc>
-        <lastmod>2016-07-07T20:40:29-07:00</lastmod>
+        <lastmod>2016-07-10T13:11:51-07:00</lastmod>
     </url>
 </urlset>

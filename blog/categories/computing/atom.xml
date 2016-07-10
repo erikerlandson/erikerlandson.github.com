@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2016-07-07T20:41:25-07:00</updated>
+  <updated>2016-07-10T13:12:53-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,29 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Approximating a PDF of Distances With a Gamma Distribution]]></title>
+    <link href="http://erikerlandson.github.com/blog/2016/07/09/approximating-a-pdf-of-distances-with-a-gamma-distribution/"/>
+    <updated>2016-07-09T11:25:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2016/07/09/approximating-a-pdf-of-distances-with-a-gamma-distribution</id>
+    <content type="html"><![CDATA[<p>In a <a href="http://erikerlandson.github.io/blog/2016/06/08/exploring-the-effects-of-dimensionality-on-a-pdf-of-distances/">previous post</a> I discussed some unintuitive aspects of the distribution of distances as spatial dimension changes.  To help explain this to myself I derived a formula for this distribution, assuming a unit multivariate Gaussian.  For distance (aka radius) r, and spatial dimension d, the PDF of distances is:</p>
+
+<p><img src="/assets/images/dist_dist/gwwv5a5.png" alt="Figure 1" /></p>
+
+<p>Recall that the form of this PDF is the <a href="https://en.wikipedia.org/wiki/Generalized_gamma_distribution">generalized gamma distribution</a>, with scale parameter <nobr>a=sqrt(2),</nobr> shape parameter p=2, and free shape parameter (d) representing the dimensionality.</p>
+
+<p>I was interested in fitting parameters to such a distribution, using some distance data from a clustering algorithm.  <a href="https://www.scipy.org/">SciPy</a> comes with a predefined method for fitting generalized gamma parameters, however I wished to implement something similar using <a href="http://commons.apache.org/proper/commons-math/">Apache Commons Math</a>, which does not have native support for fitting a generalized gamma PDF.  I even went so far as to start working out <a href="http://erikerlandson.github.io/blog/2016/06/15/computing-derivatives-of-the-gamma-function/">some of the math</a> needed to augment the Commons Math <a href="http://commons.apache.org/proper/commons-math/apidocs/org/apache/commons/math3/analysis/differentiation/package-summary.html">Automatic Differentiation libraries</a> with Gamma function differentiation needed to numerically fit my parameters.</p>
+
+<p>Meanwhile, I have been fitting a <em>non generalized</em> <a href="https://en.wikipedia.org/wiki/Gamma_distribution">gamma distribution</a> to the distance data, as a sort of rough cut, using a fast <a href="https://en.wikipedia.org/wiki/Gamma_distribution#Maximum_likelihood_estimation">non-iterative approximation</a> to the parameter optimization.  Consistent with my habit of asking the obvious question last, I tried plotting this gamma approximation against distance data, to see how well it compared against the PDF that I derived.</p>
+
+<p>Surprisingly (at least to me), my approximation using the gamma distribution is a very effective fit for spatial dimensionalities <nobr> >= 2 </nobr>:</p>
+
+<p><img src="/assets/images/gamma_approx/approx_plot.png" alt="Figure 2" /></p>
+
+<p>As the plot shows, only for the 1-dimension case is the gamma approximation substiantially deviating.  In fact, the fit appears to get better as dimensionality increases.  To address the 1D case, I can easily test the fit of a half-gaussian as a possible model.</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Computing Derivatives of the Gamma Function]]></title>
@@ -635,45 +658,6 @@ val outlierStr = outliers.collect
 <p><head><style type="text/css">
 .gist {max-height:500px; overflow:auto}
 </style></head></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Computing Simplex Vertex Locations From Pairwise Object Distances]]></title>
-    <link href="http://erikerlandson.github.com/blog/2016/03/26/computing-simplex-vertex-locations-from-pairwise-vertex-distances/"/>
-    <updated>2016-03-26T16:22:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2016/03/26/computing-simplex-vertex-locations-from-pairwise-vertex-distances</id>
-    <content type="html"><![CDATA[<p>Suppose I have a collection of (N) objects, and distances d(j,k) between each pair of objects (j) and (k); that is, my objects are members of a <a href="https://en.wikipedia.org/wiki/Metric_space">metric space</a>.  I have no knowledge about my objects, beyond these pair-wise distances.  These objects could be construed as vertices in an (N-1) dimensional <a href="https://en.wikipedia.org/wiki/Simplex">simplex</a>.  However, since I have no spatial information about my objects, I first need a way to assign spatial locations to each object, in vector space R<sup>(N-1),</sup> with only my object distances to work with.</p>
-
-<p>In this post I will derive an algorithm for assigning vertex locations in R<sup>(N-1)</sup> for each of N objects, using only pairwise object distances.</p>
-
-<p>I will assume that N >= 2, since at least two object are required to define a pairwise distance.  The case N=2 is easy, as I can assign vertex 1 to the origin, and vertex 2 to the point d(1,2), to form a 1-simplex (i.e. a line segment) whose single edge is just the distance between the two objects.  I will also assume that my N objects are distinct; that is, each pair has a non-zero distance.</p>
-
-<p>Next consider an arbitrary N, and suppose I have already added vertices 1 through k.  The next vertex (k+1) must obey the pairwise distance relations, as follows:</p>
-
-<p><img src="http://mathurl.com/jm56vxq.png" alt="figure 1" /></p>
-
-<p>Adding the new vertex (k+1) involves adding another dimension (k) to the simplex.  I define this new kth coordinate x(k) to be zero for the existing k vertices, as annotated above; only the new vertex (k+1) will have a non-zero kth coordinate.  Expanding the quadratic terms on the left yields the following form:</p>
-
-<p><img src="http://mathurl.com/jtm7dpq.png" alt="figure 2" /></p>
-
-<p>The squared terms for the coordinates of the new vertex (k+1) are inconvenient, however I can get rid of them by subtracting pairs of equations above.  For example, if I subtract equation 1 from the remaining k-1 equations (2 through k), these squared terms disappear, leaving me with the following system of k-1 equations, which we can see is linear in the 1st k-1 coordinates of the new vertex.  Therefore, I know I'll be able to solve for those coordinates.  I can solve for the remaining kth coordinate by plugging it into the first distance equation:</p>
-
-<p><img src="http://mathurl.com/haovm32.png" alt="figure 3" /></p>
-
-<p>To clarify matters, the equations above can be re-written as the following matrix equation, solveable by any linear systems library:</p>
-
-<p><img src="http://mathurl.com/h6qdtms.png" alt="figure 4" /></p>
-
-<p>This gives me a recusion relation for adding a new vertex (k+1), given that I have already added the first k vertices.  The basis case of adding the first two vertices was already described above.  And so I can iteratively add all my vertices one at a time by applying the recursion relation.</p>
-
-<p>As a corollary, assume that I have constructed a simplex having k vertices, as shown above, and I would like to assign a spatial location to a new object, (y), given its k distances to each vertex.  The corresponding distance relations are given by:</p>
-
-<p><img src="http://mathurl.com/zdw9uv8.png" alt="figure 5" /></p>
-
-<p>I can apply a derivation very similar to the one above, to obtain the following linear equation for the (k-1) coordinates of (y):</p>
-
-<p><img src="http://mathurl.com/zvr5jre.png" alt="figure 6" /></p>
 ]]></content>
   </entry>
   

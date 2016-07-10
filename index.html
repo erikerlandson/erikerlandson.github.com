@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="In this post I&#8217;ll describe a simple algorithm to compute the kth derivatives of the Gamma function. I&#8217;ll start by showing a simple &hellip;">
+  <meta name="description" content="In a previous post I discussed some unintuitive aspects of the distribution of distances as spatial dimension changes. To help explain this to myself &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,59 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2016/07/09/approximating-a-pdf-of-distances-with-a-gamma-distribution/">Approximating a PDF of Distances With a Gamma Distribution</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2016-07-09T11:25:00-07:00" pubdate data-updated="true">Jul 9<span>th</span>, 2016</time>
+        
+        
+         | <a href="/blog/2016/07/09/approximating-a-pdf-of-distances-with-a-gamma-distribution/#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>In a <a href="http://erikerlandson.github.io/blog/2016/06/08/exploring-the-effects-of-dimensionality-on-a-pdf-of-distances/">previous post</a> I discussed some unintuitive aspects of the distribution of distances as spatial dimension changes.  To help explain this to myself I derived a formula for this distribution, assuming a unit multivariate Gaussian.  For distance (aka radius) r, and spatial dimension d, the PDF of distances is:</p>
+
+<p><img src="/assets/images/dist_dist/gwwv5a5.png" alt="Figure 1" /></p>
+
+<p>Recall that the form of this PDF is the <a href="https://en.wikipedia.org/wiki/Generalized_gamma_distribution">generalized gamma distribution</a>, with scale parameter <nobr>a=sqrt(2),</nobr> shape parameter p=2, and free shape parameter (d) representing the dimensionality.</p>
+
+<p>I was interested in fitting parameters to such a distribution, using some distance data from a clustering algorithm.  <a href="https://www.scipy.org/">SciPy</a> comes with a predefined method for fitting generalized gamma parameters, however I wished to implement something similar using <a href="http://commons.apache.org/proper/commons-math/">Apache Commons Math</a>, which does not have native support for fitting a generalized gamma PDF.  I even went so far as to start working out <a href="http://erikerlandson.github.io/blog/2016/06/15/computing-derivatives-of-the-gamma-function/">some of the math</a> needed to augment the Commons Math <a href="http://commons.apache.org/proper/commons-math/apidocs/org/apache/commons/math3/analysis/differentiation/package-summary.html">Automatic Differentiation libraries</a> with Gamma function differentiation needed to numerically fit my parameters.</p>
+
+<p>Meanwhile, I have been fitting a <em>non generalized</em> <a href="https://en.wikipedia.org/wiki/Gamma_distribution">gamma distribution</a> to the distance data, as a sort of rough cut, using a fast <a href="https://en.wikipedia.org/wiki/Gamma_distribution#Maximum_likelihood_estimation">non-iterative approximation</a> to the parameter optimization.  Consistent with my habit of asking the obvious question last, I tried plotting this gamma approximation against distance data, to see how well it compared against the PDF that I derived.</p>
+
+<p>Surprisingly (at least to me), my approximation using the gamma distribution is a very effective fit for spatial dimensionalities <nobr> >= 2 </nobr>:</p>
+
+<p><img src="/assets/images/gamma_approx/approx_plot.png" alt="Figure 2" /></p>
+
+<p>As the plot shows, only for the 1-dimension case is the gamma approximation substiantially deviating.  In fact, the fit appears to get better as dimensionality increases.  To address the 1D case, I can easily test the fit of a half-gaussian as a possible model.</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -2299,129 +2352,6 @@ text-align: center;
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2015/08/18/lightweight-non-negative-numerics-for-better-scala-type-signatures/">Lightweight Non-Negative Numerics for Better Scala Type Signatures</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2015-08-18T17:42:00-07:00" pubdate data-updated="true">Aug 18<span>th</span>, 2015</time>
-        
-        
-         | <a href="/blog/2015/08/18/lightweight-non-negative-numerics-for-better-scala-type-signatures/#feedback">Feedback</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>In this post I want to discuss several advantages of defining lightweight non-negative numeric types in Scala, whose primary benefit is that they allow improved type signatures for Scala functions and methods.  I&#8217;ll first describe the simple class definition, and then demonstrate how it can be used in function signatures and the benefits of doing so.</p>
-
-<p>If the following ideas interest you at all, I highly recommend looking at the <a href="https://github.com/fthomas/refined">&#8216;refined&#8217; project</a> authored by <a href="http://timepit.eu/~frank/">Frank S. Thomas</a>, which generalizes on the ideas below and supports additional static checking functionalities via macros.</p>
-
-<h5>A Non-Negative Integer Type</h5>
-
-<p>As a working example, I&#8217;ll discuss a non-negative integer type <code>NonNegInt</code>.  My proposed definition is sufficiently lightweight to view as a single code block:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">object</span> <span class="nc">nonneg</span> <span class="o">{</span>
-</span><span class='line'>  <span class="k">import</span> <span class="nn">scala.language.implicitConversions</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">class</span> <span class="nc">NonNegInt</span> <span class="k">private</span> <span class="o">(</span><span class="k">val</span> <span class="n">value</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span> <span class="k">extends</span> <span class="nc">AnyVal</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">object</span> <span class="nc">NonNegInt</span> <span class="o">{</span>
-</span><span class='line'>    <span class="k">def</span> <span class="n">apply</span><span class="o">(</span><span class="n">v</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span> <span class="k">=</span> <span class="o">{</span>
-</span><span class='line'>      <span class="n">require</span><span class="o">(</span><span class="n">v</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="o">,</span> <span class="s">&quot;NonNegInt forbids negative integer values&quot;</span><span class="o">)</span>
-</span><span class='line'>      <span class="k">new</span> <span class="nc">NonNegInt</span><span class="o">(</span><span class="n">v</span><span class="o">)</span>
-</span><span class='line'>    <span class="o">}</span>
-</span><span class='line'>
-</span><span class='line'>    <span class="k">implicit</span> <span class="k">def</span> <span class="n">toNonNegInt</span><span class="o">(</span><span class="n">v</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span> <span class="k">=</span> <span class="nc">NonNegInt</span><span class="o">(</span><span class="n">v</span><span class="o">)</span>
-</span><span class='line'>  <span class="o">}</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">implicit</span> <span class="k">def</span> <span class="n">toInt</span><span class="o">(</span><span class="n">nn</span><span class="k">:</span> <span class="kt">NonNegInt</span><span class="o">)</span> <span class="k">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">value</span>
-</span><span class='line'><span class="o">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>The notable properties and features of <code>NonNegInt</code> are:</p>
-
-<ul>
-<li><code>NonNegInt</code> is a value class around an <code>Int</code>, and so invokes no actual object construction or allocation</li>
-<li>Its constructor is private, and so is safe from directly constructing around a negative integer</li>
-<li>It supplies factory method <code>NonNegInt(v)</code> to construct a non negative integer value</li>
-<li>It supplies implicit conversion from <code>Int</code> values to <code>NonNegInt</code></li>
-<li>Both factory method and implicit conversion check for negative values.  There is no way to construct a <code>NonNegInt</code> that contains a negative integer value.</li>
-<li>It also supplies implicit conversion from <code>NonNegInt</code> back to <code>Int</code>.  Moving back and forth between <code>Int</code> and <code>NonNegInt</code> is effectively transparent.</li>
-</ul>
-
-
-<p>The above properties work to make <code>NonNegInt</code> very lightweight with respect to size and runtime properties, and semantically safe in the sense that it is impossible to construct one with a negative value inside it.</p>
-
-<h5>Application of <code>NonNegInt</code></h5>
-
-<p>I primarily envision <code>NonNegInt</code> as an easy and informative way to declare function parameters that are only well defined for non-negative values, without the need to write any explicit checking code, and yet allowing the programmer to call the function with normal <code>Int</code> values, due to the implicit conversions:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">object</span> <span class="nc">example</span> <span class="o">{</span>
-</span><span class='line'>  <span class="k">import</span> <span class="nn">nonneg._</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">def</span> <span class="n">element</span><span class="o">[</span><span class="kt">T</span><span class="o">](</span><span class="n">seq</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">T</span><span class="o">],</span> <span class="n">j</span><span class="k">:</span> <span class="kt">NonNegInt</span><span class="o">)</span> <span class="k">=</span> <span class="n">seq</span><span class="o">(</span><span class="n">j</span><span class="o">)</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="c1">// call element function with a regular Int index</span>
-</span><span class='line'>  <span class="k">val</span> <span class="n">e</span> <span class="k">=</span> <span class="n">element</span><span class="o">(</span><span class="nc">Vector</span><span class="o">(</span><span class="mi">1</span><span class="o">,</span><span class="mi">2</span><span class="o">,</span><span class="mi">3</span><span class="o">),</span> <span class="mi">1</span><span class="o">)</span> <span class="c1">// e is set to 2</span>
-</span><span class='line'><span class="o">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>This short example demonstrates some appealing properties of <code>NonNegInt</code>.  Firstly, the constraint that index <code>j &gt;= 0</code> is enforced via the type definition, and so the programmer does not have to write the usual <code>require(j &gt;= 0, ...)</code> check (or worry about forgetting it).  Secondly, the implicit conversion from <code>Int</code> to <code>NonNegInt</code> means the programmer can just provide a regular integer value for parameter <code>j</code>, instead of having to explicitly say <code>NonNegInt(1)</code>.  Third, the implicit conversion from <code>NonNegInt</code> to <code>Int</code> means that <code>j</code> can easily be used anywhere a regular <code>Int</code> is used.  Last, and very definitely not least, the fact that function <code>element</code> requires a non-negative integer is obvious <strong>right in the function signature</strong>.  There is no need for a programmer to guess whether <code>j</code> can be negative, and no need for the author of <code>element</code> to document that <code>j</code> cannot be negative.  Its type makes that completely clear.</p>
-
-<h5>Conclusions</h5>
-
-<p>In this post I&#8217;ve laid out some advantages of defining lightweight non-negative numeric types, in particular using <code>NonNegInt</code> as a working example.  Clearly, if you want to apply this idea, you&#8217;d want to also define <code>NonNegLong</code>, <code>NonNegDouble</code>, <code>NonNegFloat</code> and for that matter <code>PosInt</code>, <code>PosLong</code>, etc.  Happy computing!</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/2/">&larr; Older</a>
@@ -2441,6 +2371,10 @@ text-align: center;
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2016/07/09/approximating-a-pdf-of-distances-with-a-gamma-distribution/">Approximating a PDF of Distances With a Gamma Distribution</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2016/06/15/computing-derivatives-of-the-gamma-function/">Computing Derivatives of the Gamma Function</a>
       </li>
     
@@ -2454,10 +2388,6 @@ text-align: center;
     
       <li class="post">
         <a href="/blog/2016/05/05/random-forest-clustering-of-machine-package-configurations/">Random Forest Clustering of Machine Package Configurations in Apache Spark</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2016/03/26/computing-simplex-vertex-locations-from-pairwise-vertex-distances/">Computing Simplex Vertex Locations From Pairwise Object Distances</a>
       </li>
     
   </ul>
