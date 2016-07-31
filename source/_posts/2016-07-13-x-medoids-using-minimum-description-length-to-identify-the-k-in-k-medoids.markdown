@@ -7,6 +7,8 @@ published: false
 categories: [ computing, k-medoids, minimum description length, MDL, optimization ]
 ---
 
+![EQ-1](/assets/images/xmedoids/z7zf8sl.png)
+
 ![K2-Raw](/assets/images/xmedoids/k2_raw.png)
 ![K2-MDL](/assets/images/xmedoids/k2_mdl.png)
 ![K2-Clusters](/assets/images/xmedoids/k2_clusters.png)
