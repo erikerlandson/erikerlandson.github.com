@@ -263,11 +263,17 @@
         <lastmod>2016-07-10T13:11:51-07:00</lastmod>
     </url>
     <url>
+        <loc>
+            http://erikerlandson.github.com/blog/2016/08/03/x-medoids-using-minimum-description-length-to-identify-the-k-in-k-medoids/
+        </loc>
+        <lastmod>2016-08-03T20:07:56-07:00</lastmod>
+    </url>
+    <url>
         <loc>http://erikerlandson.github.com/</loc>
-        <lastmod>2016-07-10T13:11:51-07:00</lastmod>
+        <lastmod>2016-08-03T20:07:56-07:00</lastmod>
     </url>
     <url>
         <loc>http://erikerlandson.github.com/blog/archives/</loc>
-        <lastmod>2016-07-10T13:11:51-07:00</lastmod>
+        <lastmod>2016-08-03T20:07:56-07:00</lastmod>
     </url>
 </urlset>

@@ -4,7 +4,7 @@
   <title><![CDATA[tool monkey]]></title>
   <link href="http://erikerlandson.github.com/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2016-07-10T13:12:53-07:00</updated>
+  <updated>2016-08-03T20:13:26-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,101 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Using Minimum Description Length to Optimize the 'K' in K-Medoids]]></title>
+    <link href="http://erikerlandson.github.com/blog/2016/08/03/x-medoids-using-minimum-description-length-to-identify-the-k-in-k-medoids/"/>
+    <updated>2016-08-03T20:00:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2016/08/03/x-medoids-using-minimum-description-length-to-identify-the-k-in-k-medoids</id>
+    <content type="html"><![CDATA[<p>Applying many popular clustering models, for example <a href="https://en.wikipedia.org/wiki/K-means_clustering">K-Means</a>, <a href="https://en.wikipedia.org/wiki/K-medoids">K-Medoids</a> and <a href="https://en.wikipedia.org/wiki/Expectation%E2%80%93maximization_algorithm#Gaussian_mixture">Gaussian Mixtures</a>, requires an up-front choice of the number of clusters &#8211; the &#8216;K&#8217; in K-Means, as it were.
+Anybody who has ever applied these models is familiar with the inconvenient task of guessing what an appropriate value for K might actually be.
+As the size and dimensionality of data grows, estimating a good value for K rapidly becomes an exercise in wild guessing and multiple iterations through the free-parameter space of possible K values.</p>
+
+<p>There are some varied approaches in the community for addressing the task of identifying a good number of clusters in a data set.  In this post I want to focus on an approach that I think deserves more attention than it gets: <a href="https://en.wikipedia.org/wiki/Minimum_description_length">Minimum Description Length</a>.</p>
+
+<p>Many years ago I ran across a <a href="#cite1">superb paper</a> by Stephen J. Roberts on anomaly detection that described a method for <em>automatically</em> choosing a good value for the number of clusters based on the principle of Minimum Description Length.
+Minimum Description Length (MDL) is an elegant framework for evaluating the parsimony of a model.
+The Description Length of a model is defined as the amount of information needed to encode that model, plus the encoding-length of some data, <em>given</em> that model.
+Therefore, in an MDL framework, a good model is one that allows an efficient (i.e. short) encoding of the data, but whose <em>own</em> description is <em>also</em> efficient
+(This suggests connections between MDL and the idea of <a href="https://en.wikipedia.org/wiki/Data_compression#Machine_learning">learning as a form of data compression</a>).</p>
+
+<p>For example, a model that directly memorizes all the data may allow for a very short description of the data, but the model itself will cleary require at least the size of the raw data to encode, and so direct memorization models generaly stack up poorly with respect to MDL.
+On the other hand, consider a model of some Gaussian data.  We can describe these data in a length proportional to their log-likelihood under the Gaussian density.  Furthermore, the description length of the Gaussian model itself is very short; just the encoding of its mean and standard deviation.  And so in this case a Gaussian distribution represents an efficient model with respect to MDL.</p>
+
+<p><strong>In summary, an MDL framework allows us to mathematically capture the idea that we only wish to consider increasing the complexity of our models if that buys us a corresponding increase in descriptive power on our data.</strong></p>
+
+<p>In the case of <a href="#cite1">Roberts&#8217; paper</a>, the clustering model in question is a <a href="https://en.wikipedia.org/wiki/Expectation%E2%80%93maximization_algorithm#Gaussian_mixture">Gaussian Mixture Model</a> (GMM), and the description length expression to be optimized can be written as:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/xmedoids/mdl_gm_eq.png" alt="EQ-1" /></p>
+
+<p>In this expression, X represents the vector of data elements.
+The first term is the (negative) log-likelihood of the data, with respect to a candidate GMM having some number (K) of Gaussians; p(x) is the GMM density at point (x).
+This term represents the cost of encoding the data, given that GMM.
+The second term is the cost of encoding the GMM itself.
+The value P is the number of free parameters needed to describe that GMM.
+Assuming a dimensionality D for the data, then <nobr>P = K(D + D(D+1)/2):</nobr> D values for each mean vector, and <nobr>D(D+1)/2</nobr> values for each covariance matrix.</p>
+
+<p>I wanted to apply this same MDL principle to identifying a good value for K, in the case of a <a href="https://en.wikipedia.org/wiki/K-medoids">K-Medoids</a> model.
+How best to adapt MDL to K-Medoids poses some problems.
+In the case of K-Medoids, the <em>only</em> structure given to the data is a distance metric.
+There is no vector algebra defined on data elements, much less any ability to model the points as a Gaussian Mixture.</p>
+
+<p>However, any candidate clustering of my data <em>does</em> give me a corresponding distribution of distances from each data element to it&#8217;s closest medoid.
+I can evaluate an MDL measure on these distance values.
+If adding more clusters (i.e. increasing K) does not sufficiently tighten this distribution, then its description length will start to increase at larger values of K, thus indicating that more clusters are not improving our model of the data.
+Expressing this idea as an MDL formulation produces the following description length formula:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/xmedoids/mdl_km_eq.png" alt="EQ-2" /></p>
+
+<p>Note that the first two terms are similar to the equation above; however, the underlying distribution <nobr>p(||x-c<sub>x</sub>||)</nobr> is now a distribution over the distances of each data element (x) to its closest medoid <nobr>c<sub>x</sub></nobr>, and P is the corresponding number of free parameters for this distribution (more on this below).
+There is now an additional third term, representing the cost of encoding the K medoids.
+Each medoid is a data element, and specifying each data element requires log|X| bits (or <a href="http://mathworld.wolfram.com/Nat.html">nats</a>, since I generally use natural logarithms), yielding an additional <nobr>(K)log|X|</nobr> in description length cost.</p>
+
+<p>And so, an MDL-based algorithm for automatically identifying a good number of clusters (K) in a K-Medoids model is to run a K-Medoids clustering on my data, for some set of potential K values, and evaluate the MDL measure above for each, and choose the model whose description length L(X) is the smallest!</p>
+
+<p>As I mentioned above, there is also an implied task of choosing a form (or a set of forms) for the distance distribution <nobr>p(||x-c<sub>x</sub>||)</nobr>.
+At the time of this writing, I am fitting a <a href="https://en.wikipedia.org/wiki/Gamma_distribution">gamma distribution</a> to the distance data, and <a href="https://github.com/erikerlandson/silex/blob/blog/xmedoids/src/main/scala/com/redhat/et/silex/cluster/KMedoids.scala#L578">using this gamma distribution</a> to compute log-likelihood values.
+A gamma distribution has two free parameters &#8211; a shape parameter and a location parameter &#8211; and so currently the value of P is always 2 in my implementations.
+I elaborated on some back-story about how I arrived at the decision to use a gamma distribution <a href="http://erikerlandson.github.io/blog/2016/07/09/approximating-a-pdf-of-distances-with-a-gamma-distribution/">here</a> and <a href="http://erikerlandson.github.io/blog/2016/06/08/exploring-the-effects-of-dimensionality-on-a-pdf-of-distances/">here</a>.
+An additional reason for my choice is that the gamma distribution does have a fairly good shape coverage, including two-tailed, single-tailed, and/or exponential-like shapes.</p>
+
+<p>Another observation (based on my blog posts mentioned above) is that my use of the gamma distribution implies a bias toward cluster distributions that behave (more or less) like Gaussian clusters, and so in this respect its current behavior is probably somewhat analogous to the <a href="#cite2">G-Means algorithm</a>, which identifies clusterings that yield Gaussian disributions in each cluster.
+Adding other candidates for distance distributions is a useful subject for future work, since there is no compelling reason to either favor or assume Gaussian-like cluster distributions over <em>all</em> kinds of metric spaces.
+That said, I am seeing reasonable results even on data with clusters that I suspect are not well modeled as Gaussian distributions.
+Perhaps the shape-coverage of the gamma distribution is helping to add some robustness.</p>
+
+<p>To demonstrate the MDL-enhanced K-Medoids in action, I will illustrate its performance on some data sets that are amenable to graphic representation.  The code I used to generate these results is <a href="https://github.com/erikerlandson/silex/blob/blog/xmedoids/src/main/scala/com/redhat/et/silex/cluster/KMedoids.scala#L629">here</a>.</p>
+
+<p>Consider this synthetic data set of points in 2D space.  You can see that I&#8217;ve generated the data to have two latent clusters:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/xmedoids/k2_raw.png" alt="K2-Raw" /></p>
+
+<p>I collected the description-length values for candidate K-Medoids models having 1 up to 10 clusters, and plotted them.  This plot shows that the clustering with minimal description length had 2 clusters:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/xmedoids/k2_mdl.png" alt="K2-MDL" /></p>
+
+<p>When I plot that optimal clustering at K=2 (with cluster medoids marked in black-and-yellow), the clustering looks good:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/xmedoids/k2_clusters.png" alt="K2-Clusters" /></p>
+
+<p>To show the behavior for a different optimal value, the following plots demonstrate the MDL K-Medoids results on data where the number of latent clusters is 4:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/xmedoids/k4_raw.png" alt="K4-Raw" />
+<img src="http://erikerlandson.github.com/assets/images/xmedoids/k4_mdl.png" alt="K4-MDL" />
+<img src="http://erikerlandson.github.com/assets/images/xmedoids/k4_clusters.png" alt="K4-Clusters" /></p>
+
+<p>A final comment on Minimum Description Length approaches to clustering &#8211; although I focused on K-Medoids models in this post, the basic approach (and I suspect even the same description length formulation) would apply equally well to K-Means, and possibly other clustering models.
+Any clustering model that involves a distance function from elements to some kind of cluster center should be a good candidate.
+I intend to keep an eye out for applications of MDL to <em>other</em> learning models, as well.</p>
+
+<h5>References</h5>
+
+<p><a name="cite1"</a>
+[1] <a href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.49.1338&amp;rep=rep1&amp;type=pdf">&#8220;Novelty Detection Using Extreme Value Statistics&#8221;</a>; Stephen J. Roberts; Feb 23, 1999
+<a name="cite2"</a>
+[2] <a href="http://papers.nips.cc/paper/2526-learning-the-k-in-k-means.pdf">&#8220;Learning the k in k-means. Advances in neural information processing systems&#8221;</a>; Hamerly, G., &amp; Elkan, C.; 2004</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Approximating a PDF of Distances With a Gamma Distribution]]></title>
@@ -3146,47 +3241,6 @@ java.lang.StackOverflowError
 <p>The code implementing the logic above can be <a href="https://github.com/erikerlandson/spark/blob/rdd_scan_blog/core/src/main/scala/org/apache/spark/rdd/ScanRDDFunctions.scala#L161">viewed here.</a></p>
 
 <p>I will conclude by noting that there is an alternative to this highly distributed computation of <code>{z1, z2, ...}</code>, which is to collect the last-values in the per-partition intermediate scan ouputs into a single array, and run <code>scan</code> directly on that array.   This has the advantage of avoiding the construction of log(n) intermediate RDDs.   It does, however, require a monolithic &#8216;fan-in&#8217; of data into a single RDD to receive the collection of values.  That is followed by a fan-out of the array, where each output partition picks its single z-value from the array.  It is for this reason I suspect this alternative incurs substantially more transfer overhead across worker processes.  However, one might also partition the resulting z-values in some optimal way, so that each final output partition needs to request only the partition that contains its z-value.  Future experimentation might show that this can out-perform the current fully-distributed implementation.</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Implementing an RDD scanLeft Transform With Cascade RDDs]]></title>
-    <link href="http://erikerlandson.github.com/blog/2014/08/09/implementing-an-rdd-scanleft-transform-with-cascade-rdds/"/>
-    <updated>2014-08-09T09:10:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2014/08/09/implementing-an-rdd-scanleft-transform-with-cascade-rdds</id>
-    <content type="html"><![CDATA[<p>In Scala, sequence (and iterator) data types support the <code>scanLeft</code> method for computing a sequential prefix scan on sequence elements:</p>
-
-<pre><code>// Use scanLeft to compute the cumulative sum of some integers
-scala&gt; List(1, 2, 3).scanLeft(0)(_ + _)
-res0: List[Int] = List(0, 1, 3, 6)
-</code></pre>
-
-<p>Spark RDDs are logically a sequence of row objects, and so <code>scanLeft</code> is in principle well defined on RDDs.  In this post I will describe how to cleanly implement a <code>scanLeft</code> RDD transform by applying an RDD variation called Cascade RDDs.</p>
-
-<p>A Cascade RDD is an RDD having one partition which is a function of an input RDD partition and an optional predecessor Cascade RDD partition.  You can see that this definition is somewhat recursive, where the basis case is a Cascade RDD having no precedessor.  The following diagram illustrates both cases of Cascade RDD:</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/rdd_scanleft/rdd_scan_1.png" alt="image" /></p>
-
-<p>As implied by the above diagram, a series of Cascade RDDs falling out of an input RDD will have as many Cascade RDDs as there are input partitions.  This situation begs for an abstraction to re-assemble the cascade back into a single output RDD, and so the method <code>cascadePartitions</code> is defined, as illustrated:</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/rdd_scanleft/rdd_scan_3.png" alt="image" /></p>
-
-<p>The <code>cascadePartitions</code> method takes a function argument <code>f</code>, with the signature:</p>
-
-<pre><code>f(input: Iterator[T], cascade: Option[Iterator[U]]): Iterator[U]
-</code></pre>
-
-<p>in a manner somewhat analogous to <code>mapPartitions</code>.  The function <code>f</code> must address the fact that <code>cascade</code> is optional and will be <code>None</code> in case where there is no predecessor Cascade RDD.  The interested reader can examine the details of how the <code>CascadeRDD</code> class and its companion method <code>cascadePartitions</code> are <a href="https://github.com/erikerlandson/spark/blob/rdd_scan_blog/core/src/main/scala/org/apache/spark/rdd/CascadeRDDFunctions.scala">implemented here.</a></p>
-
-<p>With Cascade RDDs it is now straightforward to define a <code>scanLeft</code> transform for RDDs.  We wish to run <code>scanLeft</code> on each input partition, with the condition that we want to start where the previous input partition left off.  The Scala <code>scanLeft</code> function makes this easy, as the starting point is its first parameter (z): <code>scanLeft(z)(f)</code>.  The following figure illustrates what this looks like:</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/rdd_scanleft/rdd_scan_2.png" alt="image" /></p>
-
-<p>As the above schematic demonstrates, almost all the work is accomplished with a single call to <code>cascadePartitions</code>, using a thin wrapper around <code>f</code> which determines where to start the next invocation of Scala <code>scanLeft</code> &#8211; either the input parameter <code>z</code>, or the last output element of the previous cascade.   One final transform must be applied to remove the initial element that Scala <code>scanLeft</code> inserts into its output, excepting the first output partition, where it is kept to be consistent with the <code>scanLeft</code> definition.</p>
-
-<p>All computation is accomplished in the standard RDD formalism, and so <code>scanLeft</code> is a proper lazy RDD transform.</p>
-
-<p>The actual implementation is as compact as the above description implies, and you can see the <a href="https://github.com/erikerlandson/spark/blob/rdd_scan_blog/core/src/main/scala/org/apache/spark/rdd/ScanRDDFunctions.scala#L144">code here.</a></p>
 ]]></content>
   </entry>
   

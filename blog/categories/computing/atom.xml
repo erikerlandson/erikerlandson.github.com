@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2016-07-10T13:12:53-07:00</updated>
+  <updated>2016-08-03T20:13:26-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,101 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Using Minimum Description Length to Optimize the 'K' in K-Medoids]]></title>
+    <link href="http://erikerlandson.github.com/blog/2016/08/03/x-medoids-using-minimum-description-length-to-identify-the-k-in-k-medoids/"/>
+    <updated>2016-08-03T20:00:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2016/08/03/x-medoids-using-minimum-description-length-to-identify-the-k-in-k-medoids</id>
+    <content type="html"><![CDATA[<p>Applying many popular clustering models, for example <a href="https://en.wikipedia.org/wiki/K-means_clustering">K-Means</a>, <a href="https://en.wikipedia.org/wiki/K-medoids">K-Medoids</a> and <a href="https://en.wikipedia.org/wiki/Expectation%E2%80%93maximization_algorithm#Gaussian_mixture">Gaussian Mixtures</a>, requires an up-front choice of the number of clusters -- the 'K' in K-Means, as it were.
+Anybody who has ever applied these models is familiar with the inconvenient task of guessing what an appropriate value for K might actually be.
+As the size and dimensionality of data grows, estimating a good value for K rapidly becomes an exercise in wild guessing and multiple iterations through the free-parameter space of possible K values.</p>
+
+<p>There are some varied approaches in the community for addressing the task of identifying a good number of clusters in a data set.  In this post I want to focus on an approach that I think deserves more attention than it gets: <a href="https://en.wikipedia.org/wiki/Minimum_description_length">Minimum Description Length</a>.</p>
+
+<p>Many years ago I ran across a <a href="#cite1">superb paper</a> by Stephen J. Roberts on anomaly detection that described a method for <em>automatically</em> choosing a good value for the number of clusters based on the principle of Minimum Description Length.
+Minimum Description Length (MDL) is an elegant framework for evaluating the parsimony of a model.
+The Description Length of a model is defined as the amount of information needed to encode that model, plus the encoding-length of some data, <em>given</em> that model.
+Therefore, in an MDL framework, a good model is one that allows an efficient (i.e. short) encoding of the data, but whose <em>own</em> description is <em>also</em> efficient
+(This suggests connections between MDL and the idea of <a href="https://en.wikipedia.org/wiki/Data_compression#Machine_learning">learning as a form of data compression</a>).</p>
+
+<p>For example, a model that directly memorizes all the data may allow for a very short description of the data, but the model itself will cleary require at least the size of the raw data to encode, and so direct memorization models generaly stack up poorly with respect to MDL.
+On the other hand, consider a model of some Gaussian data.  We can describe these data in a length proportional to their log-likelihood under the Gaussian density.  Furthermore, the description length of the Gaussian model itself is very short; just the encoding of its mean and standard deviation.  And so in this case a Gaussian distribution represents an efficient model with respect to MDL.</p>
+
+<p><strong>In summary, an MDL framework allows us to mathematically capture the idea that we only wish to consider increasing the complexity of our models if that buys us a corresponding increase in descriptive power on our data.</strong></p>
+
+<p>In the case of <a href="#cite1">Roberts' paper</a>, the clustering model in question is a <a href="https://en.wikipedia.org/wiki/Expectation%E2%80%93maximization_algorithm#Gaussian_mixture">Gaussian Mixture Model</a> (GMM), and the description length expression to be optimized can be written as:</p>
+
+<p><img src="/assets/images/xmedoids/mdl_gm_eq.png" alt="EQ-1" /></p>
+
+<p>In this expression, X represents the vector of data elements.
+The first term is the (negative) log-likelihood of the data, with respect to a candidate GMM having some number (K) of Gaussians; p(x) is the GMM density at point (x).
+This term represents the cost of encoding the data, given that GMM.
+The second term is the cost of encoding the GMM itself.
+The value P is the number of free parameters needed to describe that GMM.
+Assuming a dimensionality D for the data, then <nobr>P = K(D + D(D+1)/2):</nobr> D values for each mean vector, and <nobr>D(D+1)/2</nobr> values for each covariance matrix.</p>
+
+<p>I wanted to apply this same MDL principle to identifying a good value for K, in the case of a <a href="https://en.wikipedia.org/wiki/K-medoids">K-Medoids</a> model.
+How best to adapt MDL to K-Medoids poses some problems.
+In the case of K-Medoids, the <em>only</em> structure given to the data is a distance metric.
+There is no vector algebra defined on data elements, much less any ability to model the points as a Gaussian Mixture.</p>
+
+<p>However, any candidate clustering of my data <em>does</em> give me a corresponding distribution of distances from each data element to it's closest medoid.
+I can evaluate an MDL measure on these distance values.
+If adding more clusters (i.e. increasing K) does not sufficiently tighten this distribution, then its description length will start to increase at larger values of K, thus indicating that more clusters are not improving our model of the data.
+Expressing this idea as an MDL formulation produces the following description length formula:</p>
+
+<p><img src="/assets/images/xmedoids/mdl_km_eq.png" alt="EQ-2" /></p>
+
+<p>Note that the first two terms are similar to the equation above; however, the underlying distribution <nobr>p(||x-c<sub>x</sub>||)</nobr> is now a distribution over the distances of each data element (x) to its closest medoid <nobr>c<sub>x</sub></nobr>, and P is the corresponding number of free parameters for this distribution (more on this below).
+There is now an additional third term, representing the cost of encoding the K medoids.
+Each medoid is a data element, and specifying each data element requires log|X| bits (or <a href="http://mathworld.wolfram.com/Nat.html">nats</a>, since I generally use natural logarithms), yielding an additional <nobr>(K)log|X|</nobr> in description length cost.</p>
+
+<p>And so, an MDL-based algorithm for automatically identifying a good number of clusters (K) in a K-Medoids model is to run a K-Medoids clustering on my data, for some set of potential K values, and evaluate the MDL measure above for each, and choose the model whose description length L(X) is the smallest!</p>
+
+<p>As I mentioned above, there is also an implied task of choosing a form (or a set of forms) for the distance distribution <nobr>p(||x-c<sub>x</sub>||)</nobr>.
+At the time of this writing, I am fitting a <a href="https://en.wikipedia.org/wiki/Gamma_distribution">gamma distribution</a> to the distance data, and <a href="https://github.com/erikerlandson/silex/blob/blog/xmedoids/src/main/scala/com/redhat/et/silex/cluster/KMedoids.scala#L578">using this gamma distribution</a> to compute log-likelihood values.
+A gamma distribution has two free parameters -- a shape parameter and a location parameter -- and so currently the value of P is always 2 in my implementations.
+I elaborated on some back-story about how I arrived at the decision to use a gamma distribution <a href="http://erikerlandson.github.io/blog/2016/07/09/approximating-a-pdf-of-distances-with-a-gamma-distribution/">here</a> and <a href="http://erikerlandson.github.io/blog/2016/06/08/exploring-the-effects-of-dimensionality-on-a-pdf-of-distances/">here</a>.
+An additional reason for my choice is that the gamma distribution does have a fairly good shape coverage, including two-tailed, single-tailed, and/or exponential-like shapes.</p>
+
+<p>Another observation (based on my blog posts mentioned above) is that my use of the gamma distribution implies a bias toward cluster distributions that behave (more or less) like Gaussian clusters, and so in this respect its current behavior is probably somewhat analogous to the <a href="#cite2">G-Means algorithm</a>, which identifies clusterings that yield Gaussian disributions in each cluster.
+Adding other candidates for distance distributions is a useful subject for future work, since there is no compelling reason to either favor or assume Gaussian-like cluster distributions over <em>all</em> kinds of metric spaces.
+That said, I am seeing reasonable results even on data with clusters that I suspect are not well modeled as Gaussian distributions.
+Perhaps the shape-coverage of the gamma distribution is helping to add some robustness.</p>
+
+<p>To demonstrate the MDL-enhanced K-Medoids in action, I will illustrate its performance on some data sets that are amenable to graphic representation.  The code I used to generate these results is <a href="https://github.com/erikerlandson/silex/blob/blog/xmedoids/src/main/scala/com/redhat/et/silex/cluster/KMedoids.scala#L629">here</a>.</p>
+
+<p>Consider this synthetic data set of points in 2D space.  You can see that I've generated the data to have two latent clusters:</p>
+
+<p><img src="/assets/images/xmedoids/k2_raw.png" alt="K2-Raw" /></p>
+
+<p>I collected the description-length values for candidate K-Medoids models having 1 up to 10 clusters, and plotted them.  This plot shows that the clustering with minimal description length had 2 clusters:</p>
+
+<p><img src="/assets/images/xmedoids/k2_mdl.png" alt="K2-MDL" /></p>
+
+<p>When I plot that optimal clustering at K=2 (with cluster medoids marked in black-and-yellow), the clustering looks good:</p>
+
+<p><img src="/assets/images/xmedoids/k2_clusters.png" alt="K2-Clusters" /></p>
+
+<p>To show the behavior for a different optimal value, the following plots demonstrate the MDL K-Medoids results on data where the number of latent clusters is 4:</p>
+
+<p><img src="/assets/images/xmedoids/k4_raw.png" alt="K4-Raw" />
+<img src="/assets/images/xmedoids/k4_mdl.png" alt="K4-MDL" />
+<img src="/assets/images/xmedoids/k4_clusters.png" alt="K4-Clusters" /></p>
+
+<p>A final comment on Minimum Description Length approaches to clustering -- although I focused on K-Medoids models in this post, the basic approach (and I suspect even the same description length formulation) would apply equally well to K-Means, and possibly other clustering models.
+Any clustering model that involves a distance function from elements to some kind of cluster center should be a good candidate.
+I intend to keep an eye out for applications of MDL to <em>other</em> learning models, as well.</p>
+
+<h5>References</h5>
+
+<p><a name="cite1"</a>
+[1] <a href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.49.1338&amp;rep=rep1&amp;type=pdf">"Novelty Detection Using Extreme Value Statistics"</a>; Stephen J. Roberts; Feb 23, 1999
+<a name="cite2"</a>
+[2] <a href="http://papers.nips.cc/paper/2526-learning-the-k-in-k-means.pdf">"Learning the k in k-means. Advances in neural information processing systems"</a>; Hamerly, G., &amp; Elkan, C.; 2004</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Approximating a PDF of Distances With a Gamma Distribution]]></title>
@@ -449,215 +544,6 @@ Else (feature 1 not in {1.0})
 
 
 <p>I believe they are a useful tool for improved training of decision tree models!  Happy computing!</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Random Forest Clustering of Machine Package Configurations in Apache Spark]]></title>
-    <link href="http://erikerlandson.github.com/blog/2016/05/05/random-forest-clustering-of-machine-package-configurations/"/>
-    <updated>2016-05-05T15:05:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2016/05/05/random-forest-clustering-of-machine-package-configurations</id>
-    <content type="html"><![CDATA[<p>In this post I am going to describe some results I obtained for <a href="https://en.wikipedia.org/wiki/Cluster_analysis">clustering</a> machines by which <a href="https://en.wikipedia.org/wiki/RPM_Package_Manager">RPM packages</a> that were installed on them.  The clustering technique I used was <a href="https://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm#unsup">Random Forest Clustering</a>.</p>
-
-<p><a name="data"></a></p>
-
-<h5>The Data</h5>
-
-<p>The data I clustered consisted of 135 machines, each with a list of installed RPM packages.  The number of unique package names among all 135 machines was 4397.  Each machine was assigned a vector of Boolean values: a value of <code>1</code> indicates that the corresponding RPM was installed on that machine.  This means that the clustering data occupied a space of nearly 4400 dimensions.  I discuss the implications of this <a href="#payoff">later in the post</a>, and what it has to do with Random Forest Clustering in particular.</p>
-
-<p>For ease of navigation and digestion, the remainder of this post is organized in sections:</p>
-
-<p><a href="#clustering">Introduction to Random Forest Clustering</a> <br>
-&nbsp; &nbsp; &nbsp; &nbsp;  (<a href="#payoff">The Pay-Off</a>) <br>
-<a href="#code">Package Configuration Clustering Code</a> <br>
-<a href="#results">Clustering Results</a> <br>
-&nbsp; &nbsp; &nbsp; &nbsp;  (<a href="#outliers">Outliers</a>) <br></p>
-
-<p><a name="clustering"></a></p>
-
-<h5>Random Forests and Random Forest Clustering</h5>
-
-<p>Full explainations of <a href="https://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm">Random Forests</a> and <a href="https://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm#unsup">Random Forest Clustering</a> could easily occupy blog posts of their own, but I will attempt to summarize them briefly here.  Random Forest learning models <em>per se</em> are well covered in the machine learning community, and available in most machine learning toolkits.  With that in mind, I will focus on their application to Random Forest Clustering, as it is less commonly used.</p>
-
-<p>A Random Forest is an <a href="https://en.wikipedia.org/wiki/Ensemble_learning">ensemble learning model</a>, consisting of some number of individual <a href="https://en.wikipedia.org/wiki/Decision_tree_learning">decision trees</a>, each trained on a random subset of the training data, and which choose from a random subset of candidate features when learning each internal decision node.</p>
-
-<p>Random Forest Clustering begins by training a Random Forest to distinguish between the data to be clustered, and a corresponding <em>synthetic</em> data set created by sampling from the <a href="https://en.wikipedia.org/wiki/Marginal_distribution">marginal</a> distributions of each <a href="https://en.wikipedia.org/wiki/Feature_vector">feature</a>.  If the data has well defined clusters in the <a href="https://en.wikipedia.org/wiki/Joint_probability_distribution">joint feature space</a> (a common scenario), then the model can identify these clusters as standing out from the more homogeneous distribution of synthetic data.  A simple example of what this looks like in 2 dimensional data is displayed in Figure 1, where the dark red dots are the data to be clustered, and the lighter pink dots represent synthetic data generated from the marginal distributions:</p>
-
-<p><img src="/assets/images/rfc_machines/demo1_both.png" alt="Figure 1" /></p>
-
-<p>Each interior decision node, in each tree of a Random Forest, typically divides the space of feature vectors in half: the half-space &lt;= some threshold, and the half-space > that threshold.  The result is that the model learned for our data can be visualized as rectilinear regions of space.  In this simple example, these regions can be plotted directly over the data, and show that the Random Forest did indeed learn the location of the data clusters against the background of synthetic data:</p>
-
-<p><img src="/assets/images/rfc_machines/demo1_rules.png" alt="Figure 2" /></p>
-
-<p>Once this model has been trained, the actual data to be clustered are evaluated against this model.  Each data element navigates the interior decision nodes and eventually arrives at a leaf-node of each tree in the Random Forest ensemble, as illustrated in the following schematic:</p>
-
-<p><img src="/assets/images/rfc_machines/eval_leafs.png" alt="Figure 3" /></p>
-
-<p>A key insight of Random Forest Clustering is that if two objects (or, their feature vectors) are similar, then they are likely to arrive at the same leaf nodes more often than not.  As the figure above suggests, it means we can cluster objects by their corresponding vectors of leaf nodes, <em>instead</em> of their raw feature vectors.</p>
-
-<p>If we map the points in our toy example to leaf ids in this way, and then cluster the results, we obtain the following two clusters, which correspond well with the structure of the data:</p>
-
-<p><img src="/assets/images/rfc_machines/demo1_clust.png" alt="Figure 4" /></p>
-
-<p>A note on clustering leaf ids.  A leaf id is just that -- an identifier -- and in that respect a vector of leaf ids has no <em>algebra</em>; it is not meaningful to take an average of such identifiers, any more than it would be meaningful to take the average of people's names.  Pragmatically, what this means is that the popular <a href="https://en.wikipedia.org/wiki/K-means_clustering">k-means clustering algorithm</a> <em>cannot</em> be applied to this problem.</p>
-
-<p>These vectors do, however, have <em>distance</em>: for any pair of vectors, add 1 for each corresponding pair of leaf ids that differ.  If two data elements arrived at all the same leafs in the Random Forest model, all their leaf ids are the same, and their distance is zero (with respect to the model, they are the same).  Therefore, we <em>can</em> apply <a href="https://en.wikipedia.org/wiki/K-medoids">k-medoids clustering</a>.</p>
-
-<p><a name="payoff"></a></p>
-
-<h5>The Pay-Off</h5>
-
-<p>What does this somewhat indirect method of clustering buy us?  Why <em>not</em> just cluster objects by their raw feature vectors?</p>
-
-<p>The problem is that in many real-world cases (unlike in our toy example above), feature vectors computed for objects have <em>many dimensions</em> -- hundreds, thousands, perhaps millions -- instead of the two dimensions in this example.  Computing distances on such objects, necessary for clustering, is often expensive, and worse yet the quality of these distances is frequently poor due to the fact that most features in large spaces will be poorly correlated with <em>any</em> structure in the data.  This problem is so common, and so important, it has a name: the <a href="https://en.wikipedia.org/wiki/Curse_of_dimensionality">Curse of Dimensionality</a>.</p>
-
-<p>Random Forest Clustering, which clusters on vectors of leaf-node ids from the trees in the model, side-steps the curse of dimensionality because the Random Forest training process, by learning where the data is against the background of the synthetic data, has already identified the features that are useful for identifying the structure of the data!   If any particular feature was poorly correlated with that struture, it has already been ignored by the model.  In other words, a Random Forest Clustering model is implicitly examining <strong> <em>exactly those features that are most useful for clustering</em> </strong>, thus providing a cure for the Curse of Dimensionality.</p>
-
-<p>The <a href="#data">machine package configurations</a> whose clustering I describe for this post are a good example of high dimensional data that is vulnerable to the Curse of Dimensionality.  The dimensionality of the feature space is nearly 4400, making distances between vectors potentially expensive to evaluate.  Any individual feature contributes little to the distance, having to contend with over 4000 other features.  Installed packages are also noisy.  Many packages, such as kernels, are installed everywhere.  Others may be installed but not used, making them potentially irrelevant to grouping machines.  Furthermore, there are only 135 machines, and so there are far more features than data examples, making this an underdetermined data set.</p>
-
-<p>All of these factors make the machine package configuration data a good test of the strenghts of Random Forest Clustering.</p>
-
-<p><a name="code"></a></p>
-
-<h5>Package Configuration Clustering Code</h5>
-
-<p>The implementation of Random Forest Clustering I used for the results in this post is a library available from the <a href="http://silex.freevariable.com/">silex project</a>, a package of analytics libraries and utilities for <a href="http://spark.apache.org/">Apache Spark</a>.</p>
-
-<p>In this section I will describe three code fragments that load the machine configuration data, perform a Random Forest clustering, and format some of the output.  This is the code I ran to obtain the <a href="#results">results</a> described in the final section of this post.</p>
-
-<p>The first fragment of code illustrates the logistics of loading the feature vectors from file <code>train.txt</code> that represent the installed-package configurations for each machine. A corresponding "parallel" file <code>nodesclean.txt</code> contains corresponding machine names for each vector.  A third companion file <code>rpms.txt</code> contains names of each installed package.  These are used to instantiate a specialized Scala function (<code>InvertibleIndexFunction</code>) between feature indexes and human-readable feature names (in this case, names of RPM packages).  Finally, another specialized function (<code>Extractor</code>) for instantiating Spark feature vectors is created.</p>
-
-<p>Note: <code>Extractor</code> and <code>InvertibleIndexFunction</code> are also component libraries of <a href="http://silex.freevariable.com/">silex</a></p>
-
-<p>```scala
-// Load installed-package feature vectors
-val fields = spark.textFile(s"$dataDir/train.txt").map(_.split(" ").toVector)</p>
-
-<p>// Pair feature vectors with machine names
-val nodes = spark.textFile(s"$dataDir/nodesclean.txt").map { _.split(" ")(1) }
-val ids = fields.paste(nodes)</p>
-
-<p>// Load map from feature indexes to package names
-val inp = spark.textFile(s"$dataDir/rpms.txt").map(<em>.split(" "))
-  .map(r => (r(0).toInt, r(1)))
-  .collect.toVector.sorted
-val nf = InvertibleIndexFunction(inp.map(</em>._2))</p>
-
-<p>// A feature extractor maps features into sequence of doubles
-val m = fields.first.length - 1
-val ext = Extractor(m, (v: Vector[String]) => v.map(_.toDouble).tail :FeatureSeq)
-  .withNames(nf)
-  .withCategoryInfo(IndexFunction.constant(2, m))
-```</p>
-
-<p>The next section of code is where the work of Random Forest Clustering happens.  A <code>RandomForestCluster</code> object is instantiated, and configured.  Here, the configuration is for 7 clusters, 250 synthetic points (about twice as many synthetic points as true data), and a Random Forest of 20 trees.  Training against the input data is a simple call to the <code>run</code> method.</p>
-
-<p>The <code>predictWithDistanceBy</code> method is then applied to the data paired with machine names, to yield tuples of cluster-id, distance to cluster center, and the associated machine name.  These tuples are split by distance into data with a cluster, and data considered to be "outliers" (i.e. elements far from any cluster center).  Lastly, the <code>histFeatures</code> method is applied, to examine the Random Forest Model and identify any commonly-used features.</p>
-
-<p>```scala
-// Train a Random Forest Clustering Model
-val rfcModel = RandomForestCluster(ext)
-  .setClusterK(7)
-  .setSyntheticSS(250)
-  .setRfNumTrees(20)
-  .setSeed(37)
-  .run(fields)</p>
-
-<p>// Evaluate to get tuples: (cluster, distance, machine-name)
-val cid = ids.map(rfcModel.predictWithDistanceBy(_)(x => x))</p>
-
-<p>// Split by closest distances into clusters and outliers<br/>
-val (clusters, outliers) = cid.splitFilter { case (<em>, dist, </em>) => dist &lt;= 5 }</p>
-
-<p>// Generate a histogram of features used in the RF model
-val featureHist = rfcModel.randomForestModel.histFeatures(ext.names)
-```</p>
-
-<p>The final code fragment simply formats clusters and outliers into a tabular form, as displayed in the <a href="#results">next section</a> of this post.  Note that there is neither Spark nor silex code here; standard Scala methods are sufficient to post-process the clustering data:</p>
-
-<p>```scala
-// Format clusters for display
-val clusterStr = clusters.map { case (j, d, n) => (j, (d, n)) }
-  .groupByKey
-  .collect
-  .map { case (j, nodes) =></p>
-
-<pre><code>nodes.toSeq.sorted.map { case (d, n) =&gt; s"$d  $n" }.mkString("\n")
-</code></pre>
-
-<p>  }
-  .mkString("\n\n")</p>
-
-<p>// Format outliers for display
-val outlierStr = outliers.collect
-  .map { case (_, d,n) => (d, n) }
-  .toVector.sorted
-  .map { case (d, n) => s"$d  $n" }
-  .mkString("\n")
-```</p>
-
-<p><a name="results"></a></p>
-
-<h5>Package Configuration Clustering Results</h5>
-
-<p>The result of running the code in the <a href="#code">previous section</a> is seven clusters of machines.  In the following files, the first column represents distance from the cluster center, and the second is the actual machine's node name.  A cluster distance of 0.0 indicates that the machine was indistinguishable from cluster center, as far as the Random Forest model was concerned.   The larger the distance, the more different from the cluster's center a machine was, in terms of its installed RPM packages.</p>
-
-<p>Was the clustering meaningful?  Examining the first two clusters below is promising; the machine names in these clusters are clearly similar, likely configured for some common task by the IT department.  The first cluster of machines appears to be web servers and corresponding backend services.  It would be unsurprising to find their RPM configurations were similar.</p>
-
-<p>The second cluster is a series of executor machines of varying sizes, but presumably these would be configured similarly to one another.</p>
-
-<script src="https://gist.github.com/erikerlandson/184d202560c628c0383c5050d9f4be24.js?file=cluster_1"></script>
-
-
-
-
-<script src="https://gist.github.com/erikerlandson/184d202560c628c0383c5050d9f4be24.js?file=cluster_2"></script>
-
-
-<p>The second pair of clusters (3 &amp; 4) are small.  All of their names are similar (and furthermore, similar to some machines in other clusters), and so an IT administrator might wonder why they ended up in oddball small clusters.  Perhaps they have some spurious, non-standard packages installed that ought to be cleaned up.  Identifying these kinds of structure in a clustering is one common clustering application.</p>
-
-<script src="https://gist.github.com/erikerlandson/184d202560c628c0383c5050d9f4be24.js?file=cluster_3"></script>
-
-
-
-
-<script src="https://gist.github.com/erikerlandson/184d202560c628c0383c5050d9f4be24.js?file=cluster_4"></script>
-
-
-<p>Cluster 5 is a series of bugzilla web servers and corresponding back-end bugzilla data base services.  Although they were clustered together, we see that the web servers have a larger distance from the center, indicating a somewhat different configuration.</p>
-
-<script src="https://gist.github.com/erikerlandson/184d202560c628c0383c5050d9f4be24.js?file=cluster_5"></script>
-
-
-<p>Cluster 6 represents a group of performance-related machines.  Not all of these machines occupy the same distance, even though most of their names are similar.  These are also the same series of machines as in clusters 3 &amp; 4.  Does this indicate spurious package installations, or some other legitimate configuration difference?  A question for the IT department...</p>
-
-<script src="https://gist.github.com/erikerlandson/184d202560c628c0383c5050d9f4be24.js?file=cluster_6"></script>
-
-
-<p>Cluster 7 is by far the largest.  It is primarily a combination of OpenStack machines and yet more perf machines.   This clustering was relatively stable -- it appeared across multiple independent clustering runs.  Because of its stability I would suggest to an IT administrator that the performance and OpenStack machines are sharing some configuration similarities, and the performance machines in other clusters suggest that there might be yet more configuration anomalies.  Perhaps these were OpenStack nodes that were re-purposed as performance machines?  Yet another question for IT...</p>
-
-<script src="https://gist.github.com/erikerlandson/184d202560c628c0383c5050d9f4be24.js?file=cluster_7"></script>
-
-
-<p><a name="outliers"></a></p>
-
-<h5>Outliers</h5>
-
-<p>This last grouping represents machines which were "far" from any of the previous cluster centers.  They may be interpreted as "outliers" - machines that don't fit any model category.  Of these the node <code>frodo</code> is clearly somebody's personal machine, likely with a customized or idiosyncratic package configuration.  Unsurprising that it is farthest of all machines from any cluster, with distance 9.0.   The <code>jenkins</code> machine is also somewhat unique among the nodes, and so perhaps not surprising that its registers as anomalous.  The remaining machines match node series from other clusters.   Their large distance is another indication of spurious configurations for IT to examine.</p>
-
-<script src="https://gist.github.com/erikerlandson/184d202560c628c0383c5050d9f4be24.js?file=outliers"></script>
-
-
-<p>I will conclude with another useful feature of Random Forest Models, which is that you can interrogate them for information such as which features were used most frequently.  Here is a histogram of model features (in this case, installed packages) that were used most frequently in the clustering model.  This particular histogram i sinteresting, as no feature was used more than twice.  The remaining features were all used exactly once.  This is a bit unusual for a Random Forest model.  Frequently some features are used commonly, with a longer tail.  This histogram is rather "flat," which may be a consequence of there being many more features (over 4000 installed packages) than there are data elements (135 machines).  This makes the problem somewhat under-determined.  To its credit, the model still achieves a meaningful clustering.</p>
-
-<p>Lastly I'll note that full histogram length was 186; in other words, of the nearly 4400 installed packages, the Random Forest model used only 186 of them -- a tiny fraction!  A nice illustration of Random Forest Clustering performing in the face of <a href="#payoff">high dimensionality</a>!</p>
-
-<script src="https://gist.github.com/erikerlandson/184d202560c628c0383c5050d9f4be24.js?file=histogram"></script>
-
-
-<p><head><style type="text/css">
-.gist {max-height:500px; overflow:auto}
-</style></head></p>
 ]]></content>
   </entry>
   
