@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="In Scala, sequence (and iterator) data types support the scanLeft method for computing a sequential prefix scan on sequence elements: // Use scanLeft &hellip;">
+  <meta name="description" content="In my previous post, I described how to implement the Scala scanLeft function as an RDD transform. By definition scanLeft invokes a sequential-only &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,61 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2014/08/12/implementing-parallel-prefix-scan-as-a-spark-rdd-transform/">Implementing Parallel Prefix Scan as a Spark RDD Transform</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-08-12T11:37:00-07:00" pubdate data-updated="true">Aug 12<span>th</span>, 2014</time>
+        
+        
+         | <a href="/blog/2014/08/12/implementing-parallel-prefix-scan-as-a-spark-rdd-transform/#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>In my <a href="/blog/2014/08/09/implementing-an-rdd-scanleft-transform-with-cascade-rdds/">previous post</a>, I described how to implement the Scala <code>scanLeft</code> function as an RDD transform.  By definition <code>scanLeft</code> invokes a sequential-only prefix scan algorithm; it does not assume that either its input function <code>f</code> or its initial-value <code>z</code> can be applied in a parallel fashion.   Its companion function <code>scan</code>, however, computes a <em>parallel</em> prefix scan.  In this post I will describe an implementation of parallel prefix <code>scan</code> as an RDD transform.</p>
+
+<p>As was the case with <code>scanLeft</code>, a basic strategy is to begin by applying <code>scan</code> to each RDD partition.  Provided that appropriate &#8220;offsets&#8221; <code>{z1, z2, ...}</code> can be computed for each partition, these can be applied to the partial, per-partition results to yield the output.   In fact, the desired <code>{z1, z2, ...}</code> are the parallel prefix scan of the last element in each per-partition scan.  The following diagram illustrates:</p>
+
+<p><img src="/assets/images/rdd_scan/rdd_scan_4.png" alt="image" /></p>
+
+<p>The diagram above glosses over the details of computing <code>scan</code> to obtain <code>{z1, z2, ...}</code>.   I will first describe the implementation I currently use, and then also discuss a possible alternative.  The current implementation takes the approach of encoding the <a href="http://en.wikipedia.org/wiki/Prefix_sum#Parallel_algorithm">logic of a parallel prefix scan</a> directly into an RDD computation DAG.   Each iteration, or &#8220;ply,&#8221; of the parallel algorithm is represented by an RDD.  Each element resides in its own partition, and so the computation dependency for each element is directly representable in the RDD dependency substructure.  This construction is illustrated in the following schematic (for a vector of 8 z-values):</p>
+
+<p><img src="/assets/images/rdd_scan/rdd_scan_5.png" alt="image" /></p>
+
+<p>The parallel prefix scan algorithm executes O(log(n)) plies, which materializes as O(log(n)) RDDs shown in the diagram above.  In this context, (n) is the number of input RDD <em>partitions</em>, not to be confused with the number of data rows in the RDD.   There are O((n)log(n)) partitions, each having a single row containing the z-value for a corresponding output partition.   Some z-values are determined earlier than others.  For example z1 is immediately available in ply(0), and ply(3) can refer directly back to that ply(0) partition in the interest of efficiency, as called out by the red DAG arcs.</p>
+
+<p>This scheme allows each final output partition to obtain its z-value directly from a single dedicated partition, which ensures that minimal data needs to be transferred across worker processes.  Final output partitions can be computed local to their corresponding input partitions.  Data transfer may be limited to the intermediate z-values, which are small single-row affairs by construction.</p>
+
+<p>The code implementing the logic above can be <a href="https://github.com/erikerlandson/spark/blob/rdd_scan_blog/core/src/main/scala/org/apache/spark/rdd/ScanRDDFunctions.scala#L161">viewed here.</a></p>
+
+<p>I will conclude by noting that there is an alternative to this highly distributed computation of <code>{z1, z2, ...}</code>, which is to collect the last-values in the per-partition intermediate scan ouputs into a single array, and run <code>scan</code> directly on that array.   This has the advantage of avoiding the construction of log(n) intermediate RDDs.   It does, however, require a monolithic &#8216;fan-in&#8217; of data into a single RDD to receive the collection of values.  That is followed by a fan-out of the array, where each output partition picks its single z-value from the array.  It is for this reason I suspect this alternative incurs substantially more transfer overhead across worker processes.  However, one might also partition the resulting z-values in some optimal way, so that each final output partition needs to request only the partition that contains its z-value.  Future experimentation might show that this can out-perform the current fully-distributed implementation.</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1497,73 +1552,6 @@ slot1_1@rorschach | 1
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/11/26/rethinking-the-semantics-of-group-quotas-and-slot-weights-computing-claim-capacity-from-consumption-policy/">Rethinking the Semantics of Group Quotas and Slot Weights: Computing Claim Capacity from Consumption Policy</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-11-26T13:52:00-07:00" pubdate data-updated="true">Nov 26<span>th</span>, 2012</time>
-        
-        
-         | <a href="/blog/2012/11/26/rethinking-the-semantics-of-group-quotas-and-slot-weights-computing-claim-capacity-from-consumption-policy/#feedback">Feedback</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>In two previous posts, I made a case to motivate the need for a better definition of slot weights and group quotas that could accommodate use cases involving aggregate resources (partitionable slots) with heterogeneous consumption policies and also provide a principled unit analysis for weights and quotas.  These previous posts can be viewed here:</p>
-
-<ul>
-<li><a href="http://erikerlandson.github.com/blog/2012/11/13/rethinking-the-semantics-of-group-quotas-and-slot-weights-for-heterogeneous-and-multidimensional-compute-resources/">Rethinking the Semantics of Group Quotas and Slot Weights for Heterogeneous and Multidimensional Compute Resources</a></li>
-<li><a href="http://erikerlandson.github.com/blog/2012/11/15/rethinking-the-semantics-of-group-quotas-and-slot-weights-claim-capacity-model/">Rethinking the Semantics of Group Quotas and Slot Weights: Claim Capacity Model</a></li>
-</ul>
-
-
-<p>As previously mentioned, a Claim Capacity Model of accounting group quotas and slot weights (or &#8220;resource consumption costs&#8221;) requires a resource claiming model that assigns a well defined finite value for the maximum number of claims that each resource and its consumption policy can support.  It must also be re-evaluatable on a resource as its assets are consumed, so that the cost of a proposed claim (or match, in negotiation-speak) can be defined as W(R) - W(R&#8217;), were R&#8217; embodies the amounts of all assets remaining after the claim has taken its share.  (Here, I will be using the term &#8216;assets&#8217; to refer to quantities such as cpus, memory, disk, swap or any <a href="http://spinningmatt.wordpress.com/2012/11/19/extensible-machine-resources/">extensible resources</a> defined, to clarify the difference between an aggregate resource (i.e. a partitionable slot) versus a single resource dimension such as cpus, memory, etc).</p>
-
-<p>This almost immediately raises the question of how best to define such a resource claiming model.  In this post I will briefly describe a few possible approaches, focusing on models which are easy reason about, easy to configure and additionally allow claim capacity for a resource - W(R) - to be computed automatically for the user, thus making a sane relationship between consumption policies and consumption costs possible to enforce.</p>
-
-<h3>Approach 1: fixed claim consumption model</h3>
-
-<p>The simplest-possible approach is arguably to just directly configure a fixed number, M, of claims attached to a resource.  In this model, each match of a job against a resource consumes one of the M claims.   Here, match cost W(R) - W(R&#8217;) = 1 in all cases, and is independent of the &#8216;size&#8217; of assets consumed from a resource.</p>
-
-<p>A possible use case for such a model is that one might wish to declare that a resource can run up to a certain number of jobs, without assigning any particular cost to consuming individual assets.  If the pool users&#8217; workload consists of large numbers of resource-cheap jobs that can effectively share cpu, memory, etc, then such a model might be a good fit.</p>
-
-<h3>Approach 2: configure asset quantization levels</h3>
-
-<p>Another approach that makes the relation between consumption policy and claim capacity easy to think about is to configure a quantization level for each resource asset.  For example, here we might quantize memory into 20 levels, i.e. Q(memory) = 20.  Similarly we might define Q(cpus) = 10 (note that HTCondor does not currently handle fractional cpus on resources, but this kind of model would benefit if floating point asset fractions were supported).  At any time, a resource R has some number q(a) left of the original Q(a).  A job requests an amount r(a) for asset (a).   Here, a claim gets a quantized approximation of any requested asset = V(a)(n(a)/Q(a)), where V(a) is the total original value available for asset (a), and n(a) = ceiling(r(a)Q(a)/V(a)).   Here there are two possible sub-policies.  If we demand that each claim consume >= 1 quantum of every asset (i.e. n(a) >= 1), then the claim capacity W(R) is the minimum of q(a), for (a) over all assets.  However, if a claim is allowed to consume a zero quantity of some individual assets (n(a)=0), then the claim capacity is the <em>maximum</em> of the q(a).   In this case, one must address the corner case of a claim attempting to consume (n(a)=0) over all assets.  The resulting resource R&#8217; has q&#8217;(a) = q(a)-n(a), and W(R&#8217;) is the minium (or maximum) over the new q&#8217;(a).</p>
-
-<h3>Approach 3: configure minimum asset charges</h3>
-
-<p>A third approach is to configure a <em>minimum</em> amount of each asset that any claim must be charged.   For example, we might define a minimum amount of memory C(memory) to charge any claim.   If a job requests an amount r(a), it will always receive max(r(a), C(a)).  As above, q(a) is the number of quanta currently available for asset (a).  Let v(a) be the amount of (a) currently available.  Here we define q(a) for an asset (a) to be floor(v(a)/C(a)).   If we adhere to a reasonable restriction that C(a) must be strictly > 0 for all (a), we are guaranteed a well defined W(R) = min over the q(a).</p>
-
-<p>It is an open question which of these models (or some other completely different options) should be supported.  Conceivably all of them could be provided as options.</p>
-
-<p>Currently my personal preference leans toward Approach 3.  It is easy to reason about and configure.  It yields a well defined W(R) in all circumstances, with no corner cases, that is straightforward to compute and enforce automatically.  It is easy to configure heterogeneous consumption policies that cost different resource assets in different ways, simply by tuning minimum charge C(a) appropriately for each asset.  This includes claim capacity models where jobs are assumed to use very small amounts of any resource, including fractional shares of cpu assets.</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/4/">&larr; Older</a>
@@ -1585,6 +1573,10 @@ slot1_1@rorschach | 1
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2016/08/31/supporting-competing-apis-in-scala-can-better-package-factoring-help/">Supporting Competing APIs in Scala &#8211; Can Better Package Factoring Help?</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2016/08/03/x-medoids-using-minimum-description-length-to-identify-the-k-in-k-medoids/">Using Minimum Description Length to Optimize the &#8216;K&#8217; in K-Medoids</a>
       </li>
     
@@ -1598,10 +1590,6 @@ slot1_1@rorschach | 1
     
       <li class="post">
         <a href="/blog/2016/06/08/exploring-the-effects-of-dimensionality-on-a-pdf-of-distances/">Exploring the Effects of Dimensionality on a PDF of Distances</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2016/05/26/measuring-decision-tree-split-quality-with-test-statistic-p-values/">Measuring Decision Tree Split Quality with Test Statistic P-Values</a>
       </li>
     
   </ul>

@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="Applying many popular clustering models, for example K-Means, K-Medoids and Gaussian Mixtures, requires an up-front choice of the number of clusters &hellip;">
+  <meta name="description" content="On and off over the last year, I&#8217;ve been working on a library of tree and map classes in Scala that happen to make use of some algebraic &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,108 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2016/08/31/supporting-competing-apis-in-scala-can-better-package-factoring-help/">Supporting Competing APIs in Scala &#8211; Can Better Package Factoring Help?</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2016-08-31T17:55:00-07:00" pubdate data-updated="true">Aug 31<span>st</span>, 2016</time>
+        
+        
+         | <a href="/blog/2016/08/31/supporting-competing-apis-in-scala-can-better-package-factoring-help/#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p> On and off over the last year, I&#8217;ve been working on a <a href="http://erikerlandson.github.io/blog/2015/09/26/a-library-of-binary-tree-algorithms-as-mixable-scala-traits/">library</a> of tree and map classes in Scala that happen to make use of some algebraic structures (mostly monoids or related concepts).
+ In my initial implementations, I made use of the popular <a href="https://github.com/twitter/algebird">algebird</a> variations on monoid and friends.
+ In their incarnation as an <a href="https://github.com/twitter/algebird/pull/496">algebird PR</a> this was uncontroversial to say the least, but lately I have been re-thinking them as a <a href="https://github.com/isarn/isarn/pull/1">third-party Scala package</a>.</p>
+
+<p>This immediately raised some interesting and thorny questions:
+in an ecosystem that contains not just <a href="https://github.com/twitter/algebird">algebird</a>, but other popular alternatives such as <a href="https://github.com/typelevel/cats">cats</a> and <a href="https://github.com/scalaz/scalaz">scalaz</a>, what algebra API should I use in my code?
+How best to allow the library user to interoperate with the algebra libray of their choice?
+Can I accomplish these things while also avoiding any problematic package dependencies in my library code?</p>
+
+<p>In Scala, the second question is relatively straightforward to answer.
+I can write my interface using <a href="http://docs.scala-lang.org/tutorials/tour/implicit-conversions">implicit conversions</a>, and provide sub-packages that provide such conversions from popular algebra libraries into the library I actually use in my code.
+A library user can import the predefined implicit conversions of their choice, or if necessary provide their own.</p>
+
+<p>So far so good, but that leads immediately back to the first question &#8211; what API should <strong><em>I</em></strong> choose to use internally in my own library?</p>
+
+<p>One obvious approach is to just pick one of the popular options (I might favor <code>cats</code>, for example) and write my library code using that.
+If a library user also prefers <code>cats</code>, great.
+Otherwise, they can import the appropritate implicit conversions from their favorite alternative into <code>cats</code> and be on their way.</p>
+
+<p>But this solution is not without drawbacks.
+Anybody using my library will now be including <code>cats</code> as a transitive dependency in their project, even if they are already using some other alternative.
+Although <code>cats</code> is not an enormous library, that represents a fair amount of code sucked into my users&#8217; projects, most of which isn&#8217;t going to be used at all.
+More insidiously, I have now introduced the possiblity that the <code>cats</code> version I package with is out of sync with the version my library users are building against.
+Version misalignment in transitive dependencies is a land-mine in project builds and very difficult to resolve.</p>
+
+<p>A second approach I might use is to define some abstract algebraic traits of my own.
+I can write my libraries in terms of this new API, and then provide implicit conversions from popular APIs into mine.</p>
+
+<p>This approach has some real advantages over the previous.  Being entirely abstract, my internal API will be lightweight.  I have the option of including only the algebraic concepts I need.  It does not introduce any possibly problematic 3rd-party dependencies that might cause code bloat or versioning problems for my library users.</p>
+
+<p>Although this is an effective solution, I find it dissatisfying for a couple reasons.
+Firstly, my new internal API effectively represents <em>yet another competing algebra API</em>, and so I am essentially contributing to the proliferating-standards antipattern.</p>
+
+<p><img src="https://imgs.xkcd.com/comics/standards.png" alt="standards" /></p>
+
+<p>Secondly, it means that I am not taking advantage of community knowledge.
+The <code>cats</code> library embodies a great deal of cumulative human expertise in both category theory and Scala library design.
+What does a good algebra library API look like?
+Well, <em>it&#8217;s likely to look a lot like <code>cats</code></em> of course!
+The odds that I end up doing an inferior job designing my little internal vanity API are rather higher than the odds that I do as well or better.
+The best I can hope for is to re-invent the wheel, with a real possibility that my wheel has corners.</p>
+
+<p>Is there a way to resolve this unpalatable situation?
+Can we design our projects to both remain flexible about interfacing with multiple 3rd-party alternatives, but avoid effectively writing <em>yet another alternative</em> for our own internal use?</p>
+
+<p>I hardly have any authoritative answers to this problem, but I have one idea that might move toward a solution.
+As I alluded to above, when I write my libraries, I am most frequently <em>only</em> interested in the API &#8211; the abstract interface.
+If I did go with writing my own algebra API, I would seek to define purely abstract traits.
+Since my intention is that my library users would supply their own favorite library alternative, I would have no need or desire to instantiate any of my APIs.
+That function would be provided by the separate sub-projects that provide implicit conversions from community alternatives into my API.</p>
+
+<p>On the other hand, what if <code>cats</code> and <code>algebird</code> factored <em>their</em> libraries in a similar way?
+What if I could include a sub-package like <code>cats-kernel-api</code>, or <code>algebird-core-api</code>, which contained <em>only</em> pure abstract traits for monoid, semigroup, etc?
+Then I could choose my favorite community API, and code against it, with much less code bloat, and a much reduced vulnerability to any versioning drift.
+I would still be free to provide implicit conversions and allow <em>my</em> users to make their own choice of library in their projects.</p>
+
+<p>Although I find this idea attractive, it is certainly not foolproof.
+For example, there is never a way to <em>guarantee</em> that versioning drift won&#8217;t break an API.
+APIs such as <code>cats</code> and <code>algebird</code> are likely to be unusually amenable to this kind of approach.
+After all, their interfaces are primarily driven by underlying mathematical definitions, which are generally as stable as such things ever get.
+However, APIs in general tend to be significantly more stable than underlying code.
+And the most-stable subsets of APIs might be encoded as traits and exposed this way, allowing other more experimental API components to change at a higher frequency.
+Perhaps library packages could even be factored in some way such as <code>library-stable-api</code> and <code>library-unstable-api</code>.
+That would clearly add a bit of complication to library trait hierarchies, but the payoff in terms of increased 3rd-party usability might be worth it.</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1775,143 +1877,6 @@ I intend to keep an eye out for applications of MDL to <em>other</em> learning m
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2015/11/20/very-fast-reservoir-sampling/">Very Fast Reservoir Sampling</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2015-11-20T11:27:00-07:00" pubdate data-updated="true">Nov 20<span>th</span>, 2015</time>
-        
-        
-         | <a href="/blog/2015/11/20/very-fast-reservoir-sampling/#feedback">Feedback</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>In this post I will demonstrate how to do reservoir sampling orders of magnitude faster than the traditional &#8220;naive&#8221; reservoir sampling algorithm, using a fast high-fidelity approximation to the reservoir sampling-gap distribution.</p>
-
-<blockquote><p>The code I used to collect the data for this post can be viewed <a href="https://github.com/erikerlandson/silex/blob/blog/reservoir/src/main/scala/com/redhat/et/silex/sample/reservoir/reservoir.scala">here</a>.  I generated the plots using the <a href="https://github.com/quantifind/wisp">quantifind WISP</a> project.</p>
-
-<p>Update (April 4, 2016): my colleague <a href="http://rnowling.github.io/">RJ Nowling</a> ran across a <a href="http://www.ittc.ku.edu/~jsv/Papers/Vit87.RandomSampling.pdf">paper by J.S. Vitter</a> that shows Vitter developed the trick of accelerating sampling with a sampling-gap distribution in 1987 &#8211; I re-invented Vitter&#8217;s wheel 30 years after the fact!  I&#8217;m surprised it never caught on, as it is not much harder to implement than the naive version.</p></blockquote>
-
-<p>In a <a href="http://erikerlandson.github.io/blog/2014/09/11/faster-random-samples-with-gap-sampling/">previous post</a>, I showed that random Bernoulli and Poisson sampling could be made much faster by modeling the <em>sampling gap distribution</em> for the corresponding sampling distributions.  More recently, I also began exploring whether <a href="https://en.wikipedia.org/wiki/Reservoir_sampling">reservoir sampling</a> might also be optimized using the gap sampling technique, by deriving the <a href="http://erikerlandson.github.io/blog/2015/08/17/the-reservoir-sampling-gap-distribution/">reservoir sampling gap distribution</a>.  For a sampling reservoir of size (R), starting at data element (j), the probability distribution of the sampling gap is:</p>
-
-<p><img src="/assets/images/reservoir1/figure6.png" title="Figure 1" alt="Figure 1" /></p>
-
-<p>Modeling a sampling gap distribution is a powerful tool for optimizing a sampling algorithm, but it presupposes that you can actually draw values from that distribution substantially faster than just applying a random process to drawing each data element.  I was unable to come up with a &#8220;direct&#8221; algorithm for drawing samples from P(k) above (I suspect none exists), however I also know the CDF F(k), so it <em>is</em> possible to apply <a href="https://en.wikipedia.org/wiki/Inverse_transform_sampling">inversion sampling</a>, which runs in logarithmic time w.r.t the desired accuracy.  Although its logarithmic cost effectively guarantees that it will be a net efficiency win for sufficiently large (j), it still involves a substantial number of computations to yield its samples, and it seems unlikely to be competitive with straight &#8220;naive&#8221; reservoir sampling over many real-world data sizes, where (j) may never grow very large.</p>
-
-<p>Well, if exact computations are too expensive, we can always look for a fast approximation.  Consider the original &#8220;first principles&#8221; formula for the sampling gap P(k):</p>
-
-<p><img src="/assets/images/reservoir2/figure2.png" title="Figure 2" alt="Figure 2" /></p>
-
-<p>As the figure above alludes to, if (j) is relatively large compared to (k), then values (j+1),(j+2)&#8230;(j+k) are all going to be effectively &#8220;close&#8221; to (j), and so we can replace them all with (j) as an approximation.  Note that the resulting approximation is just the PMF of the <a href="https://en.wikipedia.org/wiki/Geometric_distribution">geometric distribution</a>, with probability of success p=(R/j), and we already saw how to efficiently draw values from a geometric distribution from our experience with Bernoulli sampling.</p>
-
-<p>Do we have any reason to hope that this approximation will be useful?  For reasons that are similar to those for Bernoulli gap sampling, it will only be efficient to employ gap sampling when the probability (R/j) becomes small enough.  From our experiences with Bernoulli sampling that is <em>at least</em> j>=2R.  So, we have some assurance that (j) itself will be never be <em>very</em> small.  What about (k)?  Note that a geometric distribution &#8220;favors&#8221; smaller values of (k) &#8211; that is, small values of (k) have the highest probabilities.  In fact, the smaller that (j) is, the larger the probability (R/j) is, and so the more likely that (k) values that are small relative to (j) will be the frequent ones.  It is also promising that the true distribution for P(k) <em>also</em> favors smaller values of (k) (in fact it favors them even a bit more strongly than the approximation).</p>
-
-<p>Although it is encouraging, it is also clear that my argument above is limited to heuristic hand-waving.  What does this approximation really <em>look</em> like, compared to the true distribution?  Fortunately, it is easy to plot both distributions numerically, since we now know the formulas for both:</p>
-
-<p><img src="/assets/images/reservoir2/CDFs_R=10.png" title="Figure 3" alt="Figure 3" /></p>
-
-<p>The plot above shows that, in fact, the geometric approximation is a <em>surprisingly good</em> approximation to the true distribution!  Furthermore, the approximation remains good as both (j) and (k) grow larger.</p>
-
-<p>Our numeric eye-balling looks quite promising.  Is there an effective way to <em>measure</em> how good this approximation is?  One useful measure is the <a href="https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test">Kolmogorov-Smirnov D statistic</a>, which is just the maximum absolute error between two cumulative distributions.  Here is a plot of the D statistic for reservoir size R=10, as (j) varies across several magnitudes:</p>
-
-<p><img src="/assets/images/reservoir2/R=10.png" title="Figure 4" alt="Figure 4" /></p>
-
-<p>This plot is also good news: we can see that deviation, as measured by D, remains bounded at a small value (less than 0.0262).  As this is for the specific value R=10, we also want to know how things change as reservoir size changes:</p>
-
-<p><img src="/assets/images/reservoir2/R=all.png" title="Figure 5" alt="Figure 5" /></p>
-
-<p>The news is still good!  As reservoir size grows, the approximation only gets better: the D values get smaller as R increases, and remain asymptotically bounded as (j) increases.</p>
-
-<p>Now we have some numeric assurance that the geometric approximation is a good one, and stays good as reservoir size grows and sampling runs get longer.  However, we should also verify that an actual implementation of the approximation works as expected.</p>
-
-<p>Here is pseudocode for an implementation of reservoir sampling using the fast geometric approximation:</p>
-
-<pre><code>// data is array to sample from
-// R is the reservoir size
-function reservoirFast(data: Array, R: Int) {
-  n = data.length
-  // Initialize reservoir with first R elements of data:
-  res = data[0 until R]
-  // Until this threshold, use traditional sampling.  This value may
-  // depend on performance characteristics of random number generation and/or
-  // numeric libraries:
-  t = 4 * R
-  j = 1 + R
-  while (j &lt; n  &amp;&amp;  j &lt;= t) {
-    k = randomInt(j) // random integer &gt;= 0 and &lt; j
-    if (k &lt; R) res[k] = data[j]
-    j = j + 1
-  }
-  // Once gaps become significant, it pays to do gap sampling
-  while (j &lt; n) {
-    // draw gap size (g) from geometric distribution with probability p = R/j
-    p = R / j
-    u = randomFloat() // random float &gt; 0 and &lt;= 1
-    g = floor(log(u) / log(1-p))
-    j = j + g
-    if (j &lt; n) {
-      k = randomInt(R)
-      res[k] = data[j]
-    }
-    j = j + 1
-  }
-  // return the reservoir
-  return res
-}
-</code></pre>
-
-<p>Following is a plot that shows two-sample D statistics, comparing the distribution in sample gaps between runs of the exact &#8220;naive&#8221; reservoir sampling with the fast geometric approximation:</p>
-
-<p><img src="/assets/images/reservoir2/D_naive_vs_fast.png" title="Figure 6" alt="Figure 6" /></p>
-
-<p>As expected, the measured difference in sampling characteristics between naive and fast approximation are small, confirming the numeric predictions.</p>
-
-<p>Since the point of this exercise was to achieve faster random sampling, it remains to measure what kind of speed improvements the fast approximation provides.  As a point of reference, here is a plot of run times for reservoir sampling over 10<sup>8</sup> integers:</p>
-
-<p><img src="/assets/images/reservoir2/naive_sample_time_vs_R.png" title="Figure 7" alt="Figure 7" /></p>
-
-<p>As expected, sample time remains constant at around 1.5 seconds, regardless of reservoir size, since the naive algorithm always samples from its RNG per each sample.</p>
-
-<p>Compare this to the corresponding plot for the fast geometric approximation:</p>
-
-<p><img src="/assets/images/reservoir2/gap_sample_times_vs_R.png" title="Figure 8" alt="Figure 8" /></p>
-
-<p>Firstly, we see that the sampling times are <em>much faster</em>, as originally anticipated in my <a href="http://erikerlandson.github.io/blog/2015/08/17/the-reservoir-sampling-gap-distribution/">previous post</a> &#8211; in the neighborhood of 3 orders of magnitude faster.  Secondly, we see that the sampling times do increase as a linear function of reservoir size.  Based on our experience with Bernoulli gap sampling, this is expected; the sampling probabilities are given by (R/j), and therefore the amount of sampling is proportional to R.</p>
-
-<p>Another property anticipated in my previous post was that the efficiency of gap sampling should continue to increase as the amount of data sampled grows; the sampling probability being (R/j), the probability of sampling decreases as j gets larger, and so the corresponding gap sizes grow.  The following plot verifies this property, holding reservoir size R constant, and increasing the data size:</p>
-
-<p><img src="/assets/images/reservoir2/gap_sampling_efficiency.png" title="Figure 9" alt="Figure 9" /></p>
-
-<p>The sampling time (per million elements) decreases as the sample size grows, as predicted by the formula.</p>
-
-<p>In conclusion, I have demonstrated that a geometric distribution can be used as a high quality approximation to the true sampling gap distribution for reservoir sampling, which allows reservoir sampling to be performed much faster than the naive algorithm while still retaining sampling quality.</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/2/">&larr; Older</a>
@@ -1931,6 +1896,10 @@ function reservoirFast(data: Array, R: Int) {
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2016/08/31/supporting-competing-apis-in-scala-can-better-package-factoring-help/">Supporting Competing APIs in Scala &#8211; Can Better Package Factoring Help?</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2016/08/03/x-medoids-using-minimum-description-length-to-identify-the-k-in-k-medoids/">Using Minimum Description Length to Optimize the &#8216;K&#8217; in K-Medoids</a>
       </li>
     
@@ -1944,10 +1913,6 @@ function reservoirFast(data: Array, R: Int) {
     
       <li class="post">
         <a href="/blog/2016/06/08/exploring-the-effects-of-dimensionality-on-a-pdf-of-distances/">Exploring the Effects of Dimensionality on a PDF of Distances</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2016/05/26/measuring-decision-tree-split-quality-with-test-statistic-p-values/">Measuring Decision Tree Split Quality with Test Statistic P-Values</a>
       </li>
     
   </ul>

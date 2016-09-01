@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="In this post I am going to describe some work I&#8217;ve done recently on a system of Scala traits that support tree-based collection algorithms &hellip;">
+  <meta name="description" content="In this post I will demonstrate how to do reservoir sampling orders of magnitude faster than the traditional &#8220;naive&#8221; reservoir sampling &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,143 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2015/11/20/very-fast-reservoir-sampling/">Very Fast Reservoir Sampling</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2015-11-20T11:27:00-07:00" pubdate data-updated="true">Nov 20<span>th</span>, 2015</time>
+        
+        
+         | <a href="/blog/2015/11/20/very-fast-reservoir-sampling/#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>In this post I will demonstrate how to do reservoir sampling orders of magnitude faster than the traditional &#8220;naive&#8221; reservoir sampling algorithm, using a fast high-fidelity approximation to the reservoir sampling-gap distribution.</p>
+
+<blockquote><p>The code I used to collect the data for this post can be viewed <a href="https://github.com/erikerlandson/silex/blob/blog/reservoir/src/main/scala/com/redhat/et/silex/sample/reservoir/reservoir.scala">here</a>.  I generated the plots using the <a href="https://github.com/quantifind/wisp">quantifind WISP</a> project.</p>
+
+<p>Update (April 4, 2016): my colleague <a href="http://rnowling.github.io/">RJ Nowling</a> ran across a <a href="http://www.ittc.ku.edu/~jsv/Papers/Vit87.RandomSampling.pdf">paper by J.S. Vitter</a> that shows Vitter developed the trick of accelerating sampling with a sampling-gap distribution in 1987 &#8211; I re-invented Vitter&#8217;s wheel 30 years after the fact!  I&#8217;m surprised it never caught on, as it is not much harder to implement than the naive version.</p></blockquote>
+
+<p>In a <a href="http://erikerlandson.github.io/blog/2014/09/11/faster-random-samples-with-gap-sampling/">previous post</a>, I showed that random Bernoulli and Poisson sampling could be made much faster by modeling the <em>sampling gap distribution</em> for the corresponding sampling distributions.  More recently, I also began exploring whether <a href="https://en.wikipedia.org/wiki/Reservoir_sampling">reservoir sampling</a> might also be optimized using the gap sampling technique, by deriving the <a href="http://erikerlandson.github.io/blog/2015/08/17/the-reservoir-sampling-gap-distribution/">reservoir sampling gap distribution</a>.  For a sampling reservoir of size (R), starting at data element (j), the probability distribution of the sampling gap is:</p>
+
+<p><img src="/assets/images/reservoir1/figure6.png" title="Figure 1" alt="Figure 1" /></p>
+
+<p>Modeling a sampling gap distribution is a powerful tool for optimizing a sampling algorithm, but it presupposes that you can actually draw values from that distribution substantially faster than just applying a random process to drawing each data element.  I was unable to come up with a &#8220;direct&#8221; algorithm for drawing samples from P(k) above (I suspect none exists), however I also know the CDF F(k), so it <em>is</em> possible to apply <a href="https://en.wikipedia.org/wiki/Inverse_transform_sampling">inversion sampling</a>, which runs in logarithmic time w.r.t the desired accuracy.  Although its logarithmic cost effectively guarantees that it will be a net efficiency win for sufficiently large (j), it still involves a substantial number of computations to yield its samples, and it seems unlikely to be competitive with straight &#8220;naive&#8221; reservoir sampling over many real-world data sizes, where (j) may never grow very large.</p>
+
+<p>Well, if exact computations are too expensive, we can always look for a fast approximation.  Consider the original &#8220;first principles&#8221; formula for the sampling gap P(k):</p>
+
+<p><img src="/assets/images/reservoir2/figure2.png" title="Figure 2" alt="Figure 2" /></p>
+
+<p>As the figure above alludes to, if (j) is relatively large compared to (k), then values (j+1),(j+2)&#8230;(j+k) are all going to be effectively &#8220;close&#8221; to (j), and so we can replace them all with (j) as an approximation.  Note that the resulting approximation is just the PMF of the <a href="https://en.wikipedia.org/wiki/Geometric_distribution">geometric distribution</a>, with probability of success p=(R/j), and we already saw how to efficiently draw values from a geometric distribution from our experience with Bernoulli sampling.</p>
+
+<p>Do we have any reason to hope that this approximation will be useful?  For reasons that are similar to those for Bernoulli gap sampling, it will only be efficient to employ gap sampling when the probability (R/j) becomes small enough.  From our experiences with Bernoulli sampling that is <em>at least</em> j>=2R.  So, we have some assurance that (j) itself will be never be <em>very</em> small.  What about (k)?  Note that a geometric distribution &#8220;favors&#8221; smaller values of (k) &#8211; that is, small values of (k) have the highest probabilities.  In fact, the smaller that (j) is, the larger the probability (R/j) is, and so the more likely that (k) values that are small relative to (j) will be the frequent ones.  It is also promising that the true distribution for P(k) <em>also</em> favors smaller values of (k) (in fact it favors them even a bit more strongly than the approximation).</p>
+
+<p>Although it is encouraging, it is also clear that my argument above is limited to heuristic hand-waving.  What does this approximation really <em>look</em> like, compared to the true distribution?  Fortunately, it is easy to plot both distributions numerically, since we now know the formulas for both:</p>
+
+<p><img src="/assets/images/reservoir2/CDFs_R=10.png" title="Figure 3" alt="Figure 3" /></p>
+
+<p>The plot above shows that, in fact, the geometric approximation is a <em>surprisingly good</em> approximation to the true distribution!  Furthermore, the approximation remains good as both (j) and (k) grow larger.</p>
+
+<p>Our numeric eye-balling looks quite promising.  Is there an effective way to <em>measure</em> how good this approximation is?  One useful measure is the <a href="https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test">Kolmogorov-Smirnov D statistic</a>, which is just the maximum absolute error between two cumulative distributions.  Here is a plot of the D statistic for reservoir size R=10, as (j) varies across several magnitudes:</p>
+
+<p><img src="/assets/images/reservoir2/R=10.png" title="Figure 4" alt="Figure 4" /></p>
+
+<p>This plot is also good news: we can see that deviation, as measured by D, remains bounded at a small value (less than 0.0262).  As this is for the specific value R=10, we also want to know how things change as reservoir size changes:</p>
+
+<p><img src="/assets/images/reservoir2/R=all.png" title="Figure 5" alt="Figure 5" /></p>
+
+<p>The news is still good!  As reservoir size grows, the approximation only gets better: the D values get smaller as R increases, and remain asymptotically bounded as (j) increases.</p>
+
+<p>Now we have some numeric assurance that the geometric approximation is a good one, and stays good as reservoir size grows and sampling runs get longer.  However, we should also verify that an actual implementation of the approximation works as expected.</p>
+
+<p>Here is pseudocode for an implementation of reservoir sampling using the fast geometric approximation:</p>
+
+<pre><code>// data is array to sample from
+// R is the reservoir size
+function reservoirFast(data: Array, R: Int) {
+  n = data.length
+  // Initialize reservoir with first R elements of data:
+  res = data[0 until R]
+  // Until this threshold, use traditional sampling.  This value may
+  // depend on performance characteristics of random number generation and/or
+  // numeric libraries:
+  t = 4 * R
+  j = 1 + R
+  while (j &lt; n  &amp;&amp;  j &lt;= t) {
+    k = randomInt(j) // random integer &gt;= 0 and &lt; j
+    if (k &lt; R) res[k] = data[j]
+    j = j + 1
+  }
+  // Once gaps become significant, it pays to do gap sampling
+  while (j &lt; n) {
+    // draw gap size (g) from geometric distribution with probability p = R/j
+    p = R / j
+    u = randomFloat() // random float &gt; 0 and &lt;= 1
+    g = floor(log(u) / log(1-p))
+    j = j + g
+    if (j &lt; n) {
+      k = randomInt(R)
+      res[k] = data[j]
+    }
+    j = j + 1
+  }
+  // return the reservoir
+  return res
+}
+</code></pre>
+
+<p>Following is a plot that shows two-sample D statistics, comparing the distribution in sample gaps between runs of the exact &#8220;naive&#8221; reservoir sampling with the fast geometric approximation:</p>
+
+<p><img src="/assets/images/reservoir2/D_naive_vs_fast.png" title="Figure 6" alt="Figure 6" /></p>
+
+<p>As expected, the measured difference in sampling characteristics between naive and fast approximation are small, confirming the numeric predictions.</p>
+
+<p>Since the point of this exercise was to achieve faster random sampling, it remains to measure what kind of speed improvements the fast approximation provides.  As a point of reference, here is a plot of run times for reservoir sampling over 10<sup>8</sup> integers:</p>
+
+<p><img src="/assets/images/reservoir2/naive_sample_time_vs_R.png" title="Figure 7" alt="Figure 7" /></p>
+
+<p>As expected, sample time remains constant at around 1.5 seconds, regardless of reservoir size, since the naive algorithm always samples from its RNG per each sample.</p>
+
+<p>Compare this to the corresponding plot for the fast geometric approximation:</p>
+
+<p><img src="/assets/images/reservoir2/gap_sample_times_vs_R.png" title="Figure 8" alt="Figure 8" /></p>
+
+<p>Firstly, we see that the sampling times are <em>much faster</em>, as originally anticipated in my <a href="http://erikerlandson.github.io/blog/2015/08/17/the-reservoir-sampling-gap-distribution/">previous post</a> &#8211; in the neighborhood of 3 orders of magnitude faster.  Secondly, we see that the sampling times do increase as a linear function of reservoir size.  Based on our experience with Bernoulli gap sampling, this is expected; the sampling probabilities are given by (R/j), and therefore the amount of sampling is proportional to R.</p>
+
+<p>Another property anticipated in my previous post was that the efficiency of gap sampling should continue to increase as the amount of data sampled grows; the sampling probability being (R/j), the probability of sampling decreases as j gets larger, and so the corresponding gap sizes grow.  The following plot verifies this property, holding reservoir size R constant, and increasing the data size:</p>
+
+<p><img src="/assets/images/reservoir2/gap_sampling_efficiency.png" title="Figure 9" alt="Figure 9" /></p>
+
+<p>The sampling time (per million elements) decreases as the sample size grows, as predicted by the formula.</p>
+
+<p>In conclusion, I have demonstrated that a geometric distribution can be used as a high quality approximation to the true sampling gap distribution for reservoir sampling, which allows reservoir sampling to be performed much faster than the naive algorithm while still retaining sampling quality.</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -2002,61 +2139,6 @@ java.lang.StackOverflowError
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2014/08/12/implementing-parallel-prefix-scan-as-a-spark-rdd-transform/">Implementing Parallel Prefix Scan as a Spark RDD Transform</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2014-08-12T11:37:00-07:00" pubdate data-updated="true">Aug 12<span>th</span>, 2014</time>
-        
-        
-         | <a href="/blog/2014/08/12/implementing-parallel-prefix-scan-as-a-spark-rdd-transform/#feedback">Feedback</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>In my <a href="/blog/2014/08/09/implementing-an-rdd-scanleft-transform-with-cascade-rdds/">previous post</a>, I described how to implement the Scala <code>scanLeft</code> function as an RDD transform.  By definition <code>scanLeft</code> invokes a sequential-only prefix scan algorithm; it does not assume that either its input function <code>f</code> or its initial-value <code>z</code> can be applied in a parallel fashion.   Its companion function <code>scan</code>, however, computes a <em>parallel</em> prefix scan.  In this post I will describe an implementation of parallel prefix <code>scan</code> as an RDD transform.</p>
-
-<p>As was the case with <code>scanLeft</code>, a basic strategy is to begin by applying <code>scan</code> to each RDD partition.  Provided that appropriate &#8220;offsets&#8221; <code>{z1, z2, ...}</code> can be computed for each partition, these can be applied to the partial, per-partition results to yield the output.   In fact, the desired <code>{z1, z2, ...}</code> are the parallel prefix scan of the last element in each per-partition scan.  The following diagram illustrates:</p>
-
-<p><img src="/assets/images/rdd_scan/rdd_scan_4.png" alt="image" /></p>
-
-<p>The diagram above glosses over the details of computing <code>scan</code> to obtain <code>{z1, z2, ...}</code>.   I will first describe the implementation I currently use, and then also discuss a possible alternative.  The current implementation takes the approach of encoding the <a href="http://en.wikipedia.org/wiki/Prefix_sum#Parallel_algorithm">logic of a parallel prefix scan</a> directly into an RDD computation DAG.   Each iteration, or &#8220;ply,&#8221; of the parallel algorithm is represented by an RDD.  Each element resides in its own partition, and so the computation dependency for each element is directly representable in the RDD dependency substructure.  This construction is illustrated in the following schematic (for a vector of 8 z-values):</p>
-
-<p><img src="/assets/images/rdd_scan/rdd_scan_5.png" alt="image" /></p>
-
-<p>The parallel prefix scan algorithm executes O(log(n)) plies, which materializes as O(log(n)) RDDs shown in the diagram above.  In this context, (n) is the number of input RDD <em>partitions</em>, not to be confused with the number of data rows in the RDD.   There are O((n)log(n)) partitions, each having a single row containing the z-value for a corresponding output partition.   Some z-values are determined earlier than others.  For example z1 is immediately available in ply(0), and ply(3) can refer directly back to that ply(0) partition in the interest of efficiency, as called out by the red DAG arcs.</p>
-
-<p>This scheme allows each final output partition to obtain its z-value directly from a single dedicated partition, which ensures that minimal data needs to be transferred across worker processes.  Final output partitions can be computed local to their corresponding input partitions.  Data transfer may be limited to the intermediate z-values, which are small single-row affairs by construction.</p>
-
-<p>The code implementing the logic above can be <a href="https://github.com/erikerlandson/spark/blob/rdd_scan_blog/core/src/main/scala/org/apache/spark/rdd/ScanRDDFunctions.scala#L161">viewed here.</a></p>
-
-<p>I will conclude by noting that there is an alternative to this highly distributed computation of <code>{z1, z2, ...}</code>, which is to collect the last-values in the per-partition intermediate scan ouputs into a single array, and run <code>scan</code> directly on that array.   This has the advantage of avoiding the construction of log(n) intermediate RDDs.   It does, however, require a monolithic &#8216;fan-in&#8217; of data into a single RDD to receive the collection of values.  That is followed by a fan-out of the array, where each output partition picks its single z-value from the array.  It is for this reason I suspect this alternative incurs substantially more transfer overhead across worker processes.  However, one might also partition the resulting z-values in some optimal way, so that each final output partition needs to request only the partition that contains its z-value.  Future experimentation might show that this can out-perform the current fully-distributed implementation.</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/3/">&larr; Older</a>
@@ -2078,6 +2160,10 @@ java.lang.StackOverflowError
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2016/08/31/supporting-competing-apis-in-scala-can-better-package-factoring-help/">Supporting Competing APIs in Scala &#8211; Can Better Package Factoring Help?</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2016/08/03/x-medoids-using-minimum-description-length-to-identify-the-k-in-k-medoids/">Using Minimum Description Length to Optimize the &#8216;K&#8217; in K-Medoids</a>
       </li>
     
@@ -2091,10 +2177,6 @@ java.lang.StackOverflowError
     
       <li class="post">
         <a href="/blog/2016/06/08/exploring-the-effects-of-dimensionality-on-a-pdf-of-distances/">Exploring the Effects of Dimensionality on a PDF of Distances</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2016/05/26/measuring-decision-tree-split-quality-with-test-statistic-p-values/">Measuring Decision Tree Split Quality with Test Statistic P-Values</a>
       </li>
     
   </ul>
