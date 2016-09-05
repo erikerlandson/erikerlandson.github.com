@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="In this post I will demonstrate how to do reservoir sampling orders of magnitude faster than the traditional &#8220;naive&#8221; reservoir sampling &hellip;">
+  <meta name="description" content="I want to make an argument that the Algebird Aggregator design, in particular its use of the prepare operation in a map-reduce context, has &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -41,7 +41,7 @@
   <header role="banner"><hgroup>
   <h1><a href="/">tool monkey</a></h1>
   
-    <h2>a many-angled blog</h2>
+    <h2>adventures of an unfrozen caveman programmer</h2>
   
 </hgroup>
 
@@ -68,6 +68,254 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2015/11/24/the-prepare-operation-considered-harmful-in-algebird/">The &#8216;prepare&#8217; operation considered harmful in Algebird aggregation</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2015-11-24T16:32:00-07:00" pubdate data-updated="true">Nov 24<span>th</span>, 2015</time>
+        
+        
+         | <a href="/blog/2015/11/24/the-prepare-operation-considered-harmful-in-algebird/#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>I want to make an argument that the Algebird <a href="http://twitter.github.io/algebird/#com.twitter.algebird.Aggregator">Aggregator</a> design, in particular its use of the <code>prepare</code> operation in a map-reduce context, has substantial inefficiencies, compared to an equivalent formulation that is more directly suited to taking advantage of Scala&#8217;s <a href="http://www.scala-lang.org/api/current/index.html#scala.collection.Seq">aggregate method on collections</a> method.</p>
+
+<p>Consider the definition of aggregation in the Aggregator class:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">def</span> <span class="n">apply</span><span class="o">(</span><span class="n">inputs</span><span class="k">:</span> <span class="kt">TraversableOnce</span><span class="o">[</span><span class="kt">A</span><span class="o">])</span><span class="k">:</span> <span class="kt">C</span> <span class="o">=</span> <span class="n">present</span><span class="o">(</span><span class="n">reduce</span><span class="o">(</span><span class="n">inputs</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="n">prepare</span><span class="o">)))</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>You can see that it is a standard map/reduce operation, where <code>reduce</code> is defined as a monoidal (or semigroup &#8211; more on this later) operation. Under the hood, it boils down to an invocation of Scala&#8217;s <code>reduceLeft</code> method.  The key thing to notice is that the role of <code>prepare</code> is to map a collection of data elements into the required monoids, which are then aggregated using that monoid&#8217;s <code>plus</code> operation.  In other words, <code>prepare</code> converts data elements into &#8220;singleton&#8221; monoids each representing a data element.</p>
+
+<p>Now, if the monoid in question is simple, say some numeric type, this conversion is free, or nearly so.  For example, the conversion of an integer into the &#8220;integer monoid&#8221; is a no-op.  However, there are other kinds of &#8220;non-trivial&#8221; monoids, for which the conversion of a data element into its corresponding monoid may be costly.  In this post, I will be using the monoid defined by Scala Set[Int], where the monoid <code>plus</code> operation is set union, and of course the <code>zero</code> element is the empty set.</p>
+
+<p>Consider the process of defining an Algebird aggregator for the task of generating the set of unique elements in a data set.  The corresponding <code>prepare</code> operation is: <code>prepare(e: Int) = Set(e)</code>.  A monoid trait that encodes this idea might look like the following.  (the code I used in this post can be found <a href="https://gist.github.com/erikerlandson/d96dc553bc51e0eb5e4b">here</a>)</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="c1">// an algebird-like monoid with the &#39;prepare&#39; operation</span>
+</span><span class='line'><span class="k">trait</span> <span class="nc">PreparedMonoid</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>  <span class="k">val</span> <span class="n">zero</span><span class="k">:</span> <span class="kt">M</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">plus</span><span class="o">(</span><span class="n">m1</span><span class="k">:</span> <span class="kt">M</span><span class="o">,</span> <span class="n">m2</span><span class="k">:</span> <span class="kt">M</span><span class="o">)</span><span class="k">:</span> <span class="kt">M</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">prepare</span><span class="o">(</span><span class="n">e</span><span class="k">:</span> <span class="kt">E</span><span class="o">)</span><span class="k">:</span> <span class="kt">M</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// a PreparedMonoid for a set of integers.  monoid operator is set union.</span>
+</span><span class='line'><span class="k">object</span> <span class="nc">intSetPrepared</span> <span class="k">extends</span> <span class="nc">PreparedMonoid</span><span class="o">[</span><span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span>, <span class="kt">Int</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>  <span class="k">val</span> <span class="n">zero</span> <span class="k">=</span> <span class="nc">Set</span><span class="o">.</span><span class="n">empty</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">plus</span><span class="o">(</span><span class="n">m1</span><span class="k">:</span> <span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">],</span> <span class="n">m2</span><span class="k">:</span> <span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">])</span> <span class="k">=</span> <span class="n">m1</span> <span class="o">++</span> <span class="n">m2</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">prepare</span><span class="o">(</span><span class="n">e</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span> <span class="k">=</span> <span class="nc">Set</span><span class="o">(</span><span class="n">e</span><span class="o">)</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">implicit</span> <span class="k">class</span> <span class="nc">SeqWithMapReduce</span><span class="o">[</span><span class="kt">E</span><span class="o">](</span><span class="n">seq</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">E</span><span class="o">])</span> <span class="o">{</span>
+</span><span class='line'>  <span class="c1">// algebird map/reduce Aggregator model</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">mrPrepared</span><span class="o">[</span><span class="kt">M</span><span class="o">](</span><span class="n">mon</span><span class="k">:</span> <span class="kt">PreparedMonoid</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">])</span><span class="k">:</span> <span class="kt">M</span> <span class="o">=</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">seq</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="n">mon</span><span class="o">.</span><span class="n">prepare</span><span class="o">).</span><span class="n">reduceLeft</span><span class="o">(</span><span class="n">mon</span><span class="o">.</span><span class="n">plus</span><span class="o">)</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>If we unpack the above code, as applied to <code>intSetPrepared</code>, we are instantiating a new Set object, containing a single value, for every single input data element.</p>
+
+<p>But there is a potentially better model of aggregation, exemplified by the Scala <code>aggregate</code> method.  This method does not use a <code>prepare</code> operation.  It uses a zero value and a monoidal operator, which the Scala docs refer to as <code>combop</code>, but it also uses an &#8220;update&#8221; operation, that defines how to update the monoid object, directly, with a single element, referred to as <code>seqop</code> in Scala&#8217;s documentation.  This idea can also be encoded as a flavor of monoid, enhanced with an <code>update</code> method:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="c1">// an algebird-like monoid with &#39;update&#39; operation</span>
+</span><span class='line'><span class="k">trait</span> <span class="nc">UpdatedMonoid</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>  <span class="k">val</span> <span class="n">zero</span><span class="k">:</span> <span class="kt">M</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">plus</span><span class="o">(</span><span class="n">m1</span><span class="k">:</span> <span class="kt">M</span><span class="o">,</span> <span class="n">m2</span><span class="k">:</span> <span class="kt">M</span><span class="o">)</span><span class="k">:</span> <span class="kt">M</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">update</span><span class="o">(</span><span class="n">m</span><span class="k">:</span> <span class="kt">M</span><span class="o">,</span> <span class="n">e</span><span class="k">:</span> <span class="kt">E</span><span class="o">)</span><span class="k">:</span> <span class="kt">M</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// an equivalent UpdatedMonoid for a set of integers</span>
+</span><span class='line'><span class="k">object</span> <span class="nc">intSetUpdated</span> <span class="k">extends</span> <span class="nc">UpdatedMonoid</span><span class="o">[</span><span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span>, <span class="kt">Int</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>  <span class="k">val</span> <span class="n">zero</span> <span class="k">=</span> <span class="nc">Set</span><span class="o">.</span><span class="n">empty</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">plus</span><span class="o">(</span><span class="n">m1</span><span class="k">:</span> <span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">],</span> <span class="n">m2</span><span class="k">:</span> <span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">])</span> <span class="k">=</span> <span class="n">m1</span> <span class="o">++</span> <span class="n">m2</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">update</span><span class="o">(</span><span class="n">m</span><span class="k">:</span> <span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">],</span> <span class="n">e</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span> <span class="k">=</span> <span class="n">m</span> <span class="o">+</span> <span class="n">e</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">implicit</span> <span class="k">class</span> <span class="nc">SeqWithMapReduceUpdated</span><span class="o">[</span><span class="kt">E</span><span class="o">](</span><span class="n">seq</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">E</span><span class="o">])</span> <span class="o">{</span>
+</span><span class='line'>  <span class="c1">// map/reduce logic, taking advantage of scala &#39;aggregate&#39;</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">mrUpdatedAggregate</span><span class="o">[</span><span class="kt">M</span><span class="o">](</span><span class="n">mon</span><span class="k">:</span> <span class="kt">UpdatedMonoid</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">])</span><span class="k">:</span> <span class="kt">M</span> <span class="o">=</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">seq</span><span class="o">.</span><span class="n">aggregate</span><span class="o">(</span><span class="n">mon</span><span class="o">.</span><span class="n">zero</span><span class="o">)(</span><span class="n">mon</span><span class="o">.</span><span class="n">update</span><span class="o">,</span> <span class="n">mon</span><span class="o">.</span><span class="n">plus</span><span class="o">)</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>This arrangement promises more efficiency when aggregating w.r.t. nontrivial monoids, by avoiding the construction of &#8220;singleton&#8221; monoids for each data element.  The following demo confirms that for the Set-based monoid, it is over 10 times faster:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="k">:</span><span class="kt">load</span> <span class="kt">/home/eje/scala/prepare.scala</span>
+</span><span class='line'><span class="nc">Loading</span> <span class="o">/</span><span class="n">home</span><span class="o">/</span><span class="n">eje</span><span class="o">/</span><span class="n">scala</span><span class="o">/</span><span class="n">prepare</span><span class="o">.</span><span class="n">scala</span><span class="o">...</span>
+</span><span class='line'><span class="n">defined</span> <span class="n">module</span> <span class="n">prepare</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="k">import</span> <span class="nn">prepare._</span>
+</span><span class='line'><span class="k">import</span> <span class="nn">prepare._</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="k">val</span> <span class="n">data</span> <span class="k">=</span> <span class="nc">Vector</span><span class="o">.</span><span class="n">fill</span><span class="o">(</span><span class="mi">1000000</span><span class="o">)</span> <span class="o">{</span> <span class="n">scala</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="nc">Random</span><span class="o">.</span><span class="n">nextInt</span><span class="o">(</span><span class="mi">10</span><span class="o">)</span> <span class="o">}</span>
+</span><span class='line'><span class="n">data</span><span class="k">:</span> <span class="kt">scala.collection.immutable.Vector</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="nc">Vector</span><span class="o">(</span><span class="mi">7</span><span class="o">,</span> <span class="mi">9</span><span class="o">,</span> <span class="mi">4</span><span class="o">,</span> <span class="mi">2</span><span class="o">,</span> <span class="mi">7</span><span class="o">,...</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// Verify that output is the same for both implementations:</span>
+</span><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="n">data</span><span class="o">.</span><span class="n">mrPrepared</span><span class="o">(</span><span class="n">intSetPrepared</span><span class="o">)</span>
+</span><span class='line'><span class="n">res0</span><span class="k">:</span> <span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="nc">Set</span><span class="o">(</span><span class="mi">0</span><span class="o">,</span> <span class="mi">5</span><span class="o">,</span> <span class="mi">1</span><span class="o">,</span> <span class="mi">6</span><span class="o">,</span> <span class="mi">9</span><span class="o">,</span> <span class="mi">2</span><span class="o">,</span> <span class="mi">7</span><span class="o">,</span> <span class="mi">3</span><span class="o">,</span> <span class="mi">8</span><span class="o">,</span> <span class="mi">4</span><span class="o">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// results are the same</span>
+</span><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="n">data</span><span class="o">.</span><span class="n">mrUpdatedAggregate</span><span class="o">(</span><span class="n">intSetUpdated</span><span class="o">)</span>
+</span><span class='line'><span class="n">res1</span><span class="k">:</span> <span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="nc">Set</span><span class="o">(</span><span class="mi">0</span><span class="o">,</span> <span class="mi">5</span><span class="o">,</span> <span class="mi">1</span><span class="o">,</span> <span class="mi">6</span><span class="o">,</span> <span class="mi">9</span><span class="o">,</span> <span class="mi">2</span><span class="o">,</span> <span class="mi">7</span><span class="o">,</span> <span class="mi">3</span><span class="o">,</span> <span class="mi">8</span><span class="o">,</span> <span class="mi">4</span><span class="o">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// Compare timings of prepare-based versus update-based aggregation</span>
+</span><span class='line'><span class="c1">// (benchmark values are returned in seconds)</span>
+</span><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="n">benchmark</span><span class="o">(</span><span class="mi">10</span><span class="o">)</span> <span class="o">{</span> <span class="n">data</span><span class="o">.</span><span class="n">mrPrepared</span><span class="o">(</span><span class="n">intSetPrepared</span><span class="o">)</span> <span class="o">}</span>
+</span><span class='line'><span class="n">res2</span><span class="k">:</span> <span class="kt">Double</span> <span class="o">=</span> <span class="mf">0.2957673056</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// update-based aggregation is 10 times faster</span>
+</span><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="n">benchmark</span><span class="o">(</span><span class="mi">10</span><span class="o">)</span> <span class="o">{</span> <span class="n">data</span><span class="o">.</span><span class="n">mrUpdatedAggregate</span><span class="o">(</span><span class="n">intSetUpdated</span><span class="o">)</span> <span class="o">}</span>
+</span><span class='line'><span class="n">res3</span><span class="k">:</span> <span class="kt">Double</span> <span class="o">=</span> <span class="mf">0.027041249300000004</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>It is also possible to apply Scala&#8217;s <code>aggregate</code> to a monoid enhanced with <code>prepare</code>:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">implicit</span> <span class="k">class</span> <span class="nc">SeqWithMapReducePrepared</span><span class="o">[</span><span class="kt">E</span><span class="o">](</span><span class="n">seq</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">E</span><span class="o">])</span> <span class="o">{</span>
+</span><span class='line'>  <span class="c1">// using &#39;aggregate&#39; with prepared op</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">mrPreparedAggregate</span><span class="o">[</span><span class="kt">M</span><span class="o">](</span><span class="n">mon</span><span class="k">:</span> <span class="kt">PreparedMonoid</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">])</span><span class="k">:</span> <span class="kt">M</span> <span class="o">=</span> <span class="o">{</span>
+</span><span class='line'>    <span class="n">seq</span><span class="o">.</span><span class="n">aggregate</span><span class="o">(</span><span class="n">mon</span><span class="o">.</span><span class="n">zero</span><span class="o">)((</span><span class="n">m</span><span class="o">,</span> <span class="n">e</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="n">mon</span><span class="o">.</span><span class="n">plus</span><span class="o">(</span><span class="n">m</span><span class="o">,</span> <span class="n">mon</span><span class="o">.</span><span class="n">prepare</span><span class="o">(</span><span class="n">e</span><span class="o">)),</span> <span class="n">mon</span><span class="o">.</span><span class="n">plus</span><span class="o">)</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Although this turns out to be measurably faster than the literal map-reduce implementation, it is still not nearly as fast as the variation using <code>update</code>:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="n">benchmark</span><span class="o">(</span><span class="mi">10</span><span class="o">)</span> <span class="o">{</span> <span class="n">data</span><span class="o">.</span><span class="n">mrPreparedAggregate</span><span class="o">(</span><span class="n">intSetPrepared</span><span class="o">)</span> <span class="o">}</span>
+</span><span class='line'><span class="n">res2</span><span class="k">:</span> <span class="kt">Double</span> <span class="o">=</span> <span class="mf">0.1754636707</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Readers familiar with Algebird may be wondering about my use of monoids above, when the <code>Aggregator</code> interface is actually based on semigroups.  This is important, since building on Scala&#8217;s <code>aggregate</code> function requires a zero element that semigroups do not have.  Although I believe it might be worth considering changing <code>Aggregator</code> to use monoids, another sensible option is to change the internal logic for the subclass <code>AggregatorMonoid</code>, which does require a monoid, or possibly just define a new <code>AggregatorMonoidUpdated</code> subclass.</p>
+
+<p>A final note on compatability: note that any monoid enhanced with <code>prepare</code> can be converted into an equivalent monoid enhanced with <code>update</code>, as demonstrated by this factory function:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">object</span> <span class="nc">UpdatedMonoid</span> <span class="o">{</span>
+</span><span class='line'>  <span class="c1">// create an UpdatedMonoid from a PreparedMonoid</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">apply</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">](</span><span class="n">mon</span><span class="k">:</span> <span class="kt">PreparedMonoid</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">])</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">UpdatedMonoid</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">zero</span> <span class="k">=</span> <span class="n">mon</span><span class="o">.</span><span class="n">zero</span>
+</span><span class='line'>    <span class="k">def</span> <span class="n">plus</span><span class="o">(</span><span class="n">m1</span><span class="k">:</span> <span class="kt">M</span><span class="o">,</span> <span class="n">m2</span><span class="k">:</span> <span class="kt">M</span><span class="o">)</span> <span class="k">=</span> <span class="n">mon</span><span class="o">.</span><span class="n">plus</span><span class="o">(</span><span class="n">m1</span><span class="o">,</span> <span class="n">m2</span><span class="o">)</span>
+</span><span class='line'>    <span class="k">def</span> <span class="n">update</span><span class="o">(</span><span class="n">m</span><span class="k">:</span> <span class="kt">M</span><span class="o">,</span> <span class="n">e</span><span class="k">:</span> <span class="kt">E</span><span class="o">)</span> <span class="k">=</span> <span class="n">mon</span><span class="o">.</span><span class="n">plus</span><span class="o">(</span><span class="n">m</span><span class="o">,</span> <span class="n">mon</span><span class="o">.</span><span class="n">prepare</span><span class="o">(</span><span class="n">e</span><span class="o">))</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1936,209 +2184,6 @@ sample(data: sequence, p: real) {
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2014/09/03/matryoshka-class-construction-from-the-scala-iterator-drop-method/">The Scala Iterator &#8216;drop&#8217; Method Generates a Matryoshka Class Nesting</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2014-09-03T17:23:00-07:00" pubdate data-updated="true">Sep 3<span>rd</span>, 2014</time>
-        
-        
-         | <a href="/blog/2014/09/03/matryoshka-class-construction-from-the-scala-iterator-drop-method/#feedback">Feedback</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>The Scala Iterator <code>drop</code> method has a complexity bug that shows up when one calls <code>drop</code> repeatedly, for example when traversing over an iterator in a loop.</p>
-
-<p>The nature of the problem is that <code>drop</code>, under the hood, invokes <code>slice</code>, which returns a new anonymous subclass of <code>AbstractIterator</code> containing an instance of the input class, which can be seen in this <a href="https://github.com/erikerlandson/scala/blob/scala_drop_blog/src/library/scala/collection/Iterator.scala#L323">code excerpt from Iterator.scala</a>:</p>
-
-<pre><code>def drop(n: Int): Iterator[A] = slice(n, Int.MaxValue)
-
-// ... comments excised ...
-
-def slice(from: Int, until: Int): Iterator[A] = {
-  val lo = from max 0
-  var toDrop = lo
-  while (toDrop &gt; 0 &amp;&amp; self.hasNext) {
-    self.next()
-    toDrop -= 1
-  }
-
-  // I am a ticking quadratic time bomb:
-  new AbstractIterator[A] {
-    private var remaining = until - lo
-    def hasNext = remaining &gt; 0 &amp;&amp; self.hasNext
-    def next(): A =
-      if (remaining &gt; 0) {
-        remaining -= 1
-        self.next()
-      }
-      else empty.next()
-  }
-}
-</code></pre>
-
-<p>In the case where one is only calling <code>drop</code> once, this is not very consequential, but when the same method is used in a loop, the nesting is repeated, generating a nesting of anonymous classes that is ever-deeper &#8211; rather like Matryoshka dolls:</p>
-
-<p><img src="/assets/images/matryoshka.jpg" width="400"></p>
-
-<p>This can be a substantial problem, as it generates quadratic complexity in what is logically a linear operation.  A simple example of looping code that can cause this nesting:</p>
-
-<pre><code>def process_nth_elements[T](itr: Iterator[T], n: Int = 1) {
-  var iter = itr
-  while (iter.hasNext) {
-    val nxt = iter.next
-    // ... process next element ...
-
-    // skip to next element
-    iter = iter.drop(n-1)
-    // this becomes more and more expensive as iterator classes
-    // become nested deeper
-  }
-}
-</code></pre>
-
-<p>A simple example program, which can be <a href="https://gist.github.com/erikerlandson/a310ccd3c58a85f031dc">found here</a>, demonstrates this nesting directly:</p>
-
-<pre><code>import java.io.{StringWriter, PrintWriter}
-import scala.reflect.ClassTag
-
-def tracehead(e: Exception, substr: String = "slice"): String = {
-  val sw = new StringWriter()
-  e.printStackTrace(new PrintWriter(sw))
-  sw.toString.split('\n').takeWhile((s:String)=&gt; !s.contains(substr)).drop(1).mkString("\n")  
-}
-
-class TestIterator[T: ClassTag](val iter: Iterator[T]) extends Iterator[T] {
-  override def hasNext = iter.hasNext
-  override def next = {
-    println(tracehead(new Exception))
-    iter.next
-  }
-}
-
-def drop_test[T](itr: Iterator[T]) {
-  var n = 0
-  var iter = itr
-  while (iter.hasNext) {
-    n += 1
-    println(s"\ndrop # $n")
-    iter = iter.drop(1)
-  }
-}
-</code></pre>
-
-<p>When the <code>drop_test</code> function is run on an instance of <code>TestIterator</code>, the stack trace output shows the Matryoshka nesting directly:</p>
-
-<pre><code>scala&gt; drop_test(new TestIterator(List(1,2,3,4,5).iterator))
-
-drop # 1
-    at $line18.$read$$iw$$iw$$iw$$iw$TestIterator.next(&lt;console&gt;:19)
-
-drop # 2
-    at $line18.$read$$iw$$iw$$iw$$iw$TestIterator.next(&lt;console&gt;:19)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-
-drop # 3
-    at $line18.$read$$iw$$iw$$iw$$iw$TestIterator.next(&lt;console&gt;:19)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-
-drop # 4
-    at $line18.$read$$iw$$iw$$iw$$iw$TestIterator.next(&lt;console&gt;:19)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-
-drop # 5
-    at $line18.$read$$iw$$iw$$iw$$iw$TestIterator.next(&lt;console&gt;:19)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-</code></pre>
-
-<p>One would expect this quadratic behavior to show up in benchmarking, and it does.  Consider this simple timing test:</p>
-
-<pre><code>def drop_time[T](itr: Iterator[T]) {
-  val t0 = System.currentTimeMillis()
-  var iter = itr
-  while (iter.hasNext) {
-    iter = iter.drop(1)
-  }
-  println(s"Time: ${System.currentTimeMillis() - t0}")
-}
-</code></pre>
-
-<p>One would expect this function to be linear in the length of the iterator, but we see the following behavior:</p>
-
-<pre><code>scala&gt; drop_time((1 to 5000 * 1).toList.iterator)
-Time: 106
-
-scala&gt; drop_time((1 to 5000 * 2).toList.iterator)
-Time: 475
-
-scala&gt; drop_time((1 to 5000 * 3).toList.iterator)
-Time: 1108
-
-scala&gt; drop_time((1 to 5000 * 4).toList.iterator)
-Time: 2037
-
-scala&gt; drop_time((1 to 5000 * 5).toList.iterator)
-Time: 3234
-
-scala&gt; drop_time((1 to 5000 * 6).toList.iterator)
-Time: 4717
-
-scala&gt; drop_time((1 to 5000 * 7).toList.iterator)
-Time: 6447
-
-scala&gt; drop_time((1 to 5000 * 8).toList.iterator)
-java.lang.StackOverflowError
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-</code></pre>
-
-<p>The corresponding plot shows the quadratic cost:</p>
-
-<p><img src="/assets/images/matryoshka_quadratic_plot.png" alt="&quot;image&quot;" /></p>
-
-<p>Given the official semantics of <code>drop</code>, which state that the method invalidates the iterator it was called on, this nesting problem should be avoidable by implementing the method more like this:</p>
-
-<pre><code>def drop(n: Int): Iterator[A] = {
-  var j = 0
-  while (j &lt; n) {
-    this.next
-    j += 1
-  }
-  this
-}
-</code></pre>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/3/">&larr; Older</a>
@@ -2160,6 +2205,10 @@ java.lang.StackOverflowError
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2016/09/05/expressing-map-reduce-as-a-left-folding-monoid/">Encoding Map-Reduce As A Monoid With Left Folding</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2016/08/31/supporting-competing-apis-in-scala-can-better-package-factoring-help/">Supporting Competing APIs in Scala &#8211; Can Better Package Factoring Help?</a>
       </li>
     
@@ -2173,10 +2222,6 @@ java.lang.StackOverflowError
     
       <li class="post">
         <a href="/blog/2016/06/15/computing-derivatives-of-the-gamma-function/">Computing Derivatives of the Gamma Function</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2016/06/08/exploring-the-effects-of-dimensionality-on-a-pdf-of-distances/">Exploring the Effects of Dimensionality on a PDF of Distances</a>
       </li>
     
   </ul>

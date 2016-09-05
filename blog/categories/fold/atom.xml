@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: fold | tool monkey]]></title>
+  <link href="http://erikerlandson.github.com/blog/categories/fold/atom.xml" rel="self"/>
+  <link href="http://erikerlandson.github.com/"/>
+  <updated>2016-09-05T10:32:01-07:00</updated>
+  <id>http://erikerlandson.github.com/</id>
+  <author>
+    <name><![CDATA[Erik Erlandson]]></name>
+    <email><![CDATA[erikerlandson@yahoo.com]]></email>
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Encoding Map-Reduce As A Monoid With Left Folding]]></title>
+    <link href="http://erikerlandson.github.com/blog/2016/09/05/expressing-map-reduce-as-a-left-folding-monoid/"/>
+    <updated>2016-09-05T10:31:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2016/09/05/expressing-map-reduce-as-a-left-folding-monoid</id>
+    <content type="html"><![CDATA[<p>In a <a href="http://erikerlandson.github.io/blog/2015/11/24/the-prepare-operation-considered-harmful-in-algebird/">previous post</a> I discussed some scenarios where traditional map-reduce -- directly applying a map function, followed by some monoidal reduction -- could be inefficient.
+To review, the source of inefficiency is in situations where the <code>map</code> operation is creating some non-trivial monoid that represents a single element of the input type.
+For example, if the monoidal type is <code>Set[Int]</code>, then the mapping function ('prepare' in algebird) maps every input integer <code>k</code> into <code>Set(k)</code>, which is somewhat expensive.</p>
+
+<p>In that discussion, I was focusing on map-reduce as embodied by the algebird <code>Aggregator</code> type, where <code>map</code> appears as the <code>prepare</code> function.
+However, it is easy to see that <em>any</em> map-reduce implementation may be vulnerable to the same inefficiency.</p>
+
+<p>I wondered if there were a way to represent map-reduce using some alternative formulation that avoids this vulnerability.
+There is such a formulation, which I will talk about in this post.</p>
+
+<p>I'll begin by reviewing a standard map-reduce implementation.
+The following scala code sketches out the definition of a monoid over a type <code>B</code> and a map-reduce interface.
+As this code suggests, the <code>map</code> function maps input data of some type <code>A</code> into some <em>monoidal</em> type <code>B</code>, which can be reduced (aka "aggregated") in a way that is amenable to parallelization:</p>
+
+<p>``` scala
+trait Monoid[B] {
+  // aka 'combine' aka '++'
+  def plus: (B, B) => B</p>
+
+<p>  // aka 'empty' aka 'identity'
+  def e: B
+}</p>
+
+<p>trait MapReduce[A, B] {
+  // monoid embodies the reducible type
+  def monoid: Monoid[B]</p>
+
+<p>  // mapping function from input type A to reducible type B
+  def map: A => B</p>
+
+<p>  // the basic map-reduce operation
+  def apply(data: Seq[A]): B = data.map(map).fold(monoid.e)(monoid.plus)</p>
+
+<p>  // map-reduce parallelized over data partitions
+  def apply(data: ParSeq[Seq[A]]): B =</p>
+
+<pre><code>data.map { part =&gt;
+  part.map(map).fold(monoid.e)(monoid.plus)
+}
+.fold(monoid.e)(monoid.plus)
+</code></pre>
+
+<p>}
+```</p>
+
+<p>In the parallel version of map-reduce above, you can see that map and reduce are executed on each data partition (which may occur in parallel) to produce a monoidal <code>B</code> value, followed by a final reduction of those intermediate results.
+This is the classic form of map-reduce popularized by tools such as Hadoop and Apache Spark, where inidividual data partitions may reside across highly parallel commodity clusters.</p>
+
+<p>Next I will present an alternative definition of map-reduce.
+In this implementation, the <code>map</code> function is replaced by a <code>foldL</code> function, which executes a single "left-fold" of an input object with type <code>A</code> into the monoid object with type <code>B</code>:</p>
+
+<p>``` scala
+// a map reduce operation based on a monoid with left folding
+trait MapReduceLF[A, B] extends MapReduce[A, B] {
+  def monoid: Monoid[B]</p>
+
+<p>  // left-fold an object with type A into the monoid B
+  // obeys type law: foldL(b, a) = b ++ foldL(e, a)
+  def foldL: (B, A) => B</p>
+
+<p>  // foldL(e, a) embodies the role of map(a) in standard map-reduce
+  def map = (a: A) => foldL(monoid.e, a)</p>
+
+<p>  // map-reduce operation is now a single fold-left operation
+  override def apply(data: Seq[A]): B = data.foldLeft(monoid.e)(foldL)</p>
+
+<p>  // map-reduce parallelized over data partitions
+  override def apply(data: ParSeq[Seq[A]]): B =</p>
+
+<pre><code>data.map { part =&gt;
+  part.foldLeft(monoid.e)(foldL)
+}
+.fold(monoid.e)(monoid.plus)
+</code></pre>
+
+<p>}
+```</p>
+
+<p>As the comments above indicate, the left-folding function <code>foldL</code> is assumed to obey the law <code>foldL(b, a) = b ++ foldL(e, a)</code>.
+This law captures the idea that folding <code>a</code> into <code>b</code> should be the analog of reducing <code>b</code> with a monoid corresponding to the single element <code>a</code>.
+Referring to my earlier example, if type <code>A</code> is <code>Int</code> and <code>B</code> is <code>Set[Int]</code>, then <code>foldL(b, a) =&gt; b + a</code>.
+Note that <code>b + a</code> is directly inserting single element <code>a</code> into <code>b</code>, which is significantly more efficient than <code>b ++ Set(a)</code>, which is how a typical map-reduce implementation would be required to operate.</p>
+
+<p>This law also gives us the corresponding definition of <code>map(a)</code>, which is <code>foldL(e, a)</code>, or: <code>Set.empty[Int] ++ a</code> or just: <code>Set(a)</code></p>
+
+<p>In this formulation, the basic map-reduce operation is now a single <code>foldLeft</code> operation, instead of a mapping followed by a monoidal reduction.
+The parallel version is analoglous.
+Each partition uses the new <code>foldLeft</code> operation, and the final reduction of intermediate monoidal results remains the same as before.</p>
+
+<p>The <code>foldLeft</code> function is a potentially much more general operation, and it raises the question of whether this new encoding is indeed parallelizable as before.
+I will conclude with a proof that this encoding is also parallelizable;
+Note that the law <code>foldL(b, a) = b ++ foldL(e, a)</code> is a significant component of this proof, as it represents the constraint that <code>foldL</code> behaves like an analog of reducing <code>b</code> with a monoidal representation of element <code>a</code>.</p>
+
+<p>In the following proof I used a scala-like pseudo code, described in the introduction:</p>
+
+<p>```
+// given an object mr of type MapReduceFL[A, B]
+// and using notation:
+// f &lt;==> mr.foldL
+// for b1,b2 of type B: b1 ++ b2 &lt;==> mr.plus(b1, b2)
+// e &lt;==> mr.e
+// [...] &lt;==> Seq(...)
+// d1, d2 are of type Seq[A]</p>
+
+<p>// Proof that map-reduce with left-folding is parallelizable
+// i.e. mr(d1 ++ d2) == mr(d1) ++ mr(d2)
+mr(d1 ++ d2)
+== (d1 ++ d2).foldLeft(e)(f)  // definition of map-reduce operation
+== d1.foldLeft(e)(f) ++ d2.foldLeft(e)(f)  // Lemma A
+== mr(d1) ++ mr(d2)  // definition of map-reduce (QED)</p>
+
+<p>// Proof of Lemma A
+// i.e. (d1 ++ d2).foldLeft(e)(f) == d1.foldLeft(e)(f) ++ d2.foldLeft(e)(f)</p>
+
+<p>// proof is by induction on the length of data sequence d2</p>
+
+<p>// case d2 where length is zero, i.e. d2 == []
+(d1 ++ []).foldLeft(e)(f)
+== d1.foldLeft(e)(f)  // definition of empty sequence []
+== d1.foldLeft(e)(f) ++ e  // definition of identity e
+== d1.foldLeft(e)(f) ++ [].foldLeft(e)(f)  // definition of foldLeft</p>
+
+<p>// case d2 where length is 1, i.e. d2 == [a] for some a of type A
+(d1 ++ [a]).foldLeft(e)(f)
+== f(d1.foldLeft(e)(f), a)  // definition of foldLeft and f
+== d1.foldLeft(e)(f) ++ f(e, a)  // the type-law f(b, a) == b ++ f(e, a)
+== d1.foldLeft(e)(f) ++ [a].foldLeft(e)(f)  // definition of foldLeft</p>
+
+<p>// inductive step, assuming proof for d2' of length &lt;= n
+// consider d2 of length n+1, i.e. d2 == d2' ++ [a], where d2' has length n
+(d1 ++ d2).foldLeft(e)(f)
+== (d1 ++ d2' ++ [a]).foldLeft(e)(f)  // definition of d2, d2', [a]
+== f((d1 ++ d2').foldLeft(e)(f), a)  // definition of foldLeft and f
+== (d1 ++ d2').foldLeft(e)(f) ++ f(e, a)  // type-law f(b, a) == b ++ f(e, a)
+== d1.foldLeft(e)(f) ++ d2'.foldLeft(e)(f) ++ f(e, a)  // induction
+== d1.foldLeft(e)(f) ++ d2'.foldLeft(e)(f) ++ [a].foldLeft(e)(f)  // def'n of foldLeft
+== d1.foldLeft(e)(f) ++ (d2' ++ [a]).foldLeft(e)(f)  // induction
+== d1.foldLeft(e)(f) ++ d2.foldLeft(e)(f)  // definition of d2 (QED)
+```</p>
+]]></content>
+  </entry>
+  
+</feed>

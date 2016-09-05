@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="On and off over the last year, I&#8217;ve been working on a library of tree and map classes in Scala that happen to make use of some algebraic &hellip;">
+  <meta name="description" content="In a previous post I discussed some scenarios where traditional map-reduce &#8211; directly applying a map function, followed by some monoidal &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -41,7 +41,7 @@
   <header role="banner"><hgroup>
   <h1><a href="/">tool monkey</a></h1>
   
-    <h2>a many-angled blog</h2>
+    <h2>adventures of an unfrozen caveman programmer</h2>
   
 </hgroup>
 
@@ -68,6 +68,265 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2016/09/05/expressing-map-reduce-as-a-left-folding-monoid/">Encoding Map-Reduce As A Monoid With Left Folding</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2016-09-05T10:31:00-07:00" pubdate data-updated="true">Sep 5<span>th</span>, 2016</time>
+        
+        
+         | <a href="/blog/2016/09/05/expressing-map-reduce-as-a-left-folding-monoid/#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>In a <a href="http://erikerlandson.github.io/blog/2015/11/24/the-prepare-operation-considered-harmful-in-algebird/">previous post</a> I discussed some scenarios where traditional map-reduce &#8211; directly applying a map function, followed by some monoidal reduction &#8211; could be inefficient.
+To review, the source of inefficiency is in situations where the <code>map</code> operation is creating some non-trivial monoid that represents a single element of the input type.
+For example, if the monoidal type is <code>Set[Int]</code>, then the mapping function (&#8216;prepare&#8217; in algebird) maps every input integer <code>k</code> into <code>Set(k)</code>, which is somewhat expensive.</p>
+
+<p>In that discussion, I was focusing on map-reduce as embodied by the algebird <code>Aggregator</code> type, where <code>map</code> appears as the <code>prepare</code> function.
+However, it is easy to see that <em>any</em> map-reduce implementation may be vulnerable to the same inefficiency.</p>
+
+<p>I wondered if there were a way to represent map-reduce using some alternative formulation that avoids this vulnerability.
+There is such a formulation, which I will talk about in this post.</p>
+
+<p>I&#8217;ll begin by reviewing a standard map-reduce implementation.
+The following scala code sketches out the definition of a monoid over a type <code>B</code> and a map-reduce interface.
+As this code suggests, the <code>map</code> function maps input data of some type <code>A</code> into some <em>monoidal</em> type <code>B</code>, which can be reduced (aka &#8220;aggregated&#8221;) in a way that is amenable to parallelization:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">trait</span> <span class="nc">Monoid</span><span class="o">[</span><span class="kt">B</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>  <span class="c1">// aka &#39;combine&#39; aka &#39;++&#39;</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">plus</span><span class="k">:</span> <span class="o">(</span><span class="kt">B</span><span class="o">,</span> <span class="kt">B</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="n">B</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// aka &#39;empty&#39; aka &#39;identity&#39;</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">e</span><span class="k">:</span> <span class="kt">B</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">trait</span> <span class="nc">MapReduce</span><span class="o">[</span><span class="kt">A</span>, <span class="kt">B</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>  <span class="c1">// monoid embodies the reducible type</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">monoid</span><span class="k">:</span> <span class="kt">Monoid</span><span class="o">[</span><span class="kt">B</span><span class="o">]</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// mapping function from input type A to reducible type B</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">map</span><span class="k">:</span> <span class="kt">A</span> <span class="o">=&gt;</span> <span class="n">B</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// the basic map-reduce operation</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">apply</span><span class="o">(</span><span class="n">data</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">A</span><span class="o">])</span><span class="k">:</span> <span class="kt">B</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="n">map</span><span class="o">).</span><span class="n">fold</span><span class="o">(</span><span class="n">monoid</span><span class="o">.</span><span class="n">e</span><span class="o">)(</span><span class="n">monoid</span><span class="o">.</span><span class="n">plus</span><span class="o">)</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// map-reduce parallelized over data partitions</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">apply</span><span class="o">(</span><span class="n">data</span><span class="k">:</span> <span class="kt">ParSeq</span><span class="o">[</span><span class="kt">Seq</span><span class="o">[</span><span class="kt">A</span><span class="o">]])</span><span class="k">:</span> <span class="kt">B</span> <span class="o">=</span>
+</span><span class='line'>    <span class="n">data</span><span class="o">.</span><span class="n">map</span> <span class="o">{</span> <span class="n">part</span> <span class="k">=&gt;</span>
+</span><span class='line'>      <span class="n">part</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="n">map</span><span class="o">).</span><span class="n">fold</span><span class="o">(</span><span class="n">monoid</span><span class="o">.</span><span class="n">e</span><span class="o">)(</span><span class="n">monoid</span><span class="o">.</span><span class="n">plus</span><span class="o">)</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>    <span class="o">.</span><span class="n">fold</span><span class="o">(</span><span class="n">monoid</span><span class="o">.</span><span class="n">e</span><span class="o">)(</span><span class="n">monoid</span><span class="o">.</span><span class="n">plus</span><span class="o">)</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>In the parallel version of map-reduce above, you can see that map and reduce are executed on each data partition (which may occur in parallel) to produce a monoidal <code>B</code> value, followed by a final reduction of those intermediate results.
+This is the classic form of map-reduce popularized by tools such as Hadoop and Apache Spark, where inidividual data partitions may reside across highly parallel commodity clusters.</p>
+
+<p>Next I will present an alternative definition of map-reduce.
+In this implementation, the <code>map</code> function is replaced by a <code>foldL</code> function, which executes a single &#8220;left-fold&#8221; of an input object with type <code>A</code> into the monoid object with type <code>B</code>:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="c1">// a map reduce operation based on a monoid with left folding</span>
+</span><span class='line'><span class="k">trait</span> <span class="nc">MapReduceLF</span><span class="o">[</span><span class="kt">A</span>, <span class="kt">B</span><span class="o">]</span> <span class="nc">extends</span> <span class="nc">MapReduce</span><span class="o">[</span><span class="kt">A</span>, <span class="kt">B</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">monoid</span><span class="k">:</span> <span class="kt">Monoid</span><span class="o">[</span><span class="kt">B</span><span class="o">]</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// left-fold an object with type A into the monoid B</span>
+</span><span class='line'>  <span class="c1">// obeys type law: foldL(b, a) = b ++ foldL(e, a)</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">foldL</span><span class="k">:</span> <span class="o">(</span><span class="kt">B</span><span class="o">,</span> <span class="kt">A</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="n">B</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// foldL(e, a) embodies the role of map(a) in standard map-reduce</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">map</span> <span class="k">=</span> <span class="o">(</span><span class="n">a</span><span class="k">:</span> <span class="kt">A</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="n">foldL</span><span class="o">(</span><span class="n">monoid</span><span class="o">.</span><span class="n">e</span><span class="o">,</span> <span class="n">a</span><span class="o">)</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// map-reduce operation is now a single fold-left operation</span>
+</span><span class='line'>  <span class="k">override</span> <span class="k">def</span> <span class="n">apply</span><span class="o">(</span><span class="n">data</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">A</span><span class="o">])</span><span class="k">:</span> <span class="kt">B</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">monoid</span><span class="o">.</span><span class="n">e</span><span class="o">)(</span><span class="n">foldL</span><span class="o">)</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// map-reduce parallelized over data partitions</span>
+</span><span class='line'>  <span class="k">override</span> <span class="k">def</span> <span class="n">apply</span><span class="o">(</span><span class="n">data</span><span class="k">:</span> <span class="kt">ParSeq</span><span class="o">[</span><span class="kt">Seq</span><span class="o">[</span><span class="kt">A</span><span class="o">]])</span><span class="k">:</span> <span class="kt">B</span> <span class="o">=</span>
+</span><span class='line'>    <span class="n">data</span><span class="o">.</span><span class="n">map</span> <span class="o">{</span> <span class="n">part</span> <span class="k">=&gt;</span>
+</span><span class='line'>      <span class="n">part</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">monoid</span><span class="o">.</span><span class="n">e</span><span class="o">)(</span><span class="n">foldL</span><span class="o">)</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>    <span class="o">.</span><span class="n">fold</span><span class="o">(</span><span class="n">monoid</span><span class="o">.</span><span class="n">e</span><span class="o">)(</span><span class="n">monoid</span><span class="o">.</span><span class="n">plus</span><span class="o">)</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>As the comments above indicate, the left-folding function <code>foldL</code> is assumed to obey the law <code>foldL(b, a) = b ++ foldL(e, a)</code>.
+This law captures the idea that folding <code>a</code> into <code>b</code> should be the analog of reducing <code>b</code> with a monoid corresponding to the single element <code>a</code>.
+Referring to my earlier example, if type <code>A</code> is <code>Int</code> and <code>B</code> is <code>Set[Int]</code>, then <code>foldL(b, a) =&gt; b + a</code>.
+Note that <code>b + a</code> is directly inserting single element <code>a</code> into <code>b</code>, which is significantly more efficient than <code>b ++ Set(a)</code>, which is how a typical map-reduce implementation would be required to operate.</p>
+
+<p>This law also gives us the corresponding definition of <code>map(a)</code>, which is <code>foldL(e, a)</code>, or: <code>Set.empty[Int] ++ a</code> or just: <code>Set(a)</code></p>
+
+<p>In this formulation, the basic map-reduce operation is now a single <code>foldLeft</code> operation, instead of a mapping followed by a monoidal reduction.
+The parallel version is analoglous.
+Each partition uses the new <code>foldLeft</code> operation, and the final reduction of intermediate monoidal results remains the same as before.</p>
+
+<p>The <code>foldLeft</code> function is a potentially much more general operation, and it raises the question of whether this new encoding is indeed parallelizable as before.
+I will conclude with a proof that this encoding is also parallelizable;
+Note that the law <code>foldL(b, a) = b ++ foldL(e, a)</code> is a significant component of this proof, as it represents the constraint that <code>foldL</code> behaves like an analog of reducing <code>b</code> with a monoidal representation of element <code>a</code>.</p>
+
+<p>In the following proof I used a scala-like pseudo code, described in the introduction:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="c1">// given an object mr of type MapReduceFL[A, B]</span>
+</span><span class='line'><span class="c1">// and using notation:</span>
+</span><span class='line'><span class="c1">// f &lt;==&gt; mr.foldL</span>
+</span><span class='line'><span class="c1">// for b1,b2 of type B: b1 ++ b2 &lt;==&gt; mr.plus(b1, b2)</span>
+</span><span class='line'><span class="c1">// e &lt;==&gt; mr.e</span>
+</span><span class='line'><span class="c1">// [...] &lt;==&gt; Seq(...)</span>
+</span><span class='line'><span class="c1">// d1, d2 are of type Seq[A]</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// Proof that map-reduce with left-folding is parallelizable</span>
+</span><span class='line'><span class="c1">// i.e. mr(d1 ++ d2) == mr(d1) ++ mr(d2)</span>
+</span><span class='line'><span class="n">mr</span><span class="o">(</span><span class="n">d1</span> <span class="o">++</span> <span class="n">d2</span><span class="o">)</span>
+</span><span class='line'><span class="o">==</span> <span class="o">(</span><span class="n">d1</span> <span class="o">++</span> <span class="n">d2</span><span class="o">).</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>  <span class="c1">// definition of map-reduce operation</span>
+</span><span class='line'><span class="o">==</span> <span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="n">d2</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>  <span class="c1">// Lemma A</span>
+</span><span class='line'><span class="o">==</span> <span class="n">mr</span><span class="o">(</span><span class="n">d1</span><span class="o">)</span> <span class="o">++</span> <span class="n">mr</span><span class="o">(</span><span class="n">d2</span><span class="o">)</span>  <span class="c1">// definition of map-reduce (QED)</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// Proof of Lemma A</span>
+</span><span class='line'><span class="c1">// i.e. (d1 ++ d2).foldLeft(e)(f) == d1.foldLeft(e)(f) ++ d2.foldLeft(e)(f)</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// proof is by induction on the length of data sequence d2</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// case d2 where length is zero, i.e. d2 == []</span>
+</span><span class='line'><span class="o">(</span><span class="n">d1</span> <span class="o">++</span> <span class="o">[]).</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>
+</span><span class='line'><span class="o">==</span> <span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>  <span class="c1">// definition of empty sequence []</span>
+</span><span class='line'><span class="o">==</span> <span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="n">e</span>  <span class="c1">// definition of identity e</span>
+</span><span class='line'><span class="o">==</span> <span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="o">[].</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>  <span class="c1">// definition of foldLeft</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// case d2 where length is 1, i.e. d2 == [a] for some a of type A</span>
+</span><span class='line'><span class="o">(</span><span class="n">d1</span> <span class="o">++</span> <span class="o">[</span><span class="kt">a</span><span class="o">]).</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>
+</span><span class='line'><span class="o">==</span> <span class="n">f</span><span class="o">(</span><span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">),</span> <span class="n">a</span><span class="o">)</span>  <span class="c1">// definition of foldLeft and f</span>
+</span><span class='line'><span class="o">==</span> <span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="n">f</span><span class="o">(</span><span class="n">e</span><span class="o">,</span> <span class="n">a</span><span class="o">)</span>  <span class="c1">// the type-law f(b, a) == b ++ f(e, a)</span>
+</span><span class='line'><span class="o">==</span> <span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="o">[</span><span class="kt">a</span><span class="o">].</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>  <span class="c1">// definition of foldLeft</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// inductive step, assuming proof for d2&#39; of length &lt;= n</span>
+</span><span class='line'><span class="c1">// consider d2 of length n+1, i.e. d2 == d2&#39; ++ [a], where d2&#39; has length n</span>
+</span><span class='line'><span class="o">(</span><span class="n">d1</span> <span class="o">++</span> <span class="n">d2</span><span class="o">).</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>
+</span><span class='line'><span class="o">==</span> <span class="o">(</span><span class="n">d1</span> <span class="o">++</span> <span class="n">d2</span><span class="err">&#39;</span> <span class="o">++</span> <span class="o">[</span><span class="kt">a</span><span class="o">]).</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>  <span class="c1">// definition of d2, d2&#39;, [a]</span>
+</span><span class='line'><span class="o">==</span> <span class="n">f</span><span class="o">((</span><span class="n">d1</span> <span class="o">++</span> <span class="n">d2</span><span class="err">&#39;</span><span class="o">).</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">),</span> <span class="n">a</span><span class="o">)</span>  <span class="c1">// definition of foldLeft and f</span>
+</span><span class='line'><span class="o">==</span> <span class="o">(</span><span class="n">d1</span> <span class="o">++</span> <span class="n">d2</span><span class="err">&#39;</span><span class="o">).</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="n">f</span><span class="o">(</span><span class="n">e</span><span class="o">,</span> <span class="n">a</span><span class="o">)</span>  <span class="c1">// type-law f(b, a) == b ++ f(e, a)</span>
+</span><span class='line'><span class="o">==</span> <span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="n">d2</span><span class="err">&#39;</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="n">f</span><span class="o">(</span><span class="n">e</span><span class="o">,</span> <span class="n">a</span><span class="o">)</span>  <span class="c1">// induction</span>
+</span><span class='line'><span class="o">==</span> <span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="n">d2</span><span class="err">&#39;</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="o">[</span><span class="kt">a</span><span class="o">].</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>  <span class="c1">// def&#39;n of foldLeft</span>
+</span><span class='line'><span class="o">==</span> <span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="o">(</span><span class="n">d2</span><span class="err">&#39;</span> <span class="o">++</span> <span class="o">[</span><span class="kt">a</span><span class="o">]).</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>  <span class="c1">// induction</span>
+</span><span class='line'><span class="o">==</span> <span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="n">d2</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>  <span class="c1">// definition of d2 (QED)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1629,254 +1888,6 @@ I intend to keep an eye out for applications of MDL to <em>other</em> learning m
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2015/11/24/the-prepare-operation-considered-harmful-in-algebird/">The &#8216;prepare&#8217; operation considered harmful in Algebird aggregation</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2015-11-24T16:32:00-07:00" pubdate data-updated="true">Nov 24<span>th</span>, 2015</time>
-        
-        
-         | <a href="/blog/2015/11/24/the-prepare-operation-considered-harmful-in-algebird/#feedback">Feedback</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>I want to make an argument that the Algebird <a href="http://twitter.github.io/algebird/#com.twitter.algebird.Aggregator">Aggregator</a> design, in particular its use of the <code>prepare</code> operation in a map-reduce context, has substantial inefficiencies, compared to an equivalent formulation that is more directly suited to taking advantage of Scala&#8217;s <a href="http://www.scala-lang.org/api/current/index.html#scala.collection.Seq">aggregate method on collections</a> method.</p>
-
-<p>Consider the definition of aggregation in the Aggregator class:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">def</span> <span class="n">apply</span><span class="o">(</span><span class="n">inputs</span><span class="k">:</span> <span class="kt">TraversableOnce</span><span class="o">[</span><span class="kt">A</span><span class="o">])</span><span class="k">:</span> <span class="kt">C</span> <span class="o">=</span> <span class="n">present</span><span class="o">(</span><span class="n">reduce</span><span class="o">(</span><span class="n">inputs</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="n">prepare</span><span class="o">)))</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>You can see that it is a standard map/reduce operation, where <code>reduce</code> is defined as a monoidal (or semigroup &#8211; more on this later) operation. Under the hood, it boils down to an invocation of Scala&#8217;s <code>reduceLeft</code> method.  The key thing to notice is that the role of <code>prepare</code> is to map a collection of data elements into the required monoids, which are then aggregated using that monoid&#8217;s <code>plus</code> operation.  In other words, <code>prepare</code> converts data elements into &#8220;singleton&#8221; monoids each representing a data element.</p>
-
-<p>Now, if the monoid in question is simple, say some numeric type, this conversion is free, or nearly so.  For example, the conversion of an integer into the &#8220;integer monoid&#8221; is a no-op.  However, there are other kinds of &#8220;non-trivial&#8221; monoids, for which the conversion of a data element into its corresponding monoid may be costly.  In this post, I will be using the monoid defined by Scala Set[Int], where the monoid <code>plus</code> operation is set union, and of course the <code>zero</code> element is the empty set.</p>
-
-<p>Consider the process of defining an Algebird aggregator for the task of generating the set of unique elements in a data set.  The corresponding <code>prepare</code> operation is: <code>prepare(e: Int) = Set(e)</code>.  A monoid trait that encodes this idea might look like the following.  (the code I used in this post can be found <a href="https://gist.github.com/erikerlandson/d96dc553bc51e0eb5e4b">here</a>)</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="c1">// an algebird-like monoid with the &#39;prepare&#39; operation</span>
-</span><span class='line'><span class="k">trait</span> <span class="nc">PreparedMonoid</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">]</span> <span class="o">{</span>
-</span><span class='line'>  <span class="k">val</span> <span class="n">zero</span><span class="k">:</span> <span class="kt">M</span>
-</span><span class='line'>  <span class="k">def</span> <span class="n">plus</span><span class="o">(</span><span class="n">m1</span><span class="k">:</span> <span class="kt">M</span><span class="o">,</span> <span class="n">m2</span><span class="k">:</span> <span class="kt">M</span><span class="o">)</span><span class="k">:</span> <span class="kt">M</span>
-</span><span class='line'>  <span class="k">def</span> <span class="n">prepare</span><span class="o">(</span><span class="n">e</span><span class="k">:</span> <span class="kt">E</span><span class="o">)</span><span class="k">:</span> <span class="kt">M</span>
-</span><span class='line'><span class="o">}</span>
-</span><span class='line'>
-</span><span class='line'><span class="c1">// a PreparedMonoid for a set of integers.  monoid operator is set union.</span>
-</span><span class='line'><span class="k">object</span> <span class="nc">intSetPrepared</span> <span class="k">extends</span> <span class="nc">PreparedMonoid</span><span class="o">[</span><span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span>, <span class="kt">Int</span><span class="o">]</span> <span class="o">{</span>
-</span><span class='line'>  <span class="k">val</span> <span class="n">zero</span> <span class="k">=</span> <span class="nc">Set</span><span class="o">.</span><span class="n">empty</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span>
-</span><span class='line'>  <span class="k">def</span> <span class="n">plus</span><span class="o">(</span><span class="n">m1</span><span class="k">:</span> <span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">],</span> <span class="n">m2</span><span class="k">:</span> <span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">])</span> <span class="k">=</span> <span class="n">m1</span> <span class="o">++</span> <span class="n">m2</span>
-</span><span class='line'>  <span class="k">def</span> <span class="n">prepare</span><span class="o">(</span><span class="n">e</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span> <span class="k">=</span> <span class="nc">Set</span><span class="o">(</span><span class="n">e</span><span class="o">)</span>
-</span><span class='line'><span class="o">}</span>
-</span><span class='line'>
-</span><span class='line'><span class="k">implicit</span> <span class="k">class</span> <span class="nc">SeqWithMapReduce</span><span class="o">[</span><span class="kt">E</span><span class="o">](</span><span class="n">seq</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">E</span><span class="o">])</span> <span class="o">{</span>
-</span><span class='line'>  <span class="c1">// algebird map/reduce Aggregator model</span>
-</span><span class='line'>  <span class="k">def</span> <span class="n">mrPrepared</span><span class="o">[</span><span class="kt">M</span><span class="o">](</span><span class="n">mon</span><span class="k">:</span> <span class="kt">PreparedMonoid</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">])</span><span class="k">:</span> <span class="kt">M</span> <span class="o">=</span> <span class="o">{</span>
-</span><span class='line'>    <span class="n">seq</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="n">mon</span><span class="o">.</span><span class="n">prepare</span><span class="o">).</span><span class="n">reduceLeft</span><span class="o">(</span><span class="n">mon</span><span class="o">.</span><span class="n">plus</span><span class="o">)</span>
-</span><span class='line'>  <span class="o">}</span>
-</span><span class='line'><span class="o">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>If we unpack the above code, as applied to <code>intSetPrepared</code>, we are instantiating a new Set object, containing a single value, for every single input data element.</p>
-
-<p>But there is a potentially better model of aggregation, exemplified by the Scala <code>aggregate</code> method.  This method does not use a <code>prepare</code> operation.  It uses a zero value and a monoidal operator, which the Scala docs refer to as <code>combop</code>, but it also uses an &#8220;update&#8221; operation, that defines how to update the monoid object, directly, with a single element, referred to as <code>seqop</code> in Scala&#8217;s documentation.  This idea can also be encoded as a flavor of monoid, enhanced with an <code>update</code> method:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="c1">// an algebird-like monoid with &#39;update&#39; operation</span>
-</span><span class='line'><span class="k">trait</span> <span class="nc">UpdatedMonoid</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">]</span> <span class="o">{</span>
-</span><span class='line'>  <span class="k">val</span> <span class="n">zero</span><span class="k">:</span> <span class="kt">M</span>
-</span><span class='line'>  <span class="k">def</span> <span class="n">plus</span><span class="o">(</span><span class="n">m1</span><span class="k">:</span> <span class="kt">M</span><span class="o">,</span> <span class="n">m2</span><span class="k">:</span> <span class="kt">M</span><span class="o">)</span><span class="k">:</span> <span class="kt">M</span>
-</span><span class='line'>  <span class="k">def</span> <span class="n">update</span><span class="o">(</span><span class="n">m</span><span class="k">:</span> <span class="kt">M</span><span class="o">,</span> <span class="n">e</span><span class="k">:</span> <span class="kt">E</span><span class="o">)</span><span class="k">:</span> <span class="kt">M</span>
-</span><span class='line'><span class="o">}</span>
-</span><span class='line'>
-</span><span class='line'><span class="c1">// an equivalent UpdatedMonoid for a set of integers</span>
-</span><span class='line'><span class="k">object</span> <span class="nc">intSetUpdated</span> <span class="k">extends</span> <span class="nc">UpdatedMonoid</span><span class="o">[</span><span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span>, <span class="kt">Int</span><span class="o">]</span> <span class="o">{</span>
-</span><span class='line'>  <span class="k">val</span> <span class="n">zero</span> <span class="k">=</span> <span class="nc">Set</span><span class="o">.</span><span class="n">empty</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span>
-</span><span class='line'>  <span class="k">def</span> <span class="n">plus</span><span class="o">(</span><span class="n">m1</span><span class="k">:</span> <span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">],</span> <span class="n">m2</span><span class="k">:</span> <span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">])</span> <span class="k">=</span> <span class="n">m1</span> <span class="o">++</span> <span class="n">m2</span>
-</span><span class='line'>  <span class="k">def</span> <span class="n">update</span><span class="o">(</span><span class="n">m</span><span class="k">:</span> <span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">],</span> <span class="n">e</span><span class="k">:</span> <span class="kt">Int</span><span class="o">)</span> <span class="k">=</span> <span class="n">m</span> <span class="o">+</span> <span class="n">e</span>
-</span><span class='line'><span class="o">}</span>
-</span><span class='line'>
-</span><span class='line'><span class="k">implicit</span> <span class="k">class</span> <span class="nc">SeqWithMapReduceUpdated</span><span class="o">[</span><span class="kt">E</span><span class="o">](</span><span class="n">seq</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">E</span><span class="o">])</span> <span class="o">{</span>
-</span><span class='line'>  <span class="c1">// map/reduce logic, taking advantage of scala &#39;aggregate&#39;</span>
-</span><span class='line'>  <span class="k">def</span> <span class="n">mrUpdatedAggregate</span><span class="o">[</span><span class="kt">M</span><span class="o">](</span><span class="n">mon</span><span class="k">:</span> <span class="kt">UpdatedMonoid</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">])</span><span class="k">:</span> <span class="kt">M</span> <span class="o">=</span> <span class="o">{</span>
-</span><span class='line'>    <span class="n">seq</span><span class="o">.</span><span class="n">aggregate</span><span class="o">(</span><span class="n">mon</span><span class="o">.</span><span class="n">zero</span><span class="o">)(</span><span class="n">mon</span><span class="o">.</span><span class="n">update</span><span class="o">,</span> <span class="n">mon</span><span class="o">.</span><span class="n">plus</span><span class="o">)</span>
-</span><span class='line'>  <span class="o">}</span>
-</span><span class='line'><span class="o">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>This arrangement promises more efficiency when aggregating w.r.t. nontrivial monoids, by avoiding the construction of &#8220;singleton&#8221; monoids for each data element.  The following demo confirms that for the Set-based monoid, it is over 10 times faster:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="k">:</span><span class="kt">load</span> <span class="kt">/home/eje/scala/prepare.scala</span>
-</span><span class='line'><span class="nc">Loading</span> <span class="o">/</span><span class="n">home</span><span class="o">/</span><span class="n">eje</span><span class="o">/</span><span class="n">scala</span><span class="o">/</span><span class="n">prepare</span><span class="o">.</span><span class="n">scala</span><span class="o">...</span>
-</span><span class='line'><span class="n">defined</span> <span class="n">module</span> <span class="n">prepare</span>
-</span><span class='line'>
-</span><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="k">import</span> <span class="nn">prepare._</span>
-</span><span class='line'><span class="k">import</span> <span class="nn">prepare._</span>
-</span><span class='line'>
-</span><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="k">val</span> <span class="n">data</span> <span class="k">=</span> <span class="nc">Vector</span><span class="o">.</span><span class="n">fill</span><span class="o">(</span><span class="mi">1000000</span><span class="o">)</span> <span class="o">{</span> <span class="n">scala</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="nc">Random</span><span class="o">.</span><span class="n">nextInt</span><span class="o">(</span><span class="mi">10</span><span class="o">)</span> <span class="o">}</span>
-</span><span class='line'><span class="n">data</span><span class="k">:</span> <span class="kt">scala.collection.immutable.Vector</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="nc">Vector</span><span class="o">(</span><span class="mi">7</span><span class="o">,</span> <span class="mi">9</span><span class="o">,</span> <span class="mi">4</span><span class="o">,</span> <span class="mi">2</span><span class="o">,</span> <span class="mi">7</span><span class="o">,...</span>
-</span><span class='line'>
-</span><span class='line'><span class="c1">// Verify that output is the same for both implementations:</span>
-</span><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="n">data</span><span class="o">.</span><span class="n">mrPrepared</span><span class="o">(</span><span class="n">intSetPrepared</span><span class="o">)</span>
-</span><span class='line'><span class="n">res0</span><span class="k">:</span> <span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="nc">Set</span><span class="o">(</span><span class="mi">0</span><span class="o">,</span> <span class="mi">5</span><span class="o">,</span> <span class="mi">1</span><span class="o">,</span> <span class="mi">6</span><span class="o">,</span> <span class="mi">9</span><span class="o">,</span> <span class="mi">2</span><span class="o">,</span> <span class="mi">7</span><span class="o">,</span> <span class="mi">3</span><span class="o">,</span> <span class="mi">8</span><span class="o">,</span> <span class="mi">4</span><span class="o">)</span>
-</span><span class='line'>
-</span><span class='line'><span class="c1">// results are the same</span>
-</span><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="n">data</span><span class="o">.</span><span class="n">mrUpdatedAggregate</span><span class="o">(</span><span class="n">intSetUpdated</span><span class="o">)</span>
-</span><span class='line'><span class="n">res1</span><span class="k">:</span> <span class="kt">Set</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="nc">Set</span><span class="o">(</span><span class="mi">0</span><span class="o">,</span> <span class="mi">5</span><span class="o">,</span> <span class="mi">1</span><span class="o">,</span> <span class="mi">6</span><span class="o">,</span> <span class="mi">9</span><span class="o">,</span> <span class="mi">2</span><span class="o">,</span> <span class="mi">7</span><span class="o">,</span> <span class="mi">3</span><span class="o">,</span> <span class="mi">8</span><span class="o">,</span> <span class="mi">4</span><span class="o">)</span>
-</span><span class='line'>
-</span><span class='line'><span class="c1">// Compare timings of prepare-based versus update-based aggregation</span>
-</span><span class='line'><span class="c1">// (benchmark values are returned in seconds)</span>
-</span><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="n">benchmark</span><span class="o">(</span><span class="mi">10</span><span class="o">)</span> <span class="o">{</span> <span class="n">data</span><span class="o">.</span><span class="n">mrPrepared</span><span class="o">(</span><span class="n">intSetPrepared</span><span class="o">)</span> <span class="o">}</span>
-</span><span class='line'><span class="n">res2</span><span class="k">:</span> <span class="kt">Double</span> <span class="o">=</span> <span class="mf">0.2957673056</span>
-</span><span class='line'>
-</span><span class='line'><span class="c1">// update-based aggregation is 10 times faster</span>
-</span><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="n">benchmark</span><span class="o">(</span><span class="mi">10</span><span class="o">)</span> <span class="o">{</span> <span class="n">data</span><span class="o">.</span><span class="n">mrUpdatedAggregate</span><span class="o">(</span><span class="n">intSetUpdated</span><span class="o">)</span> <span class="o">}</span>
-</span><span class='line'><span class="n">res3</span><span class="k">:</span> <span class="kt">Double</span> <span class="o">=</span> <span class="mf">0.027041249300000004</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>It is also possible to apply Scala&#8217;s <code>aggregate</code> to a monoid enhanced with <code>prepare</code>:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">implicit</span> <span class="k">class</span> <span class="nc">SeqWithMapReducePrepared</span><span class="o">[</span><span class="kt">E</span><span class="o">](</span><span class="n">seq</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">E</span><span class="o">])</span> <span class="o">{</span>
-</span><span class='line'>  <span class="c1">// using &#39;aggregate&#39; with prepared op</span>
-</span><span class='line'>  <span class="k">def</span> <span class="n">mrPreparedAggregate</span><span class="o">[</span><span class="kt">M</span><span class="o">](</span><span class="n">mon</span><span class="k">:</span> <span class="kt">PreparedMonoid</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">])</span><span class="k">:</span> <span class="kt">M</span> <span class="o">=</span> <span class="o">{</span>
-</span><span class='line'>    <span class="n">seq</span><span class="o">.</span><span class="n">aggregate</span><span class="o">(</span><span class="n">mon</span><span class="o">.</span><span class="n">zero</span><span class="o">)((</span><span class="n">m</span><span class="o">,</span> <span class="n">e</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="n">mon</span><span class="o">.</span><span class="n">plus</span><span class="o">(</span><span class="n">m</span><span class="o">,</span> <span class="n">mon</span><span class="o">.</span><span class="n">prepare</span><span class="o">(</span><span class="n">e</span><span class="o">)),</span> <span class="n">mon</span><span class="o">.</span><span class="n">plus</span><span class="o">)</span>
-</span><span class='line'>  <span class="o">}</span>
-</span><span class='line'><span class="o">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>Although this turns out to be measurably faster than the literal map-reduce implementation, it is still not nearly as fast as the variation using <code>update</code>:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="n">scala</span><span class="o">&gt;</span> <span class="n">benchmark</span><span class="o">(</span><span class="mi">10</span><span class="o">)</span> <span class="o">{</span> <span class="n">data</span><span class="o">.</span><span class="n">mrPreparedAggregate</span><span class="o">(</span><span class="n">intSetPrepared</span><span class="o">)</span> <span class="o">}</span>
-</span><span class='line'><span class="n">res2</span><span class="k">:</span> <span class="kt">Double</span> <span class="o">=</span> <span class="mf">0.1754636707</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>Readers familiar with Algebird may be wondering about my use of monoids above, when the <code>Aggregator</code> interface is actually based on semigroups.  This is important, since building on Scala&#8217;s <code>aggregate</code> function requires a zero element that semigroups do not have.  Although I believe it might be worth considering changing <code>Aggregator</code> to use monoids, another sensible option is to change the internal logic for the subclass <code>AggregatorMonoid</code>, which does require a monoid, or possibly just define a new <code>AggregatorMonoidUpdated</code> subclass.</p>
-
-<p>A final note on compatability: note that any monoid enhanced with <code>prepare</code> can be converted into an equivalent monoid enhanced with <code>update</code>, as demonstrated by this factory function:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">object</span> <span class="nc">UpdatedMonoid</span> <span class="o">{</span>
-</span><span class='line'>  <span class="c1">// create an UpdatedMonoid from a PreparedMonoid</span>
-</span><span class='line'>  <span class="k">def</span> <span class="n">apply</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">](</span><span class="n">mon</span><span class="k">:</span> <span class="kt">PreparedMonoid</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">])</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">UpdatedMonoid</span><span class="o">[</span><span class="kt">M</span>, <span class="kt">E</span><span class="o">]</span> <span class="o">{</span>
-</span><span class='line'>    <span class="k">val</span> <span class="n">zero</span> <span class="k">=</span> <span class="n">mon</span><span class="o">.</span><span class="n">zero</span>
-</span><span class='line'>    <span class="k">def</span> <span class="n">plus</span><span class="o">(</span><span class="n">m1</span><span class="k">:</span> <span class="kt">M</span><span class="o">,</span> <span class="n">m2</span><span class="k">:</span> <span class="kt">M</span><span class="o">)</span> <span class="k">=</span> <span class="n">mon</span><span class="o">.</span><span class="n">plus</span><span class="o">(</span><span class="n">m1</span><span class="o">,</span> <span class="n">m2</span><span class="o">)</span>
-</span><span class='line'>    <span class="k">def</span> <span class="n">update</span><span class="o">(</span><span class="n">m</span><span class="k">:</span> <span class="kt">M</span><span class="o">,</span> <span class="n">e</span><span class="k">:</span> <span class="kt">E</span><span class="o">)</span> <span class="k">=</span> <span class="n">mon</span><span class="o">.</span><span class="n">plus</span><span class="o">(</span><span class="n">m</span><span class="o">,</span> <span class="n">mon</span><span class="o">.</span><span class="n">prepare</span><span class="o">(</span><span class="n">e</span><span class="o">))</span>
-</span><span class='line'>  <span class="o">}</span>
-</span><span class='line'><span class="o">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/2/">&larr; Older</a>
@@ -1896,6 +1907,10 @@ I intend to keep an eye out for applications of MDL to <em>other</em> learning m
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2016/09/05/expressing-map-reduce-as-a-left-folding-monoid/">Encoding Map-Reduce As A Monoid With Left Folding</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2016/08/31/supporting-competing-apis-in-scala-can-better-package-factoring-help/">Supporting Competing APIs in Scala &#8211; Can Better Package Factoring Help?</a>
       </li>
     
@@ -1909,10 +1924,6 @@ I intend to keep an eye out for applications of MDL to <em>other</em> learning m
     
       <li class="post">
         <a href="/blog/2016/06/15/computing-derivatives-of-the-gamma-function/">Computing Derivatives of the Gamma Function</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2016/06/08/exploring-the-effects-of-dimensionality-on-a-pdf-of-distances/">Exploring the Effects of Dimensionality on a PDF of Distances</a>
       </li>
     
   </ul>

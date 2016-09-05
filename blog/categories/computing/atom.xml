@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2016-08-31T17:55:54-07:00</updated>
+  <updated>2016-09-05T10:32:01-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,153 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Encoding Map-Reduce As A Monoid With Left Folding]]></title>
+    <link href="http://erikerlandson.github.com/blog/2016/09/05/expressing-map-reduce-as-a-left-folding-monoid/"/>
+    <updated>2016-09-05T10:31:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2016/09/05/expressing-map-reduce-as-a-left-folding-monoid</id>
+    <content type="html"><![CDATA[<p>In a <a href="http://erikerlandson.github.io/blog/2015/11/24/the-prepare-operation-considered-harmful-in-algebird/">previous post</a> I discussed some scenarios where traditional map-reduce -- directly applying a map function, followed by some monoidal reduction -- could be inefficient.
+To review, the source of inefficiency is in situations where the <code>map</code> operation is creating some non-trivial monoid that represents a single element of the input type.
+For example, if the monoidal type is <code>Set[Int]</code>, then the mapping function ('prepare' in algebird) maps every input integer <code>k</code> into <code>Set(k)</code>, which is somewhat expensive.</p>
+
+<p>In that discussion, I was focusing on map-reduce as embodied by the algebird <code>Aggregator</code> type, where <code>map</code> appears as the <code>prepare</code> function.
+However, it is easy to see that <em>any</em> map-reduce implementation may be vulnerable to the same inefficiency.</p>
+
+<p>I wondered if there were a way to represent map-reduce using some alternative formulation that avoids this vulnerability.
+There is such a formulation, which I will talk about in this post.</p>
+
+<p>I'll begin by reviewing a standard map-reduce implementation.
+The following scala code sketches out the definition of a monoid over a type <code>B</code> and a map-reduce interface.
+As this code suggests, the <code>map</code> function maps input data of some type <code>A</code> into some <em>monoidal</em> type <code>B</code>, which can be reduced (aka "aggregated") in a way that is amenable to parallelization:</p>
+
+<p>``` scala
+trait Monoid[B] {
+  // aka 'combine' aka '++'
+  def plus: (B, B) => B</p>
+
+<p>  // aka 'empty' aka 'identity'
+  def e: B
+}</p>
+
+<p>trait MapReduce[A, B] {
+  // monoid embodies the reducible type
+  def monoid: Monoid[B]</p>
+
+<p>  // mapping function from input type A to reducible type B
+  def map: A => B</p>
+
+<p>  // the basic map-reduce operation
+  def apply(data: Seq[A]): B = data.map(map).fold(monoid.e)(monoid.plus)</p>
+
+<p>  // map-reduce parallelized over data partitions
+  def apply(data: ParSeq[Seq[A]]): B =</p>
+
+<pre><code>data.map { part =&gt;
+  part.map(map).fold(monoid.e)(monoid.plus)
+}
+.fold(monoid.e)(monoid.plus)
+</code></pre>
+
+<p>}
+```</p>
+
+<p>In the parallel version of map-reduce above, you can see that map and reduce are executed on each data partition (which may occur in parallel) to produce a monoidal <code>B</code> value, followed by a final reduction of those intermediate results.
+This is the classic form of map-reduce popularized by tools such as Hadoop and Apache Spark, where inidividual data partitions may reside across highly parallel commodity clusters.</p>
+
+<p>Next I will present an alternative definition of map-reduce.
+In this implementation, the <code>map</code> function is replaced by a <code>foldL</code> function, which executes a single "left-fold" of an input object with type <code>A</code> into the monoid object with type <code>B</code>:</p>
+
+<p>``` scala
+// a map reduce operation based on a monoid with left folding
+trait MapReduceLF[A, B] extends MapReduce[A, B] {
+  def monoid: Monoid[B]</p>
+
+<p>  // left-fold an object with type A into the monoid B
+  // obeys type law: foldL(b, a) = b ++ foldL(e, a)
+  def foldL: (B, A) => B</p>
+
+<p>  // foldL(e, a) embodies the role of map(a) in standard map-reduce
+  def map = (a: A) => foldL(monoid.e, a)</p>
+
+<p>  // map-reduce operation is now a single fold-left operation
+  override def apply(data: Seq[A]): B = data.foldLeft(monoid.e)(foldL)</p>
+
+<p>  // map-reduce parallelized over data partitions
+  override def apply(data: ParSeq[Seq[A]]): B =</p>
+
+<pre><code>data.map { part =&gt;
+  part.foldLeft(monoid.e)(foldL)
+}
+.fold(monoid.e)(monoid.plus)
+</code></pre>
+
+<p>}
+```</p>
+
+<p>As the comments above indicate, the left-folding function <code>foldL</code> is assumed to obey the law <code>foldL(b, a) = b ++ foldL(e, a)</code>.
+This law captures the idea that folding <code>a</code> into <code>b</code> should be the analog of reducing <code>b</code> with a monoid corresponding to the single element <code>a</code>.
+Referring to my earlier example, if type <code>A</code> is <code>Int</code> and <code>B</code> is <code>Set[Int]</code>, then <code>foldL(b, a) =&gt; b + a</code>.
+Note that <code>b + a</code> is directly inserting single element <code>a</code> into <code>b</code>, which is significantly more efficient than <code>b ++ Set(a)</code>, which is how a typical map-reduce implementation would be required to operate.</p>
+
+<p>This law also gives us the corresponding definition of <code>map(a)</code>, which is <code>foldL(e, a)</code>, or: <code>Set.empty[Int] ++ a</code> or just: <code>Set(a)</code></p>
+
+<p>In this formulation, the basic map-reduce operation is now a single <code>foldLeft</code> operation, instead of a mapping followed by a monoidal reduction.
+The parallel version is analoglous.
+Each partition uses the new <code>foldLeft</code> operation, and the final reduction of intermediate monoidal results remains the same as before.</p>
+
+<p>The <code>foldLeft</code> function is a potentially much more general operation, and it raises the question of whether this new encoding is indeed parallelizable as before.
+I will conclude with a proof that this encoding is also parallelizable;
+Note that the law <code>foldL(b, a) = b ++ foldL(e, a)</code> is a significant component of this proof, as it represents the constraint that <code>foldL</code> behaves like an analog of reducing <code>b</code> with a monoidal representation of element <code>a</code>.</p>
+
+<p>In the following proof I used a scala-like pseudo code, described in the introduction:</p>
+
+<p>```
+// given an object mr of type MapReduceFL[A, B]
+// and using notation:
+// f &lt;==> mr.foldL
+// for b1,b2 of type B: b1 ++ b2 &lt;==> mr.plus(b1, b2)
+// e &lt;==> mr.e
+// [...] &lt;==> Seq(...)
+// d1, d2 are of type Seq[A]</p>
+
+<p>// Proof that map-reduce with left-folding is parallelizable
+// i.e. mr(d1 ++ d2) == mr(d1) ++ mr(d2)
+mr(d1 ++ d2)
+== (d1 ++ d2).foldLeft(e)(f)  // definition of map-reduce operation
+== d1.foldLeft(e)(f) ++ d2.foldLeft(e)(f)  // Lemma A
+== mr(d1) ++ mr(d2)  // definition of map-reduce (QED)</p>
+
+<p>// Proof of Lemma A
+// i.e. (d1 ++ d2).foldLeft(e)(f) == d1.foldLeft(e)(f) ++ d2.foldLeft(e)(f)</p>
+
+<p>// proof is by induction on the length of data sequence d2</p>
+
+<p>// case d2 where length is zero, i.e. d2 == []
+(d1 ++ []).foldLeft(e)(f)
+== d1.foldLeft(e)(f)  // definition of empty sequence []
+== d1.foldLeft(e)(f) ++ e  // definition of identity e
+== d1.foldLeft(e)(f) ++ [].foldLeft(e)(f)  // definition of foldLeft</p>
+
+<p>// case d2 where length is 1, i.e. d2 == [a] for some a of type A
+(d1 ++ [a]).foldLeft(e)(f)
+== f(d1.foldLeft(e)(f), a)  // definition of foldLeft and f
+== d1.foldLeft(e)(f) ++ f(e, a)  // the type-law f(b, a) == b ++ f(e, a)
+== d1.foldLeft(e)(f) ++ [a].foldLeft(e)(f)  // definition of foldLeft</p>
+
+<p>// inductive step, assuming proof for d2' of length &lt;= n
+// consider d2 of length n+1, i.e. d2 == d2' ++ [a], where d2' has length n
+(d1 ++ d2).foldLeft(e)(f)
+== (d1 ++ d2' ++ [a]).foldLeft(e)(f)  // definition of d2, d2', [a]
+== f((d1 ++ d2').foldLeft(e)(f), a)  // definition of foldLeft and f
+== (d1 ++ d2').foldLeft(e)(f) ++ f(e, a)  // type-law f(b, a) == b ++ f(e, a)
+== d1.foldLeft(e)(f) ++ d2'.foldLeft(e)(f) ++ f(e, a)  // induction
+== d1.foldLeft(e)(f) ++ d2'.foldLeft(e)(f) ++ [a].foldLeft(e)(f)  // def'n of foldLeft
+== d1.foldLeft(e)(f) ++ (d2' ++ [a]).foldLeft(e)(f)  // induction
+== d1.foldLeft(e)(f) ++ d2.foldLeft(e)(f)  // definition of d2 (QED)
+```</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Supporting Competing APIs in Scala -- Can Better Package Factoring Help?]]></title>
@@ -237,56 +384,6 @@ I intend to keep an eye out for applications of MDL to <em>other</em> learning m
 <p><img src="/assets/images/dgamma/jj9ph5l.png" alt="Equation 6" /></p>
 
 <p>As previously mentioned, the basis row of values <nobr>D<sub>1</sub><sup>(*)</sup>(x)</nobr> are the <a href="https://en.wikipedia.org/wiki/Polygamma_function">polygamma functions</a> where <nobr>D<sub>1</sub><sup>(n)</sup>(x) = polygamma<sup>(n)</sup>(x)</nobr>.  The first two polygammas, order 0 and 1, are simply the digamma and trigamma functions, respectively, and are available with most numeric libraries.  Computing the general polygamma is a project, and blog post, for another time, but the standard polynomial approximation for the digamma function can of course be differentiated...  Happy Computing!</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Exploring the Effects of Dimensionality on a PDF of Distances]]></title>
-    <link href="http://erikerlandson.github.com/blog/2016/06/08/exploring-the-effects-of-dimensionality-on-a-pdf-of-distances/"/>
-    <updated>2016-06-08T20:56:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2016/06/08/exploring-the-effects-of-dimensionality-on-a-pdf-of-distances</id>
-    <content type="html"><![CDATA[<p>Every so often I'm reminded that the effects of changing dimensionality on objects and processes can be surprisingly counterintuitive.  Recently I ran across a great example of this, while I working on a model for the distribution of distances in spaces of varying dimension.</p>
-
-<p>Suppose that I draw some values from a classic one-dimensional Gaussian, with zero mean and unit variance, but that I am actually interested in their corresponding distances from center.  Knowing that my Gaussian is centered on the origin, I can rephrase that as: the distribution of magnitudes of values drawn from that Gaussian.  I can simulate this process by actually samping Gaussian values and taking their absolute value.  When I do, I get the following result:</p>
-
-<p><img src="/assets/images/dist_dist/figure1.png" alt="Figure 1" /></p>
-
-<p>It's easy to see -- and intuitive -- that the resulting distribution is a <a href="https://en.wikipedia.org/wiki/Half-normal_distribution">half-Gaussian</a>, as I confirmed by overlaying the histogrammed samples above with a half-Gaussian PDF (displayed in green).</p>
-
-<p>I wanted to generalize this basic idea into some arbitrary dimensionality, (d), where I draw d-vectors from an <a href="https://en.wikipedia.org/wiki/Multivariate_normal_distribution">d-dimensional Gaussian</a> (again, centered on the origin with unit variances). When I take the magnitudes of these sampled d-vectors, what will the probability distribution of <em>their</em> magnitudes look like?</p>
-
-<p>My intuitive assumption was that these magnitudes would <em>also</em> follow a half-Gaussian distribution.  After all, every multivariate Gaussian is densest at its mean, just like the univariate case I examined above.  In fact I was so confident in this assumption that I built my initial modeling around it.  Great confusion ensued, when I saw how poorly my models were working on my higher-dimensional data!</p>
-
-<p>Eventually it occurred to me to do the obvious thing and generate some visualizations from higher dimensional data.  For example, here is the correponding plot generated from a bivariate Gaussian (d=2):</p>
-
-<p><a name="figure2"></a>
-<img src="/assets/images/dist_dist/figure2.png" alt="Figure 2" /></p>
-
-<p>Surprise -- the distribution at d=2 is <em>not even close to half-Gaussian!</em>.  My intuitions couldn't have been more misleading!</p>
-
-<p>Where did I go wrong?</p>
-
-<p>I'll start by observing what happens when I take a multi-dimensional PDF of vectors in (d) dimensions and project it down to a one-dimensional PDF of the corresponding vector magnitudes. To keep things simple, I will be assuming a multi-dimensional PDF <nobr>f<sub>r</sub>(<strong>x</strong><sub>d</sub>)</nobr> that is (1) centered on the origin, and (2) is radially symmetric; the pdf value is the same for all points at a given distance from the origin.  For example, any multivariate Gaussian with <strong>0</strong><sub>d</sub> mean and <strong>I</strong><sub>d</sub> for a covariance matrix satisfies these two assumptions.  With this in mind, you can see that the process of projecting from vectors in <strong>R</strong><sub>d</sub> to their distance from <strong>0</strong><sub>d</sub> (their magnitude) is equivalent to summing all densities <nobr>f<sub>r</sub>(<strong>x</strong><sub>d</sub>)</nobr> along the surface of "d-sphere" radius (r) to obtain a pdf f(r) in distance space.  With assumption (2) we can simplify that integration to just <nobr>f(r)=A<sub>d</sub>(r)f'(r)</nobr>, where f'(r) defines the value of <nobr>f<sub>r</sub>(<strong>x</strong>)</nobr> for all <strong>x</strong> with magnitude of (r), and A<sub>d</sub>(r) is the surface area of a d-sphere with radius (r):</p>
-
-<p><img src="/assets/images/dist_dist/ztrlusa.png" alt="Figure 3" /></p>
-
-<p>The key observation is that this term is a <em>polynomial</em> function of radius (r), with degree (d-1).  When d=1, it is simply a constant multiplier and so we get the half-Gaussian distribution we expect, but when <nobr>d >= 2</nobr>, the term is zero at r=0, and grows with radius.  Hence we see the in the <a href="#figure2">d=2 plot above</a> that the density begins at zero, then grows with radius until the decreasing gaussian density gradually drives it back toward zero again.</p>
-
-<p>The above ideas can be expressed compactly as follows:</p>
-
-<p><img src="/assets/images/dist_dist/jukgy85.png" alt="Figure 4" /></p>
-
-<p>In my experiments, I am using multivariate Gaussians of mean <strong>0</strong><sub>d</sub> and unit covariance matrix <strong>I</strong><sub>d</sub>, and so the form for f(r;d) becomes:</p>
-
-<p><img src="/assets/images/dist_dist/gwwv5a5.png" alt="Figure 4" /></p>
-
-<p>This form is in fact the <a href="https://en.wikipedia.org/wiki/Generalized_gamma_distribution">generalized gamma distribution</a>, with scale parameter <nobr>a=2<sup>1/2</sup>,</nobr> shape parameter p=2, and free shape parameter (d) representing the dimensionality in this context.</p>
-
-<p>I can verify that this PDF is correct by plotting it against randomly sampled data at differing dimensions:</p>
-
-<p><img src="/assets/images/dist_dist/figure3.png" alt="Figure 5" /></p>
-
-<p>This plot demonstrates both that the PDF expression is correct for varying dimensionalities and also illustrates how the shape of the PDF evolves as dimensionality changes.  For me, it was a great example of challenging my intuitions and learning something completely unexpected about the interplay of distances and dimension.</p>
 ]]></content>
   </entry>
   

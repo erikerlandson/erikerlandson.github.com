@@ -4,7 +4,7 @@
   <title><![CDATA[tool monkey]]></title>
   <link href="http://erikerlandson.github.com/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2016-08-31T17:55:54-07:00</updated>
+  <updated>2016-09-05T10:32:01-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,235 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Encoding Map-Reduce As A Monoid With Left Folding]]></title>
+    <link href="http://erikerlandson.github.com/blog/2016/09/05/expressing-map-reduce-as-a-left-folding-monoid/"/>
+    <updated>2016-09-05T10:31:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2016/09/05/expressing-map-reduce-as-a-left-folding-monoid</id>
+    <content type="html"><![CDATA[<p>In a <a href="http://erikerlandson.github.io/blog/2015/11/24/the-prepare-operation-considered-harmful-in-algebird/">previous post</a> I discussed some scenarios where traditional map-reduce &#8211; directly applying a map function, followed by some monoidal reduction &#8211; could be inefficient.
+To review, the source of inefficiency is in situations where the <code>map</code> operation is creating some non-trivial monoid that represents a single element of the input type.
+For example, if the monoidal type is <code>Set[Int]</code>, then the mapping function (&#8216;prepare&#8217; in algebird) maps every input integer <code>k</code> into <code>Set(k)</code>, which is somewhat expensive.</p>
+
+<p>In that discussion, I was focusing on map-reduce as embodied by the algebird <code>Aggregator</code> type, where <code>map</code> appears as the <code>prepare</code> function.
+However, it is easy to see that <em>any</em> map-reduce implementation may be vulnerable to the same inefficiency.</p>
+
+<p>I wondered if there were a way to represent map-reduce using some alternative formulation that avoids this vulnerability.
+There is such a formulation, which I will talk about in this post.</p>
+
+<p>I&#8217;ll begin by reviewing a standard map-reduce implementation.
+The following scala code sketches out the definition of a monoid over a type <code>B</code> and a map-reduce interface.
+As this code suggests, the <code>map</code> function maps input data of some type <code>A</code> into some <em>monoidal</em> type <code>B</code>, which can be reduced (aka &#8220;aggregated&#8221;) in a way that is amenable to parallelization:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">trait</span> <span class="nc">Monoid</span><span class="o">[</span><span class="kt">B</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>  <span class="c1">// aka &#39;combine&#39; aka &#39;++&#39;</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">plus</span><span class="k">:</span> <span class="o">(</span><span class="kt">B</span><span class="o">,</span> <span class="kt">B</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="n">B</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// aka &#39;empty&#39; aka &#39;identity&#39;</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">e</span><span class="k">:</span> <span class="kt">B</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">trait</span> <span class="nc">MapReduce</span><span class="o">[</span><span class="kt">A</span>, <span class="kt">B</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>  <span class="c1">// monoid embodies the reducible type</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">monoid</span><span class="k">:</span> <span class="kt">Monoid</span><span class="o">[</span><span class="kt">B</span><span class="o">]</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// mapping function from input type A to reducible type B</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">map</span><span class="k">:</span> <span class="kt">A</span> <span class="o">=&gt;</span> <span class="n">B</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// the basic map-reduce operation</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">apply</span><span class="o">(</span><span class="n">data</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">A</span><span class="o">])</span><span class="k">:</span> <span class="kt">B</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="n">map</span><span class="o">).</span><span class="n">fold</span><span class="o">(</span><span class="n">monoid</span><span class="o">.</span><span class="n">e</span><span class="o">)(</span><span class="n">monoid</span><span class="o">.</span><span class="n">plus</span><span class="o">)</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// map-reduce parallelized over data partitions</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">apply</span><span class="o">(</span><span class="n">data</span><span class="k">:</span> <span class="kt">ParSeq</span><span class="o">[</span><span class="kt">Seq</span><span class="o">[</span><span class="kt">A</span><span class="o">]])</span><span class="k">:</span> <span class="kt">B</span> <span class="o">=</span>
+</span><span class='line'>    <span class="n">data</span><span class="o">.</span><span class="n">map</span> <span class="o">{</span> <span class="n">part</span> <span class="k">=&gt;</span>
+</span><span class='line'>      <span class="n">part</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="n">map</span><span class="o">).</span><span class="n">fold</span><span class="o">(</span><span class="n">monoid</span><span class="o">.</span><span class="n">e</span><span class="o">)(</span><span class="n">monoid</span><span class="o">.</span><span class="n">plus</span><span class="o">)</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>    <span class="o">.</span><span class="n">fold</span><span class="o">(</span><span class="n">monoid</span><span class="o">.</span><span class="n">e</span><span class="o">)(</span><span class="n">monoid</span><span class="o">.</span><span class="n">plus</span><span class="o">)</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>In the parallel version of map-reduce above, you can see that map and reduce are executed on each data partition (which may occur in parallel) to produce a monoidal <code>B</code> value, followed by a final reduction of those intermediate results.
+This is the classic form of map-reduce popularized by tools such as Hadoop and Apache Spark, where inidividual data partitions may reside across highly parallel commodity clusters.</p>
+
+<p>Next I will present an alternative definition of map-reduce.
+In this implementation, the <code>map</code> function is replaced by a <code>foldL</code> function, which executes a single &#8220;left-fold&#8221; of an input object with type <code>A</code> into the monoid object with type <code>B</code>:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="c1">// a map reduce operation based on a monoid with left folding</span>
+</span><span class='line'><span class="k">trait</span> <span class="nc">MapReduceLF</span><span class="o">[</span><span class="kt">A</span>, <span class="kt">B</span><span class="o">]</span> <span class="nc">extends</span> <span class="nc">MapReduce</span><span class="o">[</span><span class="kt">A</span>, <span class="kt">B</span><span class="o">]</span> <span class="o">{</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">monoid</span><span class="k">:</span> <span class="kt">Monoid</span><span class="o">[</span><span class="kt">B</span><span class="o">]</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// left-fold an object with type A into the monoid B</span>
+</span><span class='line'>  <span class="c1">// obeys type law: foldL(b, a) = b ++ foldL(e, a)</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">foldL</span><span class="k">:</span> <span class="o">(</span><span class="kt">B</span><span class="o">,</span> <span class="kt">A</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="n">B</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// foldL(e, a) embodies the role of map(a) in standard map-reduce</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">map</span> <span class="k">=</span> <span class="o">(</span><span class="n">a</span><span class="k">:</span> <span class="kt">A</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="n">foldL</span><span class="o">(</span><span class="n">monoid</span><span class="o">.</span><span class="n">e</span><span class="o">,</span> <span class="n">a</span><span class="o">)</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// map-reduce operation is now a single fold-left operation</span>
+</span><span class='line'>  <span class="k">override</span> <span class="k">def</span> <span class="n">apply</span><span class="o">(</span><span class="n">data</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">A</span><span class="o">])</span><span class="k">:</span> <span class="kt">B</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">monoid</span><span class="o">.</span><span class="n">e</span><span class="o">)(</span><span class="n">foldL</span><span class="o">)</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// map-reduce parallelized over data partitions</span>
+</span><span class='line'>  <span class="k">override</span> <span class="k">def</span> <span class="n">apply</span><span class="o">(</span><span class="n">data</span><span class="k">:</span> <span class="kt">ParSeq</span><span class="o">[</span><span class="kt">Seq</span><span class="o">[</span><span class="kt">A</span><span class="o">]])</span><span class="k">:</span> <span class="kt">B</span> <span class="o">=</span>
+</span><span class='line'>    <span class="n">data</span><span class="o">.</span><span class="n">map</span> <span class="o">{</span> <span class="n">part</span> <span class="k">=&gt;</span>
+</span><span class='line'>      <span class="n">part</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">monoid</span><span class="o">.</span><span class="n">e</span><span class="o">)(</span><span class="n">foldL</span><span class="o">)</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>    <span class="o">.</span><span class="n">fold</span><span class="o">(</span><span class="n">monoid</span><span class="o">.</span><span class="n">e</span><span class="o">)(</span><span class="n">monoid</span><span class="o">.</span><span class="n">plus</span><span class="o">)</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>As the comments above indicate, the left-folding function <code>foldL</code> is assumed to obey the law <code>foldL(b, a) = b ++ foldL(e, a)</code>.
+This law captures the idea that folding <code>a</code> into <code>b</code> should be the analog of reducing <code>b</code> with a monoid corresponding to the single element <code>a</code>.
+Referring to my earlier example, if type <code>A</code> is <code>Int</code> and <code>B</code> is <code>Set[Int]</code>, then <code>foldL(b, a) =&gt; b + a</code>.
+Note that <code>b + a</code> is directly inserting single element <code>a</code> into <code>b</code>, which is significantly more efficient than <code>b ++ Set(a)</code>, which is how a typical map-reduce implementation would be required to operate.</p>
+
+<p>This law also gives us the corresponding definition of <code>map(a)</code>, which is <code>foldL(e, a)</code>, or: <code>Set.empty[Int] ++ a</code> or just: <code>Set(a)</code></p>
+
+<p>In this formulation, the basic map-reduce operation is now a single <code>foldLeft</code> operation, instead of a mapping followed by a monoidal reduction.
+The parallel version is analoglous.
+Each partition uses the new <code>foldLeft</code> operation, and the final reduction of intermediate monoidal results remains the same as before.</p>
+
+<p>The <code>foldLeft</code> function is a potentially much more general operation, and it raises the question of whether this new encoding is indeed parallelizable as before.
+I will conclude with a proof that this encoding is also parallelizable;
+Note that the law <code>foldL(b, a) = b ++ foldL(e, a)</code> is a significant component of this proof, as it represents the constraint that <code>foldL</code> behaves like an analog of reducing <code>b</code> with a monoidal representation of element <code>a</code>.</p>
+
+<p>In the following proof I used a scala-like pseudo code, described in the introduction:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="c1">// given an object mr of type MapReduceFL[A, B]</span>
+</span><span class='line'><span class="c1">// and using notation:</span>
+</span><span class='line'><span class="c1">// f &lt;==&gt; mr.foldL</span>
+</span><span class='line'><span class="c1">// for b1,b2 of type B: b1 ++ b2 &lt;==&gt; mr.plus(b1, b2)</span>
+</span><span class='line'><span class="c1">// e &lt;==&gt; mr.e</span>
+</span><span class='line'><span class="c1">// [...] &lt;==&gt; Seq(...)</span>
+</span><span class='line'><span class="c1">// d1, d2 are of type Seq[A]</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// Proof that map-reduce with left-folding is parallelizable</span>
+</span><span class='line'><span class="c1">// i.e. mr(d1 ++ d2) == mr(d1) ++ mr(d2)</span>
+</span><span class='line'><span class="n">mr</span><span class="o">(</span><span class="n">d1</span> <span class="o">++</span> <span class="n">d2</span><span class="o">)</span>
+</span><span class='line'><span class="o">==</span> <span class="o">(</span><span class="n">d1</span> <span class="o">++</span> <span class="n">d2</span><span class="o">).</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>  <span class="c1">// definition of map-reduce operation</span>
+</span><span class='line'><span class="o">==</span> <span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="n">d2</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>  <span class="c1">// Lemma A</span>
+</span><span class='line'><span class="o">==</span> <span class="n">mr</span><span class="o">(</span><span class="n">d1</span><span class="o">)</span> <span class="o">++</span> <span class="n">mr</span><span class="o">(</span><span class="n">d2</span><span class="o">)</span>  <span class="c1">// definition of map-reduce (QED)</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// Proof of Lemma A</span>
+</span><span class='line'><span class="c1">// i.e. (d1 ++ d2).foldLeft(e)(f) == d1.foldLeft(e)(f) ++ d2.foldLeft(e)(f)</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// proof is by induction on the length of data sequence d2</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// case d2 where length is zero, i.e. d2 == []</span>
+</span><span class='line'><span class="o">(</span><span class="n">d1</span> <span class="o">++</span> <span class="o">[]).</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>
+</span><span class='line'><span class="o">==</span> <span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>  <span class="c1">// definition of empty sequence []</span>
+</span><span class='line'><span class="o">==</span> <span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="n">e</span>  <span class="c1">// definition of identity e</span>
+</span><span class='line'><span class="o">==</span> <span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="o">[].</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>  <span class="c1">// definition of foldLeft</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// case d2 where length is 1, i.e. d2 == [a] for some a of type A</span>
+</span><span class='line'><span class="o">(</span><span class="n">d1</span> <span class="o">++</span> <span class="o">[</span><span class="kt">a</span><span class="o">]).</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>
+</span><span class='line'><span class="o">==</span> <span class="n">f</span><span class="o">(</span><span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">),</span> <span class="n">a</span><span class="o">)</span>  <span class="c1">// definition of foldLeft and f</span>
+</span><span class='line'><span class="o">==</span> <span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="n">f</span><span class="o">(</span><span class="n">e</span><span class="o">,</span> <span class="n">a</span><span class="o">)</span>  <span class="c1">// the type-law f(b, a) == b ++ f(e, a)</span>
+</span><span class='line'><span class="o">==</span> <span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="o">[</span><span class="kt">a</span><span class="o">].</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>  <span class="c1">// definition of foldLeft</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// inductive step, assuming proof for d2&#39; of length &lt;= n</span>
+</span><span class='line'><span class="c1">// consider d2 of length n+1, i.e. d2 == d2&#39; ++ [a], where d2&#39; has length n</span>
+</span><span class='line'><span class="o">(</span><span class="n">d1</span> <span class="o">++</span> <span class="n">d2</span><span class="o">).</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>
+</span><span class='line'><span class="o">==</span> <span class="o">(</span><span class="n">d1</span> <span class="o">++</span> <span class="n">d2</span><span class="err">&#39;</span> <span class="o">++</span> <span class="o">[</span><span class="kt">a</span><span class="o">]).</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>  <span class="c1">// definition of d2, d2&#39;, [a]</span>
+</span><span class='line'><span class="o">==</span> <span class="n">f</span><span class="o">((</span><span class="n">d1</span> <span class="o">++</span> <span class="n">d2</span><span class="err">&#39;</span><span class="o">).</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">),</span> <span class="n">a</span><span class="o">)</span>  <span class="c1">// definition of foldLeft and f</span>
+</span><span class='line'><span class="o">==</span> <span class="o">(</span><span class="n">d1</span> <span class="o">++</span> <span class="n">d2</span><span class="err">&#39;</span><span class="o">).</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="n">f</span><span class="o">(</span><span class="n">e</span><span class="o">,</span> <span class="n">a</span><span class="o">)</span>  <span class="c1">// type-law f(b, a) == b ++ f(e, a)</span>
+</span><span class='line'><span class="o">==</span> <span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="n">d2</span><span class="err">&#39;</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="n">f</span><span class="o">(</span><span class="n">e</span><span class="o">,</span> <span class="n">a</span><span class="o">)</span>  <span class="c1">// induction</span>
+</span><span class='line'><span class="o">==</span> <span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="n">d2</span><span class="err">&#39;</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="o">[</span><span class="kt">a</span><span class="o">].</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>  <span class="c1">// def&#39;n of foldLeft</span>
+</span><span class='line'><span class="o">==</span> <span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="o">(</span><span class="n">d2</span><span class="err">&#39;</span> <span class="o">++</span> <span class="o">[</span><span class="kt">a</span><span class="o">]).</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>  <span class="c1">// induction</span>
+</span><span class='line'><span class="o">==</span> <span class="n">d1</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span> <span class="o">++</span> <span class="n">d2</span><span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="n">e</span><span class="o">)(</span><span class="n">f</span><span class="o">)</span>  <span class="c1">// definition of d2 (QED)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Supporting Competing APIs in Scala -- Can Better Package Factoring Help?]]></title>
@@ -3115,179 +3344,6 @@ sample(data: sequence, p: real) {
 
 
 <p>As with the results for sampling without replacement, we see that gap sampling cost is linear with (p), which yields large cost savings at small sampling, but begins to exceed traditional linear sampling at higher sampling probabilities.</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[The Scala Iterator 'drop' Method Generates a Matryoshka Class Nesting]]></title>
-    <link href="http://erikerlandson.github.com/blog/2014/09/03/matryoshka-class-construction-from-the-scala-iterator-drop-method/"/>
-    <updated>2014-09-03T17:23:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2014/09/03/matryoshka-class-construction-from-the-scala-iterator-drop-method</id>
-    <content type="html"><![CDATA[<p>The Scala Iterator <code>drop</code> method has a complexity bug that shows up when one calls <code>drop</code> repeatedly, for example when traversing over an iterator in a loop.</p>
-
-<p>The nature of the problem is that <code>drop</code>, under the hood, invokes <code>slice</code>, which returns a new anonymous subclass of <code>AbstractIterator</code> containing an instance of the input class, which can be seen in this <a href="https://github.com/erikerlandson/scala/blob/scala_drop_blog/src/library/scala/collection/Iterator.scala#L323">code excerpt from Iterator.scala</a>:</p>
-
-<pre><code>def drop(n: Int): Iterator[A] = slice(n, Int.MaxValue)
-
-// ... comments excised ...
-
-def slice(from: Int, until: Int): Iterator[A] = {
-  val lo = from max 0
-  var toDrop = lo
-  while (toDrop &gt; 0 &amp;&amp; self.hasNext) {
-    self.next()
-    toDrop -= 1
-  }
-
-  // I am a ticking quadratic time bomb:
-  new AbstractIterator[A] {
-    private var remaining = until - lo
-    def hasNext = remaining &gt; 0 &amp;&amp; self.hasNext
-    def next(): A =
-      if (remaining &gt; 0) {
-        remaining -= 1
-        self.next()
-      }
-      else empty.next()
-  }
-}
-</code></pre>
-
-<p>In the case where one is only calling <code>drop</code> once, this is not very consequential, but when the same method is used in a loop, the nesting is repeated, generating a nesting of anonymous classes that is ever-deeper &#8211; rather like Matryoshka dolls:</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/matryoshka.jpg" width="400"></p>
-
-<p>This can be a substantial problem, as it generates quadratic complexity in what is logically a linear operation.  A simple example of looping code that can cause this nesting:</p>
-
-<pre><code>def process_nth_elements[T](itr: Iterator[T], n: Int = 1) {
-  var iter = itr
-  while (iter.hasNext) {
-    val nxt = iter.next
-    // ... process next element ...
-
-    // skip to next element
-    iter = iter.drop(n-1)
-    // this becomes more and more expensive as iterator classes
-    // become nested deeper
-  }
-}
-</code></pre>
-
-<p>A simple example program, which can be <a href="https://gist.github.com/erikerlandson/a310ccd3c58a85f031dc">found here</a>, demonstrates this nesting directly:</p>
-
-<pre><code>import java.io.{StringWriter, PrintWriter}
-import scala.reflect.ClassTag
-
-def tracehead(e: Exception, substr: String = "slice"): String = {
-  val sw = new StringWriter()
-  e.printStackTrace(new PrintWriter(sw))
-  sw.toString.split('\n').takeWhile((s:String)=&gt; !s.contains(substr)).drop(1).mkString("\n")  
-}
-
-class TestIterator[T: ClassTag](val iter: Iterator[T]) extends Iterator[T] {
-  override def hasNext = iter.hasNext
-  override def next = {
-    println(tracehead(new Exception))
-    iter.next
-  }
-}
-
-def drop_test[T](itr: Iterator[T]) {
-  var n = 0
-  var iter = itr
-  while (iter.hasNext) {
-    n += 1
-    println(s"\ndrop # $n")
-    iter = iter.drop(1)
-  }
-}
-</code></pre>
-
-<p>When the <code>drop_test</code> function is run on an instance of <code>TestIterator</code>, the stack trace output shows the Matryoshka nesting directly:</p>
-
-<pre><code>scala&gt; drop_test(new TestIterator(List(1,2,3,4,5).iterator))
-
-drop # 1
-    at $line18.$read$$iw$$iw$$iw$$iw$TestIterator.next(&lt;console&gt;:19)
-
-drop # 2
-    at $line18.$read$$iw$$iw$$iw$$iw$TestIterator.next(&lt;console&gt;:19)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-
-drop # 3
-    at $line18.$read$$iw$$iw$$iw$$iw$TestIterator.next(&lt;console&gt;:19)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-
-drop # 4
-    at $line18.$read$$iw$$iw$$iw$$iw$TestIterator.next(&lt;console&gt;:19)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-
-drop # 5
-    at $line18.$read$$iw$$iw$$iw$$iw$TestIterator.next(&lt;console&gt;:19)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-</code></pre>
-
-<p>One would expect this quadratic behavior to show up in benchmarking, and it does.  Consider this simple timing test:</p>
-
-<pre><code>def drop_time[T](itr: Iterator[T]) {
-  val t0 = System.currentTimeMillis()
-  var iter = itr
-  while (iter.hasNext) {
-    iter = iter.drop(1)
-  }
-  println(s"Time: ${System.currentTimeMillis() - t0}")
-}
-</code></pre>
-
-<p>One would expect this function to be linear in the length of the iterator, but we see the following behavior:</p>
-
-<pre><code>scala&gt; drop_time((1 to 5000 * 1).toList.iterator)
-Time: 106
-
-scala&gt; drop_time((1 to 5000 * 2).toList.iterator)
-Time: 475
-
-scala&gt; drop_time((1 to 5000 * 3).toList.iterator)
-Time: 1108
-
-scala&gt; drop_time((1 to 5000 * 4).toList.iterator)
-Time: 2037
-
-scala&gt; drop_time((1 to 5000 * 5).toList.iterator)
-Time: 3234
-
-scala&gt; drop_time((1 to 5000 * 6).toList.iterator)
-Time: 4717
-
-scala&gt; drop_time((1 to 5000 * 7).toList.iterator)
-Time: 6447
-
-scala&gt; drop_time((1 to 5000 * 8).toList.iterator)
-java.lang.StackOverflowError
-    at scala.collection.Iterator$$anon$10.next(Iterator.scala:312)
-</code></pre>
-
-<p>The corresponding plot shows the quadratic cost:</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/matryoshka_quadratic_plot.png" alt="&quot;image&quot;" /></p>
-
-<p>Given the official semantics of <code>drop</code>, which state that the method invalidates the iterator it was called on, this nesting problem should be avoidable by implementing the method more like this:</p>
-
-<pre><code>def drop(n: Int): Iterator[A] = {
-  var j = 0
-  while (j &lt; n) {
-    this.next
-    j += 1
-  }
-  this
-}
-</code></pre>
 ]]></content>
   </entry>
   
