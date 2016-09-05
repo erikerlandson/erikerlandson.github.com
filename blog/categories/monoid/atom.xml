@@ -4,7 +4,7 @@
   <title><![CDATA[Category: monoid | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/monoid/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2016-09-05T10:32:01-07:00</updated>
+  <updated>2016-09-05T16:00:57-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -18,7 +18,7 @@
     <link href="http://erikerlandson.github.com/blog/2016/09/05/expressing-map-reduce-as-a-left-folding-monoid/"/>
     <updated>2016-09-05T10:31:00-07:00</updated>
     <id>http://erikerlandson.github.com/blog/2016/09/05/expressing-map-reduce-as-a-left-folding-monoid</id>
-    <content type="html"><![CDATA[<p>In a <a href="http://erikerlandson.github.io/blog/2015/11/24/the-prepare-operation-considered-harmful-in-algebird/">previous post</a> I discussed some scenarios where traditional map-reduce -- directly applying a map function, followed by some monoidal reduction -- could be inefficient.
+    <content type="html"><![CDATA[<p>In a <a href="http://erikerlandson.github.io/blog/2015/11/24/the-prepare-operation-considered-harmful-in-algebird/">previous post</a> I discussed some scenarios where traditional map-reduce (directly applying a map function, followed by some monoidal reduction) could be inefficient.
 To review, the source of inefficiency is in situations where the <code>map</code> operation is creating some non-trivial monoid that represents a single element of the input type.
 For example, if the monoidal type is <code>Set[Int]</code>, then the mapping function ('prepare' in algebird) maps every input integer <code>k</code> into <code>Set(k)</code>, which is somewhat expensive.</p>
 
@@ -101,13 +101,13 @@ This law captures the idea that folding <code>a</code> into <code>b</code> shoul
 Referring to my earlier example, if type <code>A</code> is <code>Int</code> and <code>B</code> is <code>Set[Int]</code>, then <code>foldL(b, a) =&gt; b + a</code>.
 Note that <code>b + a</code> is directly inserting single element <code>a</code> into <code>b</code>, which is significantly more efficient than <code>b ++ Set(a)</code>, which is how a typical map-reduce implementation would be required to operate.</p>
 
-<p>This law also gives us the corresponding definition of <code>map(a)</code>, which is <code>foldL(e, a)</code>, or: <code>Set.empty[Int] ++ a</code> or just: <code>Set(a)</code></p>
+<p>This law also gives us the corresponding definition of <code>map(a)</code>, which is <code>foldL(e, a)</code>, or in mhy example: <code>Set.empty[Int] ++ a</code> or just: <code>Set(a)</code></p>
 
 <p>In this formulation, the basic map-reduce operation is now a single <code>foldLeft</code> operation, instead of a mapping followed by a monoidal reduction.
 The parallel version is analoglous.
 Each partition uses the new <code>foldLeft</code> operation, and the final reduction of intermediate monoidal results remains the same as before.</p>
 
-<p>The <code>foldLeft</code> function is a potentially much more general operation, and it raises the question of whether this new encoding is indeed parallelizable as before.
+<p>The <code>foldLeft</code> function is potentially a much more general operation, and it raises the question of whether this new encoding is indeed parallelizable as before.
 I will conclude with a proof that this encoding is also parallelizable;
 Note that the law <code>foldL(b, a) = b ++ foldL(e, a)</code> is a significant component of this proof, as it represents the constraint that <code>foldL</code> behaves like an analog of reducing <code>b</code> with a monoidal representation of element <code>a</code>.</p>
 
