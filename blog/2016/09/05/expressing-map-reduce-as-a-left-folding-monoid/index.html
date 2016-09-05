@@ -220,7 +220,7 @@ This law captures the idea that folding <code>a</code> into <code>b</code> shoul
 Referring to my earlier example, if type <code>A</code> is <code>Int</code> and <code>B</code> is <code>Set[Int]</code>, then <code>foldL(b, a) =&gt; b + a</code>.
 Note that <code>b + a</code> is directly inserting single element <code>a</code> into <code>b</code>, which is significantly more efficient than <code>b ++ Set(a)</code>, which is how a typical map-reduce implementation would be required to operate.</p>
 
-<p>This law also gives us the corresponding definition of <code>map(a)</code>, which is <code>foldL(e, a)</code>, or in mhy example: <code>Set.empty[Int] ++ a</code> or just: <code>Set(a)</code></p>
+<p>This law also gives us the corresponding definition of <code>map(a)</code>, which is <code>foldL(e, a)</code>, or in my example: <code>Set.empty[Int] ++ a</code> or just: <code>Set(a)</code></p>
 
 <p>In this formulation, the basic map-reduce operation is now a single <code>foldLeft</code> operation, instead of a mapping followed by a monoidal reduction.
 The parallel version is analoglous.
