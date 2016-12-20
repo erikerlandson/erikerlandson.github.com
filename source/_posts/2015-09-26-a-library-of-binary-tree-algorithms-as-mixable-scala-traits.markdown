@@ -7,7 +7,7 @@ categories: [ computing, scala, binary tree, algorithms, prefix sum, nearest ent
 ---
 In this post I am going to describe some work I've done recently on a system of Scala traits that support tree-based collection algorithms prefix-sum, nearest key query and value increment in a mixable format, all backed by Red-Black balanced tree logic, which is also a fully inheritable trait.
 
-> (update) Since I wrote this post, the code has evolved into a [PR against the algebird project](https://github.com/twitter/algebird/pull/496). The original source files, containing the exact code fragments discussed in the remainder of this post, are preserved for posterity [here](https://github.com/erikerlandson/silex/tree/blog/rbtraits/src/main/scala/com/redhat/et/silex/maps).
+> (update) Since I wrote this post, the code has evolved into a [library on the isarn project](https://github.com/isarn/isarn-collections). The original source files, containing the exact code fragments discussed in the remainder of this post, are preserved for posterity [here](https://github.com/erikerlandson/silex/tree/blog/rbtraits/src/main/scala/com/redhat/et/silex/maps).
 
 This post eventually became a bit more sprawling and "tl/dr" than I was expecting, so by way of apology, here is a table of contents with links:
 
