@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="HTCondor supports a notion of aggregate compute resources known as partitionable slots (p-slots), which may be consumed by multiple jobs. &hellip;">
+  <meta name="description" content="I&#8217;ve been considering models for the effects of HTCondor negotiation cycle cadence on pool loading and accounting group starvation, which led &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,51 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2013/01/02/the-mean-of-the-modulus-does-not-equal-the-modulus-of-the-mean/">The Mean of the Modulus Does Not Equal the Modulus of the Mean</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2013-01-02T08:55:00-07:00" pubdate data-updated="true">Jan 2<span>nd</span>, 2013</time>
+        
+        
+         | <a href="/blog/2013/01/02/the-mean-of-the-modulus-does-not-equal-the-modulus-of-the-mean/#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>I&#8217;ve been considering models for the effects of HTCondor negotiation cycle cadence on pool loading and accounting group starvation, which led me to thinking about the effects of taking the modulus of a random variable, for reasons I plan to discuss in future posts.</p>
+
+<p>When you take the modulus of a random variable, X, the corresponding expected value E[X mod m] is not equal to E[X] mod m.  Consider the following example:</p>
+
+<p><img src="/assets/images/rv_modulus_mean.png" title="An example demonstrating that E[X mod m] != E[X] mod m" alt="Random Variable Images" /></p>
+
+<p>As we see from the example above, the random variables X and Y have the same mean:  E[X] = E[Y] = 0.75, however E[X mod 1] = 0.75 while E[Y mod 1] = 0.5.  One implication is that computing the moments of the modulus of random variables must be on a per-distribution basis, perhaps via monte carlo methods.</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1153,172 +1198,6 @@ $ ps -eo "%p %C %n %a" | grep 'burn 600'
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/07/19/lifo-and-fifo-preemption-policies-for-a-condor-pool/">LIFO and FIFO Preemption Policies for a Condor Pool</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-07-19T13:57:00-07:00" pubdate data-updated="true">Jul 19<span>th</span>, 2012</time>
-        
-        
-         | <a href="/blog/2012/07/19/lifo-and-fifo-preemption-policies-for-a-condor-pool/#feedback">Feedback</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>On a Condor pool, a Last In First Out (LIFO) preemption policy favors choosing the longest-running job from the available preemption options.  Correspondingly, a First In First Out (FIFO) policy favors the most-recent job for preemption.</p>
-
-<p>Configuring a LIFO or FIFO policy is easy, using the <code>PREEMPTION_RANK</code> configuration variable.  <code>PREEMPTION_RANK</code> defines a ClassAd expression that is evaluated for all slots that are candidates for claim preemption, and causes those candidates to be sorted so that the candidates with the highest rank value are considered first.   Therefore, to implement a LIFO (or FIFO) preemption policy, one needs reference an expression that represents the claiming job&#8217;s running time:</p>
-
-<pre><code># LIFO preemption: favor preempting jobs that have been running the longest
-PREEMPTION_RANK = TotalJobRunTime
-# turn this into FIFO by using (-TotalJobRunTime)
-</code></pre>
-
-<p>The attribute <code>TotalJobRunTime</code> represents the amount of time a job has been running on its claim (generally, this is effectively equivalent to total running time, unless your job supports some form of checkpointing), and so ranking preemption candidates by this attribute results in LIFO preemption, and ranking by its negative provides FIFO preemption.</p>
-
-<p>Note that <code>PREEMPTION_RANK</code> applies <em>only</em> to candidates that have already met the requirements defined on <code>PREEMPTION_REQUIREMENTS</code>, or the slot-centric preemption policy defined by <code>RANK</code>.  <code>PREEMPTION_RANK</code> does not itself determine what claimed slots are considered by a job for preemption.</p>
-
-<p>To demonstrate LIFO and FIFO preemption in action, consider the following configuration:</p>
-
-<pre><code># turn off scheduler optimizations, as they can sometimes obscure the
-# negotiator/matchmaker behavior
-CLAIM_WORKLIFE = 0
-CLAIM_PARTITIONABLE_LEFTOVERS = False
-
-# reduce update latencies for faster testing response
-UPDATE_INTERVAL = 15
-NEGOTIATOR_INTERVAL = 20
-SCHEDD_INTERVAL = 15
-
-# for demonstration purposes, make sure basic preemption knobs are 'on'
-MAXJOBRETIREMENTTIME = 0
-PREEMPTION_REQUIREMENTS = True
-NEGOTIATOR_CONSIDER_PREEMPTION = True
-RANK = 0.0
-
-# LIFO preemption: favor preempting jobs that have been running the longest
-PREEMPTION_RANK = TotalJobRunTime
-# turn this into FIFO by using (-TotalJobRunTime)
-
-# define 3 cpus to provide fodder for preemption
-NUM_CPUS = 3
-</code></pre>
-
-<p>Begin by spinning up a condor pool with the configuration above.  When the pool is operating, fill the three slots with jobs for &#8216;user1&#8217;, with a delay to ensure that jobs have easily distinguishable values for <code>TotalJobRunTime</code>:</p>
-
-<pre><code>$ cat /tmp/user1.jsub 
-universe = vanilla
-cmd = /bin/sleep
-args = 600
-should_transfer_files = if_needed
-when_to_transfer_output = on_exit
-+AccountingGroup="user1"
-queue 1
-
-$ condor_submit /tmp/user1.jsub ; sleep 30 ; condor_submit /tmp/user1.jsub ; sleep 30 ; condor_submit /tmp/user1.jsub
-</code></pre>
-
-<p>Once these jobs have all started running, verify their run times using <a href="http://erikerlandson.github.com/blog/2012/06/29/easy-histograms-and-tables-from-condor-jobs-and-slots/">ccsort</a>:</p>
-
-<pre><code>$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
-1.0 | 78 | user1@localdomain
-2.0 | 36 | user1@localdomain
-3.0 | 16 | user1@localdomain
-</code></pre>
-
-<p>to make preemption easy, give user1 a low priority:</p>
-
-<pre><code>$ condor_userprio -setprio user1@localdomain 10
-</code></pre>
-
-<p>Now, we will submit some jobs for &#8216;user2&#8217;: which will be allowed to preempt jobs for &#8216;user1&#8217;.  We should see that the longest-running job for user1 is chosen each time:</p>
-
-<pre><code>$ condor_submit /tmp/user2.jsub
-Submitting job(s).
-1 job(s) submitted to cluster 4.
-
-$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
-2.0 | 81 | user1@localdomain
-3.0 | 61 | user1@localdomain
-4.0 | 2 | user2@localdomain
-
-$ condor_submit /tmp/user2.jsub
-Submitting job(s).
-1 job(s) submitted to cluster 5.
-
-$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
-3.0 | 91 | user1@localdomain
-4.0 | 32 | user2@localdomain
-5.0 | 3 | user2@localdomain
-</code></pre>
-
-<p>Now we change LIFO to FIFO and demonstrate.  Switch the sign of <code>TotalJobRunTime</code>:</p>
-
-<pre><code># Now I am FIFO!
-PREEMPTION_RANK = -TotalJobRunTime
-</code></pre>
-
-<p>And restart the negotiator, and check on our currently running jobs:</p>
-
-<pre><code>$ condor_restart -negotiator
-
-$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
-3.0 | 151 | user1@localdomain
-4.0 | 92 | user2@localdomain
-5.0 | 49 | user2@localdomain
-</code></pre>
-
-<p>Now, set up &#8216;user2&#8217; for easy preemption like user1:</p>
-
-<pre><code>$ condor_userprio -setprio user2@localdomain 10
-</code></pre>
-
-<p>And submit some jobs for user3.  Since we reconfigured for FIFO preemption, we should now see the <em>most recent</em> job preempted each time (in this case, these should both be the &#8216;user2&#8217; jobs):</p>
-
-<pre><code>$ condor_submit /tmp/user3.jsub
-Submitting job(s).
-1 job(s) submitted to cluster 6.
-
-$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
-3.0 | 241 | user1@localdomain
-4.0 | 182 | user2@localdomain
-6.0 | 15 | user3@localdomain
-
-$ condor_submit /tmp/user3.jsub
-Submitting job(s).
-1 job(s) submitted to cluster 7.
-
-$ ccsort condor_status JobID TotalJobRunTime AccountingGroup
-3.0 | 301 | user1@localdomain
-6.0 | 75 | user3@localdomain
-7.0 | 17 | user3@localdomain
-</code></pre>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/5/">&larr; Older</a>
@@ -1340,6 +1219,10 @@ $ ccsort condor_status JobID TotalJobRunTime AccountingGroup
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2016/12/19/converging-monoid-addition-for-t-digest/">Converging Monoid Addition for T-Digest</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2016/09/05/expressing-map-reduce-as-a-left-folding-monoid/">Encoding Map-Reduce As A Monoid With Left Folding</a>
       </li>
     
@@ -1353,10 +1236,6 @@ $ ccsort condor_status JobID TotalJobRunTime AccountingGroup
     
       <li class="post">
         <a href="/blog/2016/07/09/approximating-a-pdf-of-distances-with-a-gamma-distribution/">Approximating a PDF of Distances With a Gamma Distribution</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2016/06/15/computing-derivatives-of-the-gamma-function/">Computing Derivatives of the Gamma Function</a>
       </li>
     
   </ul>

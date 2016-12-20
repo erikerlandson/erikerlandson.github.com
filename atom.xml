@@ -4,7 +4,7 @@
   <title><![CDATA[tool monkey]]></title>
   <link href="http://erikerlandson.github.com/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2016-12-05T19:31:09-07:00</updated>
+  <updated>2016-12-20T07:54:37-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,110 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Converging Monoid Addition for T-Digest]]></title>
+    <link href="http://erikerlandson.github.com/blog/2016/12/19/converging-monoid-addition-for-t-digest/"/>
+    <updated>2016-12-19T13:29:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2016/12/19/converging-monoid-addition-for-t-digest</id>
+    <content type="html"><![CDATA[<blockquote><p>In the days when Sussman was a novice,
+Minsky once came to him as he sat hacking at the PDP-6.
+&#8220;What are you doing?&#8221;, asked Minsky.
+&#8220;I am training a randomly wired neural net to play Tic-tac-toe&#8221;, Sussman replied.
+&#8220;Why is the net wired randomly?&#8221;, asked Minsky.
+&#8220;I do not want it to have any preconceptions of how to play&#8221;, Sussman said.
+Minsky then shut his eyes.
+&#8220;Why do you close your eyes?&#8221; Sussman asked his teacher.
+&#8220;So that the room will be empty.&#8221;
+At that moment, Sussman was enlightened.</p></blockquote>
+
+<p>Recently I&#8217;ve been doing some work with the <a href="https://github.com/isarn/isarn-sketches">t-digest sketching</a> algorithm, from the
+<a href="https://github.com/tdunning/t-digest/blob/master/docs/t-digest-paper/histo.pdf">paper by Ted Dunning and Omar Ertl</a>.
+One of the appealing properties of t-digest sketches is that you can &#8220;add&#8221; them together in the monoid sense to produce a combined sketch from two separate sketches.
+This property is crucial for sketching data across data partitions in scale-out parallel computing platforms such as Apache Spark or Map-Reduce.</p>
+
+<p>In the original Dunning/Ertl paper, they describe an algorithm for monoidal combination of t-digests based on randomized cluster recombination.  The clusters of the two input sketches are collected together, then randomly shuffled, and inserted into a new t-digest in that randomized order.  In Scala code, this algorithm might look like the following:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">def</span> <span class="n">combine</span><span class="o">(</span><span class="n">ltd</span><span class="k">:</span> <span class="kt">TDigest</span><span class="o">,</span> <span class="n">rtd</span><span class="k">:</span> <span class="kt">TDigest</span><span class="o">)</span><span class="k">:</span> <span class="kt">TDigest</span> <span class="o">=</span> <span class="o">{</span>
+</span><span class='line'>  <span class="c1">// randomly shuffle input clusters and re-insert to a new t-digest</span>
+</span><span class='line'>  <span class="n">shuffle</span><span class="o">(</span><span class="n">ltd</span><span class="o">.</span><span class="n">clusters</span><span class="o">.</span><span class="n">toVector</span> <span class="o">++</span> <span class="n">rtd</span><span class="o">.</span><span class="n">clusters</span><span class="o">.</span><span class="n">toVector</span><span class="o">)</span>
+</span><span class='line'>    <span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="nc">TDigest</span><span class="o">.</span><span class="n">empty</span><span class="o">)((</span><span class="n">d</span><span class="o">,</span> <span class="n">e</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="n">d</span> <span class="o">+</span> <span class="n">e</span><span class="o">)</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>I implemented this algorithm and used it until I noticed that a sum over multiple sketches seemed to behave noticeably differently than either the individual inputs, or the nominal underlying distribution.</p>
+
+<p>To get a closer look at what was going on, I generated some random samples from a Normal distribution ~N(0,1).
+I then generated t-digest sketches of each sample, took a cumulative monoid sum, and kept track of how closely each successive sum adhered to the original ~N(0,1) distribution.
+As a measure of the difference between a t-digest sketch and the original distribution, I computed the Kolmogorov-Smirnov <a href="https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test#Kolmogorov.E2.80.93Smirnov_statistic">D-statistic</a>, which yields a distance between two cumulative distribution functions.
+(Code for my data collections can be viewed <a href="https://github.com/erikerlandson/isarn-sketches-algebird-api/blob/blog/t_digest_sum/src/main/scala/org/isarnproject/sketchesAlgebirdAPI/AlgebirdFactory.scala#L65">here</a>)
+I ran multiple data collections and subsequent cumulative sums and used those multiple measurements to generate the following box-plot.
+The result was surprising and a bit disturbing:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/tdsum/plot1.png" alt="plot1" /></p>
+
+<p>As the plot shows, the t-digest sketch distributions are gradually <em>diverging</em> from the underlying &#8220;true&#8221; distribution ~N(0,1).
+This is a potentially significant problem for the stability of monoidal t-digest sums, and by extension any parallel sketching based on combining the partial sketches on data partitions in map-reduce-like environments.</p>
+
+<p>Seeing this divergence motivated me to think about ways to avoid it.
+One property of t-digest insertion logic is that the results of inserting new data can differ depending on what clusters are already present.
+I wondered if the results might be more stable if the largest clusters were inserted first.
+The t-digest algorithm allows clusters closest to the distribution median to grow the largest.
+Combining input clusters from largest to smallest would be like building the combined distribution from the middle outwards, toward the distribution tails.
+In the case where one t-digest had larger weights, it would also somewhat approximate inserting the smaller sketch into the larger one.
+In Scala code, this alternative monoid addition looks like so:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">def</span> <span class="n">combine</span><span class="o">(</span><span class="n">ltd</span><span class="k">:</span> <span class="kt">TDigest</span><span class="o">,</span> <span class="n">rtd</span><span class="k">:</span> <span class="kt">TDigest</span><span class="o">)</span><span class="k">:</span> <span class="kt">TDigest</span> <span class="o">=</span> <span class="o">{</span>
+</span><span class='line'>  <span class="c1">// insert clusters from largest to smallest</span>
+</span><span class='line'>  <span class="o">(</span><span class="n">ltd</span><span class="o">.</span><span class="n">clusters</span><span class="o">.</span><span class="n">toVector</span> <span class="o">++</span> <span class="n">rtd</span><span class="o">.</span><span class="n">clusters</span><span class="o">.</span><span class="n">toVector</span><span class="o">).</span><span class="n">sortWith</span><span class="o">((</span><span class="n">a</span><span class="o">,</span> <span class="n">b</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="n">a</span><span class="o">.</span><span class="n">_2</span> <span class="o">&gt;</span> <span class="n">b</span><span class="o">.</span><span class="n">_2</span><span class="o">)</span>
+</span><span class='line'>    <span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="nc">TDigest</span><span class="o">.</span><span class="n">empty</span><span class="o">(</span><span class="n">delta</span><span class="o">))((</span><span class="n">d</span><span class="o">,</span> <span class="n">e</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="n">d</span> <span class="o">+</span> <span class="n">e</span><span class="o">)</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>As a second experiment, for each data sampling I compared the original monoid addition with the alternative method using largest-to-smallest cluster insertion.
+When I plotted the resulting progression of D-statistics side-by-side, the results were surprising:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/tdsum/plot2a.png" alt="plot2a" /></p>
+
+<p>As the plot demonstrates, not only was large-to-small insertion more stable, its D-statistics appeared to be getting <em>smaller</em> instead of larger.
+To see if this trend was sustained over longer cumulative sums, I plotted the D-stats for cumulative sums over 100 samples:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/tdsum/plot2.png" alt="plot2" /></p>
+
+<p>The results were even more dramatic;
+These longer sums show that the standard randomized-insertion method continues to diverge,
+but in the case of large-to-small insertion the cumulative t-digest sums continue to converge
+towards the underlying distribution!</p>
+
+<p>To test whether this effect might be dependent on particular shapes of distribution, I ran similar experiments using a Uniform distribution (no &#8220;tails&#8221;) and an Exponential distribution (one tail).
+I included the corresponding plots in the appendix.
+The convergence of this alternative monoid addition doesn&#8217;t seem to be sensitive to shape of distribution.</p>
+
+<p>I have upgraded my <a href="https://github.com/isarn/isarn-sketches#t-digest">implementation of t-digest sketching</a> to use this new definition of monoid addition for t-digests.
+As you can see, it is easy to change one implementation for another.
+One or two lines of code may be sufficient.
+I hope this idea may be useful for any other implementations in the community.
+Happy sketching!</p>
+
+<h3>Appendix: Plots with Alternate Distributions</h3>
+
+<p><img src="http://erikerlandson.github.com/assets/images/tdsum/plot3.png" alt="plot3" /></p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/tdsum/plot4.png" alt="plot4" /></p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Encoding Map-Reduce As A Monoid With Left Folding]]></title>
@@ -3154,196 +3258,6 @@ result= List((1,a), (1,b), (1,c), (3,a), (3,b), (3,c), (5,a), (5,b))
 <h5>References</h5>
 
 <p><a name="ref1name" id="ref1">[1] </a><em><a href="http://www.manning.com/bjarnason/">Functional Programming in Scala</a></em>, Paul Chiusano and Runar Bjarnason, (section 6.6)</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Faster Random Samples With Gap Sampling]]></title>
-    <link href="http://erikerlandson.github.com/blog/2014/09/11/faster-random-samples-with-gap-sampling/"/>
-    <updated>2014-09-11T07:57:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2014/09/11/faster-random-samples-with-gap-sampling</id>
-    <content type="html"><![CDATA[<blockquote><p>Update (April 4, 2016): my colleague <a href="http://rnowling.github.io/">RJ Nowling</a> ran across a <a href="http://www.ittc.ku.edu/~jsv/Papers/Vit87.RandomSampling.pdf">paper by J.S. Vitter</a> that shows Vitter developed the trick of accelerating sampling with a sampling-gap distribution in 1987 &#8211; I re-invented Vitter&#8217;s wheel 30 years after the fact!  I&#8217;m surprised it never caught on, as it is not much harder to implement than the naive version.</p></blockquote>
-
-<p>Generating a random sample of a collection is, logically, a O(np) operation, where (n) is the sample size and (p) is the sampling probability.  For example, extracting a random sample, without replacement, from an array might look like this in pseudocode:</p>
-
-<pre><code>sample(data: array, p: real) {
-    n = length(data)
-    m = floor(p * n)
-    for j = 0 to m-1 {
-        k = random(j, n-1)
-        swap(data[j], data[k])
-    }
-    emit the first m elements of 'data' to output
-}
-</code></pre>
-
-<p>We can see that this sampling algorithm is indeed O(np).  However, it makes some nontrivial assumptions about its input data:</p>
-
-<ul>
-<li>It is random access</li>
-<li>It is writable</li>
-<li>Its size is known</li>
-<li>It can be destructively modified</li>
-</ul>
-
-
-<p>These assumptions can be violated in several ways.  The input data might not support random access, for example it might be a list, or stream, or an iterator over the same.  We might not know its size a priori.  It might be read-only.  It might be up-cast to some superclass where knowledge about these assumed properties is no longer available.</p>
-
-<p>In cases such as this, there is another common sampling algorithm:</p>
-
-<pre><code>sample(data: sequence, p: real) {
-    while not end(data) {
-        v = next(data)
-        if random(0.0, 1.0) &lt; p then emit v to output
-    }
-}
-</code></pre>
-
-<p>The above algorithm enjoys all the advantage in flexibility.  It requires only linear access, does not require writable input, and makes no assumptions about input size.  However it comes at a price: this algorithm is no longer O(np), it is O(n).  Each element must be traversed directly, and worse yet the random number generagor (RNG) must be invoked on each element.  O(n) invocation of the RNG is a substantial cost &#8211; random number generation is typically very expensive compared to the cost of iterating to the next element in a sequence.</p>
-
-<p>But&#8230; does linear sampling truly require us to invoke our RNG on every element?   Consider the pattern of data access, divorced from code.   It looks like a sequence of choices: for each element we either (skip) or (sample):</p>
-
-<pre><code>(skip) (skip) (sample) (skip) (sample) (skip) (sample) (sample) (skip) (skip) (sample) ...
-</code></pre>
-
-<p>The number of consecutive (skip) events between each (sample) &#8211; the <em>sampling gap</em> &#8211; can itself be modeled as a random variable.  Each (skip)/(sample) choice is an independent Bernoulli trial, where the probability of (skip) is (1-p).   The PMF of the sampling gap for gap of {0, 1, 2, &#8230;} is therefore a geometric distribution: P(k) = p(1-p)<sup>k</sup></p>
-
-<p>This suggests an alternative algorithm for sampling, where we only need to randomly choose sample gaps instead of randomly choosing whether we sample each individual element:</p>
-
-<pre><code>// choose a random sampling gap 'k' from P(k) = p(1-p)^k
-// caution: this explodes for p = 0 or p = 1
-random_gap(p: real) {
-    u = max(random(0.0, 1.0), epsilon)
-    return floor(log(u) / log(1-p))
-}
-
-sample(data: sequence, p: real) {
-    advance(data, random_gap(p))
-    while not end(data) {
-        emit next(data) to output
-        advance(data, random_gap(p))
-    }
-}
-</code></pre>
-
-<p>The above algorithm calls the RNG only once per actual collected sample, and so the cost of RNG calls is O(np).  Note that the algorithm is still O(n), but the cost of the RNG tends to dominate the cost of sequence traversal, and so the resulting efficiency improvement is substantial.  I measured the following performance improvements with gap sampling, compared to traditional linear sequence sampling, on a <a href="https://gist.github.com/erikerlandson/05db1f15c8d623448ff6">Scala prototype testing rig</a>:</p>
-
-<p><head><style>
-table, th, td {
-border: 1px solid black;
-border-collapse: collapse;
-}
-th, td {
-padding: 10px;
-}
-th {
-text-align: center;
-}
-</style></head></p>
-
-<table>
-<tr> <th>Type</th> <th>p</th> <th>linear</th> <th>gap</th> </tr>
-<tr> <td>Array</td> <td>0.001</td> <td>2833</td> <td>29</td> </tr>
-<tr> <td>Array</td> <td>0.01</td> <td>2825</td> <td>76</td> </tr>
-<tr> <td>Array</td> <td>0.1</td> <td>2985</td> <td>787</td> </tr>
-<tr> <td>Array</td> <td>0.5</td> <td>3526</td> <td>3478</td> </tr>
-<tr> <td>Array</td> <td>0.9</td> <td>3023</td> <td>6081</td> </tr>
-<tr> <td>List</td> <td>0.001</td> <td>2213</td> <td>230</td> </tr>
-<tr> <td>List</td> <td>0.01</td> <td>2220</td> <td>265</td> </tr>
-<tr> <td>List</td> <td>0.1</td> <td>2337</td> <td>796</td> </tr>
-<tr> <td>List</td> <td>0.5</td> <td>2794</td> <td>3151</td> </tr>
-<tr> <td>List</td> <td>0.9</td> <td>2513</td> <td>4849</td> </tr>
-</table>
-
-
-
-
-<br>
-
-
-<p>In the results above, we see that the gap sampling times are essentially linear in (p), as expected.  In the case of the linear-access List type, there is a higher baseline time (230 vs 29) due to the constant cost of actual data traversal.  Efficiency improvements are substantial at small sampling probabilities.</p>
-
-<p>We can also see that the cost of gap sampling begins to meet and then exceed the cost of traditinal linear sampling, in the vicinnity (p) = 0.5.  This is due to the fact that the gap sampling logic is about twice the cost (in my test environment) of simply calling the RNG once.  For example, the gap sampling invokes a call to the numeric logarithm code that isn&#8217;t required in traditional sampling.  And so at (p) = 0.5 the time spent doing the gap sampling approximates the time spent invoking the RNG once per sample, and at higher values of (p) the cost is greater.</p>
-
-<p>This suggests that one should in fact fall back to traditional linear sampling when the sampling probability (p) >= some threshold.  That threshold appears to be about 0.5 or 0.6 in my testing rig, but is likely to depend on underlying numeric libraries, the particular RNG being used, etc, and so I would expect it to benefit from customized tuning on a per-environment basis.  With this in mind, a sample algorithm as deployed would look like this:</p>
-
-<pre><code>// threshold is a tuning parameter
-threshold = 0.5
-
-sample(data: sequence, p: real) {
-    if (p &lt; threshold) {
-        gap_sample(data, p)
-    } else {
-        traditional_linear_sample(data, p)
-    }
-}
-</code></pre>
-
-<p>The gap-sampling algorithm described above is for sampling <em>without</em> replacement.   However, the same approach can be modified to generate sampling <em>with</em> replacement.</p>
-
-<p>When sampling with replacement, it is useful to consider the <em>replication factor</em> of each element (where a replication factor of zero means the element wasn&#8217;t sampled).  Pretend for the moment that the actual data size (n) is known.  The sample size (m) = (n)(p).  The probability that each element gets sampled, per trial, is 1/n, with (m) independent trials, and so the replication factor (r) for each element obeys a binomial distribution: Binomial(m, 1/n).  If we substitute (n)(p) for (m), we have Binomial(np, 1/n).  As the (n) grows, the Binomial is <a href="http://en.wikipedia.org/wiki/Binomial_distribution#Poisson_approximation">well approximated by a Poisson distribution</a> Poisson(L), where (L) = (np)(1/n) = (p).  And so for our purposes we may sample from Poisson(p), where P(r) = (p<sup>r</sup> / r!)e<sup>(-p),</sup> for our sampling replication factors.  Note that we have now discarded any dependence on sample size (n), as we desire.</p>
-
-<p>In our gap-sampling context, the sampling gaps are now elements whose replication factor is zero, which occurs with probability P(0) = e<sup>(-p).</sup>  And so our sampling gaps are now drawn from geometric distribution P(k) = (1-q)(q)<sup>k,</sup> where q = e<sup>(-p).</sup>   When we <em>do</em> sample an element, its replication factor is drawn from Poisson(p), however <em>conditioned such that the value is >= 1.</em>  It is straightforward to adapt a <a href="http://en.wikipedia.org/wiki/Poisson_distribution#Generating_Poisson-distributed_random_variables">standard Poisson generator</a>, as shown below.</p>
-
-<p>Given the above, gap sampling with replacement in pseudocode looks like:</p>
-
-<pre><code>// sample 'k' from Poisson(p), conditioned to k &gt;= 1
-poisson_ge1(p: real) {
-    q = e^(-p)
-    // simulate a poisson trial such that k &gt;= 1
-    t = q + (1-q)*random(0.0, 1.0)
-    k = 1
-
-    // continue standard poisson generation trials
-    t = t * random(0.0, 1.0)
-    while (t &gt; q) {
-        k = k + 1
-        t = t * random(0.0, 1.0)
-    }
-    return k
-}
-
-// choose a random sampling gap 'k' from P(k) = p(1-p)^k
-// caution: this explodes for p = 0 or p = 1
-random_gap(p: real) {
-    u = max(random(0.0, 1.0), epsilon)
-    return floor(log(u) / -p)
-}
-
-sample(data: sequence, p: real) {
-    advance(data, random_gap(p))
-    while not end(data) {
-        rf = poisson_ge1(p)
-        v = next(data)
-        emit (rf) copies of (v) to output
-        advance(data, random_gap(p))
-    }
-}
-</code></pre>
-
-<p>The efficiency improvements I have measured for gap sampling with replacement are shown here:</p>
-
-<table>
-<tr> <th>Type</th> <th>p</th> <th>linear</th> <th>gap</th> </tr>
-<tr> <td>Array</td> <td>0.001</td> <td>2604</td> <td>45</td> </tr>
-<tr> <td>Array</td> <td>0.01</td> <td>3442</td> <td>117</td> </tr>
-<tr> <td>Array</td> <td>0.1</td> <td>3653</td> <td>1044</td> </tr>
-<tr> <td>Array</td> <td>0.5</td> <td>5643</td> <td>5073</td> </tr>
-<tr> <td>Array</td> <td>0.9</td> <td>7668</td> <td>8388</td> </tr>
-<tr> <td>List</td> <td>0.001</td> <td>2431</td> <td>233</td> </tr>
-<tr> <td>List</td> <td>0.01</td> <td>2450</td> <td>299</td> </tr>
-<tr> <td>List</td> <td>0.1</td> <td>2984</td> <td>1330</td> </tr>
-<tr> <td>List</td> <td>0.5</td> <td>5331</td> <td>4752</td> </tr>
-<tr> <td>List</td> <td>0.9</td> <td>6744</td> <td>7811</td> </tr>
-</table>
-
-
-
-
-<br>
-
-
-<p>As with the results for sampling without replacement, we see that gap sampling cost is linear with (p), which yields large cost savings at small sampling, but begins to exceed traditional linear sampling at higher sampling probabilities.</p>
 ]]></content>
   </entry>
   

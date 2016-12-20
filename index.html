@@ -9,7 +9,10 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="In a previous post I discussed some scenarios where traditional map-reduce (directly applying a map function, followed by some monoidal reduction) &hellip;">
+  <meta name="description" content="In the days when Sussman was a novice,
+Minsky once came to him as he sat hacking at the PDP-6.
+&#8220;What are you doing?&#8221;, asked Minsky.
+&# &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +71,140 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2016/12/19/converging-monoid-addition-for-t-digest/">Converging Monoid Addition for T-Digest</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2016-12-19T13:29:00-07:00" pubdate data-updated="true">Dec 19<span>th</span>, 2016</time>
+        
+        
+         | <a href="/blog/2016/12/19/converging-monoid-addition-for-t-digest/#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><blockquote><p>In the days when Sussman was a novice,
+Minsky once came to him as he sat hacking at the PDP-6.
+&#8220;What are you doing?&#8221;, asked Minsky.
+&#8220;I am training a randomly wired neural net to play Tic-tac-toe&#8221;, Sussman replied.
+&#8220;Why is the net wired randomly?&#8221;, asked Minsky.
+&#8220;I do not want it to have any preconceptions of how to play&#8221;, Sussman said.
+Minsky then shut his eyes.
+&#8220;Why do you close your eyes?&#8221; Sussman asked his teacher.
+&#8220;So that the room will be empty.&#8221;
+At that moment, Sussman was enlightened.</p></blockquote>
+
+<p>Recently I&#8217;ve been doing some work with the <a href="https://github.com/isarn/isarn-sketches">t-digest sketching</a> algorithm, from the
+<a href="https://github.com/tdunning/t-digest/blob/master/docs/t-digest-paper/histo.pdf">paper by Ted Dunning and Omar Ertl</a>.
+One of the appealing properties of t-digest sketches is that you can &#8220;add&#8221; them together in the monoid sense to produce a combined sketch from two separate sketches.
+This property is crucial for sketching data across data partitions in scale-out parallel computing platforms such as Apache Spark or Map-Reduce.</p>
+
+<p>In the original Dunning/Ertl paper, they describe an algorithm for monoidal combination of t-digests based on randomized cluster recombination.  The clusters of the two input sketches are collected together, then randomly shuffled, and inserted into a new t-digest in that randomized order.  In Scala code, this algorithm might look like the following:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">def</span> <span class="n">combine</span><span class="o">(</span><span class="n">ltd</span><span class="k">:</span> <span class="kt">TDigest</span><span class="o">,</span> <span class="n">rtd</span><span class="k">:</span> <span class="kt">TDigest</span><span class="o">)</span><span class="k">:</span> <span class="kt">TDigest</span> <span class="o">=</span> <span class="o">{</span>
+</span><span class='line'>  <span class="c1">// randomly shuffle input clusters and re-insert to a new t-digest</span>
+</span><span class='line'>  <span class="n">shuffle</span><span class="o">(</span><span class="n">ltd</span><span class="o">.</span><span class="n">clusters</span><span class="o">.</span><span class="n">toVector</span> <span class="o">++</span> <span class="n">rtd</span><span class="o">.</span><span class="n">clusters</span><span class="o">.</span><span class="n">toVector</span><span class="o">)</span>
+</span><span class='line'>    <span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="nc">TDigest</span><span class="o">.</span><span class="n">empty</span><span class="o">)((</span><span class="n">d</span><span class="o">,</span> <span class="n">e</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="n">d</span> <span class="o">+</span> <span class="n">e</span><span class="o">)</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>I implemented this algorithm and used it until I noticed that a sum over multiple sketches seemed to behave noticeably differently than either the individual inputs, or the nominal underlying distribution.</p>
+
+<p>To get a closer look at what was going on, I generated some random samples from a Normal distribution ~N(0,1).
+I then generated t-digest sketches of each sample, took a cumulative monoid sum, and kept track of how closely each successive sum adhered to the original ~N(0,1) distribution.
+As a measure of the difference between a t-digest sketch and the original distribution, I computed the Kolmogorov-Smirnov <a href="https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test#Kolmogorov.E2.80.93Smirnov_statistic">D-statistic</a>, which yields a distance between two cumulative distribution functions.
+(Code for my data collections can be viewed <a href="https://github.com/erikerlandson/isarn-sketches-algebird-api/blob/blog/t_digest_sum/src/main/scala/org/isarnproject/sketchesAlgebirdAPI/AlgebirdFactory.scala#L65">here</a>)
+I ran multiple data collections and subsequent cumulative sums and used those multiple measurements to generate the following box-plot.
+The result was surprising and a bit disturbing:</p>
+
+<p><img src="/assets/images/tdsum/plot1.png" alt="plot1" /></p>
+
+<p>As the plot shows, the t-digest sketch distributions are gradually <em>diverging</em> from the underlying &#8220;true&#8221; distribution ~N(0,1).
+This is a potentially significant problem for the stability of monoidal t-digest sums, and by extension any parallel sketching based on combining the partial sketches on data partitions in map-reduce-like environments.</p>
+
+<p>Seeing this divergence motivated me to think about ways to avoid it.
+One property of t-digest insertion logic is that the results of inserting new data can differ depending on what clusters are already present.
+I wondered if the results might be more stable if the largest clusters were inserted first.
+The t-digest algorithm allows clusters closest to the distribution median to grow the largest.
+Combining input clusters from largest to smallest would be like building the combined distribution from the middle outwards, toward the distribution tails.
+In the case where one t-digest had larger weights, it would also somewhat approximate inserting the smaller sketch into the larger one.
+In Scala code, this alternative monoid addition looks like so:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">def</span> <span class="n">combine</span><span class="o">(</span><span class="n">ltd</span><span class="k">:</span> <span class="kt">TDigest</span><span class="o">,</span> <span class="n">rtd</span><span class="k">:</span> <span class="kt">TDigest</span><span class="o">)</span><span class="k">:</span> <span class="kt">TDigest</span> <span class="o">=</span> <span class="o">{</span>
+</span><span class='line'>  <span class="c1">// insert clusters from largest to smallest</span>
+</span><span class='line'>  <span class="o">(</span><span class="n">ltd</span><span class="o">.</span><span class="n">clusters</span><span class="o">.</span><span class="n">toVector</span> <span class="o">++</span> <span class="n">rtd</span><span class="o">.</span><span class="n">clusters</span><span class="o">.</span><span class="n">toVector</span><span class="o">).</span><span class="n">sortWith</span><span class="o">((</span><span class="n">a</span><span class="o">,</span> <span class="n">b</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="n">a</span><span class="o">.</span><span class="n">_2</span> <span class="o">&gt;</span> <span class="n">b</span><span class="o">.</span><span class="n">_2</span><span class="o">)</span>
+</span><span class='line'>    <span class="o">.</span><span class="n">foldLeft</span><span class="o">(</span><span class="nc">TDigest</span><span class="o">.</span><span class="n">empty</span><span class="o">(</span><span class="n">delta</span><span class="o">))((</span><span class="n">d</span><span class="o">,</span> <span class="n">e</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="n">d</span> <span class="o">+</span> <span class="n">e</span><span class="o">)</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>As a second experiment, for each data sampling I compared the original monoid addition with the alternative method using largest-to-smallest cluster insertion.
+When I plotted the resulting progression of D-statistics side-by-side, the results were surprising:</p>
+
+<p><img src="/assets/images/tdsum/plot2a.png" alt="plot2a" /></p>
+
+<p>As the plot demonstrates, not only was large-to-small insertion more stable, its D-statistics appeared to be getting <em>smaller</em> instead of larger.
+To see if this trend was sustained over longer cumulative sums, I plotted the D-stats for cumulative sums over 100 samples:</p>
+
+<p><img src="/assets/images/tdsum/plot2.png" alt="plot2" /></p>
+
+<p>The results were even more dramatic;
+These longer sums show that the standard randomized-insertion method continues to diverge,
+but in the case of large-to-small insertion the cumulative t-digest sums continue to converge
+towards the underlying distribution!</p>
+
+<p>To test whether this effect might be dependent on particular shapes of distribution, I ran similar experiments using a Uniform distribution (no &#8220;tails&#8221;) and an Exponential distribution (one tail).
+I included the corresponding plots in the appendix.
+The convergence of this alternative monoid addition doesn&#8217;t seem to be sensitive to shape of distribution.</p>
+
+<p>I have upgraded my <a href="https://github.com/isarn/isarn-sketches#t-digest">implementation of t-digest sketching</a> to use this new definition of monoid addition for t-digests.
+As you can see, it is easy to change one implementation for another.
+One or two lines of code may be sufficient.
+I hope this idea may be useful for any other implementations in the community.
+Happy sketching!</p>
+
+<h3>Appendix: Plots with Alternate Distributions</h3>
+
+<p><img src="/assets/images/tdsum/plot3.png" alt="plot3" /></p>
+
+<p><img src="/assets/images/tdsum/plot4.png" alt="plot4" /></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1666,228 +1803,6 @@ I intend to keep an eye out for applications of MDL to <em>other</em> learning m
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2016/02/08/efficient-multiplexing-for-spark-rdds/">Efficient Multiplexing for Spark RDDs</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2016-02-08T10:09:00-07:00" pubdate data-updated="true">Feb 8<span>th</span>, 2016</time>
-        
-        
-         | <a href="/blog/2016/02/08/efficient-multiplexing-for-spark-rdds/#feedback">Feedback</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>In this post I&#8217;m going to propose a new abstract operation on <a href="http://spark.apache.org/docs/latest/programming-guide.html#resilient-distributed-datasets-rdds">Spark RDDs</a> &#8211; <strong>multiplexing</strong> &#8211; that makes some categories of operations on RDDs both easier to program and in many cases much faster.</p>
-
-<p>My main working example will be the operation of splitting a collection of data elements into N randomly-selected subsamples.  This operation is quite common in machine learning, for the purpose of dividing data into a <a href="https://en.wikipedia.org/wiki/Test_set">training and testing set</a>, or the related task of <a href="https://en.wikipedia.org/wiki/Cross-validation_(statistics">creating folds for cross-validation</a>).</p>
-
-<p>Consider the current standard RDD method for accomplishing this task, <code>randomSplit()</code>.  This method takes a collection of N weights, and returns N output RDDs, each of which contains a randomly-sampled subset of the input, proportional to the corresponding weight.  The <code>randomSplit()</code> method generates the jth output by running a random number generator (RNG) for each input data element and accepting all elements which are in the corresponding jth (normalized) weight range.  As a diagram, the process looks like this at each RDD partition:</p>
-
-<p><img src="/assets/images/mux/randomsplit.png" title="Figure 1" alt="Figure 1" /></p>
-
-<p>The observation I want to draw attention to is that to produce the N output RDDs, it has to run a random sampling over every element in the input <em>for each output</em>.  So if you are splitting into 10 outputs (e.g. for a 10-fold cross-validation), you are re-sampling your input 10 times, the only difference being that each output is created using a different acceptance range for the RNG output.</p>
-
-<p>To see what this looks like in code, consider a simplified version of random splitting that just takes an integer <code>n</code> and always produces (n) equally-weighted outputs:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">def</span> <span class="n">splitSample</span><span class="o">[</span><span class="kt">T</span> <span class="kt">:ClassTag</span><span class="o">](</span><span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="kt">T</span><span class="o">],</span> <span class="n">n</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span> <span class="n">seed</span><span class="k">:</span> <span class="kt">Long</span> <span class="o">=</span> <span class="mi">42</span><span class="o">)</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">RDD</span><span class="o">[</span><span class="kt">T</span><span class="o">]]</span> <span class="k">=</span> <span class="o">{</span>
-</span><span class='line'>  <span class="nc">Vector</span><span class="o">.</span><span class="n">tabulate</span><span class="o">(</span><span class="n">n</span><span class="o">)</span> <span class="o">{</span> <span class="n">j</span> <span class="k">=&gt;</span>
-</span><span class='line'>    <span class="n">rdd</span><span class="o">.</span><span class="n">mapPartitions</span> <span class="o">{</span> <span class="n">data</span> <span class="k">=&gt;</span>
-</span><span class='line'>      <span class="n">scala</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="nc">Random</span><span class="o">.</span><span class="n">setSeed</span><span class="o">(</span><span class="n">seed</span><span class="o">)</span>
-</span><span class='line'>      <span class="n">data</span><span class="o">.</span><span class="n">filter</span> <span class="o">{</span> <span class="n">unused</span> <span class="k">=&gt;</span> <span class="n">scala</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="nc">Random</span><span class="o">.</span><span class="n">nextInt</span><span class="o">(</span><span class="n">n</span><span class="o">)</span> <span class="o">==</span> <span class="n">j</span> <span class="o">}</span>
-</span><span class='line'>    <span class="o">}</span>
-</span><span class='line'>  <span class="o">}</span>
-</span><span class='line'><span class="o">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>(Note that for this method to operate correctly, the RNG seed must be set to the same value each time, or the data will not be correctly partitioned)</p>
-
-<p>While this approach to random splitting works fine, resampling the same data N times is somewhat wasteful.  However, it is possible to re-organize the computation so that the input data is sampled only once.  The idea is to run the RNG once per data element, and save the element into a randomly-chosen collection.  To make this work in the RDD compute model, all N output collections reside in a single row of an <em>intermediate</em> RDD &#8211; a &#8220;manifold&#8221; RDD.  Each output RDD then takes its data from the corresponding collection in the manifold RDD, as in this diagram:</p>
-
-<p><img src="/assets/images/mux/multiplex.png" alt="Figure 2" /></p>
-
-<p>If you abstract the diagram above into a generalized operation, you end up with methods that might like the following:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">def</span> <span class="n">muxPartitions</span><span class="o">[</span><span class="kt">U</span> <span class="kt">:ClassTag</span><span class="o">](</span><span class="n">n</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span> <span class="n">f</span><span class="k">:</span> <span class="o">(</span><span class="kt">Int</span><span class="o">,</span> <span class="kt">Iterator</span><span class="o">[</span><span class="kt">T</span><span class="o">])</span> <span class="k">=&gt;</span> <span class="nc">Seq</span><span class="o">[</span><span class="kt">U</span><span class="o">],</span>
-</span><span class='line'>  <span class="n">persist</span><span class="k">:</span> <span class="kt">StorageLevel</span><span class="o">)</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">RDD</span><span class="o">[</span><span class="kt">U</span><span class="o">]]</span> <span class="k">=</span> <span class="o">{</span>
-</span><span class='line'>  <span class="k">val</span> <span class="n">mux</span> <span class="k">=</span> <span class="n">self</span><span class="o">.</span><span class="n">mapPartitionsWithIndex</span> <span class="o">{</span> <span class="k">case</span> <span class="o">(</span><span class="n">id</span><span class="o">,</span> <span class="n">itr</span><span class="o">)</span> <span class="k">=&gt;</span>
-</span><span class='line'>    <span class="nc">Iterator</span><span class="o">.</span><span class="n">single</span><span class="o">(</span><span class="n">f</span><span class="o">(</span><span class="n">id</span><span class="o">,</span> <span class="n">itr</span><span class="o">))</span>
-</span><span class='line'>  <span class="o">}.</span><span class="n">persist</span><span class="o">(</span><span class="n">persist</span><span class="o">)</span>
-</span><span class='line'>  <span class="nc">Vector</span><span class="o">.</span><span class="n">tabulate</span><span class="o">(</span><span class="n">n</span><span class="o">)</span> <span class="o">{</span> <span class="n">j</span> <span class="k">=&gt;</span> <span class="n">mux</span><span class="o">.</span><span class="n">mapPartitions</span> <span class="o">{</span> <span class="n">itr</span> <span class="k">=&gt;</span> <span class="nc">Iterator</span><span class="o">.</span><span class="n">single</span><span class="o">(</span><span class="n">itr</span><span class="o">.</span><span class="n">next</span><span class="o">()(</span><span class="n">j</span><span class="o">))</span> <span class="o">}</span> <span class="o">}</span>
-</span><span class='line'><span class="o">}</span>
-</span><span class='line'>
-</span><span class='line'><span class="k">def</span> <span class="n">flatMuxPartitions</span><span class="o">[</span><span class="kt">U</span> <span class="kt">:ClassTag</span><span class="o">](</span><span class="n">n</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span> <span class="n">f</span><span class="k">:</span> <span class="o">(</span><span class="kt">Int</span><span class="o">,</span> <span class="kt">Iterator</span><span class="o">[</span><span class="kt">T</span><span class="o">])</span> <span class="k">=&gt;</span> <span class="nc">Seq</span><span class="o">[</span><span class="kt">TraversableOnce</span><span class="o">[</span><span class="kt">U</span><span class="o">]],</span>
-</span><span class='line'>  <span class="n">persist</span><span class="k">:</span> <span class="kt">StorageLevel</span><span class="o">)</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">RDD</span><span class="o">[</span><span class="kt">U</span><span class="o">]]</span> <span class="k">=</span> <span class="o">{</span>
-</span><span class='line'>  <span class="k">val</span> <span class="n">mux</span> <span class="k">=</span> <span class="n">self</span><span class="o">.</span><span class="n">mapPartitionsWithIndex</span> <span class="o">{</span> <span class="k">case</span> <span class="o">(</span><span class="n">id</span><span class="o">,</span> <span class="n">itr</span><span class="o">)</span> <span class="k">=&gt;</span>
-</span><span class='line'>    <span class="nc">Iterator</span><span class="o">.</span><span class="n">single</span><span class="o">(</span><span class="n">f</span><span class="o">(</span><span class="n">id</span><span class="o">,</span> <span class="n">itr</span><span class="o">))</span>
-</span><span class='line'>  <span class="o">}.</span><span class="n">persist</span><span class="o">(</span><span class="n">persist</span><span class="o">)</span>
-</span><span class='line'>  <span class="nc">Vector</span><span class="o">.</span><span class="n">tabulate</span><span class="o">(</span><span class="n">n</span><span class="o">)</span> <span class="o">{</span> <span class="n">j</span> <span class="k">=&gt;</span> <span class="n">mux</span><span class="o">.</span><span class="n">mapPartitions</span> <span class="o">{</span> <span class="n">itr</span> <span class="k">=&gt;</span> <span class="n">itr</span><span class="o">.</span><span class="n">next</span><span class="o">()(</span><span class="n">j</span><span class="o">).</span><span class="n">toIterator</span> <span class="o">}</span> <span class="o">}</span>
-</span><span class='line'><span class="o">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>Here, the operation of sampling is generalized to any user-supplied function that maps RDD partition data into a sequence of objects that are computed in a single pass, and then multiplexed to the final user-visible outputs.  Note that these functions take a <code>StorageLevel</code> argument that can be used to control the caching level of the internal &#8220;manifold&#8221; RDD.  This typically defaults to <code>MEMORY_ONLY</code>, so that the computation can be saved and re-used for efficiency.</p>
-
-<p>An efficient split-sampling method based on multiplexing, as described above, might be written using <code>flatMuxPartitions</code> as follows:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">def</span> <span class="n">splitSampleMux</span><span class="o">[</span><span class="kt">T</span> <span class="kt">:ClassTag</span><span class="o">](</span><span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="kt">T</span><span class="o">],</span> <span class="n">n</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span>
-</span><span class='line'>  <span class="n">persist</span><span class="k">:</span> <span class="kt">StorageLevel</span> <span class="o">=</span> <span class="nc">MEMORY_ONLY</span><span class="o">,</span>
-</span><span class='line'>  <span class="n">seed</span><span class="k">:</span> <span class="kt">Long</span> <span class="o">=</span> <span class="mi">42</span><span class="o">)</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">RDD</span><span class="o">[</span><span class="kt">T</span><span class="o">]]</span> <span class="k">=</span>
-</span><span class='line'>  <span class="n">rdd</span><span class="o">.</span><span class="n">flatMuxPartitions</span><span class="o">(</span><span class="n">n</span><span class="o">,</span> <span class="o">(</span><span class="n">id</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span> <span class="n">data</span><span class="k">:</span> <span class="kt">Iterator</span><span class="o">[</span><span class="kt">T</span><span class="o">])</span> <span class="k">=&gt;</span> <span class="o">{</span>
-</span><span class='line'>    <span class="n">scala</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="nc">Random</span><span class="o">.</span><span class="n">setSeed</span><span class="o">(</span><span class="n">id</span><span class="o">.</span><span class="n">toLong</span> <span class="o">*</span> <span class="n">seed</span><span class="o">)</span>
-</span><span class='line'>    <span class="k">val</span> <span class="n">samples</span> <span class="k">=</span> <span class="nc">Vector</span><span class="o">.</span><span class="n">fill</span><span class="o">(</span><span class="n">n</span><span class="o">)</span> <span class="o">{</span> <span class="n">scala</span><span class="o">.</span><span class="n">collection</span><span class="o">.</span><span class="n">mutable</span><span class="o">.</span><span class="nc">ArrayBuffer</span><span class="o">.</span><span class="n">empty</span><span class="o">[</span><span class="kt">T</span><span class="o">]</span> <span class="o">}</span>
-</span><span class='line'>    <span class="n">data</span><span class="o">.</span><span class="n">foreach</span> <span class="o">{</span> <span class="n">e</span> <span class="k">=&gt;</span> <span class="n">samples</span><span class="o">(</span><span class="n">scala</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="nc">Random</span><span class="o">.</span><span class="n">nextInt</span><span class="o">(</span><span class="n">n</span><span class="o">))</span> <span class="o">+=</span> <span class="n">e</span> <span class="o">}</span>
-</span><span class='line'>    <span class="n">samples</span>
-</span><span class='line'>  <span class="o">},</span> <span class="n">persist</span><span class="o">)</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>To test whether multiplexed RDDs actually improve compute efficiency, I collected run-time data at various split values of <code>n</code> (from 1 to 10), for both the non-multiplexing logic (equivalent to the standard <code>randomSplit</code>) and the multiplexed version:</p>
-
-<p><img src="/assets/images/mux/benchmark.png" title="Figure 3" alt="Figure 3" /></p>
-
-<p>As the timing data above show, the computation required to run a non-multiplexed version grows linearly with <code>n</code>, just as predicted.  The multiplexed version, by computing the (n) outputs in a single pass, takes a nearly constant amount of time regardless of how many samples the input is split into.</p>
-
-<p>There are other potential applications for multiplexed RDDs.  Consider the following tuple-based versions of multiplexing:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">def</span> <span class="n">muxPartitions</span><span class="o">[</span><span class="kt">U1</span> <span class="kt">:ClassTag</span>, <span class="kt">U2</span> <span class="kt">:ClassTag</span><span class="o">](</span><span class="n">f</span><span class="k">:</span> <span class="o">(</span><span class="kt">Int</span><span class="o">,</span> <span class="kt">Iterator</span><span class="o">[</span><span class="kt">T</span><span class="o">])</span> <span class="k">=&gt;</span> <span class="o">(</span><span class="n">U1</span><span class="o">,</span> <span class="n">U2</span><span class="o">),</span>
-</span><span class='line'>  <span class="n">persist</span><span class="k">:</span> <span class="kt">StorageLevel</span><span class="o">)</span><span class="k">:</span> <span class="o">(</span><span class="kt">RDD</span><span class="o">[</span><span class="kt">U1</span><span class="o">],</span> <span class="nc">RDD</span><span class="o">[</span><span class="kt">U2</span><span class="o">])</span> <span class="k">=</span> <span class="o">{</span>
-</span><span class='line'>  <span class="k">val</span> <span class="n">mux</span> <span class="k">=</span> <span class="n">self</span><span class="o">.</span><span class="n">mapPartitionsWithIndex</span> <span class="o">{</span> <span class="k">case</span> <span class="o">(</span><span class="n">id</span><span class="o">,</span> <span class="n">itr</span><span class="o">)</span> <span class="k">=&gt;</span>
-</span><span class='line'>    <span class="nc">Iterator</span><span class="o">.</span><span class="n">single</span><span class="o">(</span><span class="n">f</span><span class="o">(</span><span class="n">id</span><span class="o">,</span> <span class="n">itr</span><span class="o">))</span>
-</span><span class='line'>  <span class="o">}.</span><span class="n">persist</span><span class="o">(</span><span class="n">persist</span><span class="o">)</span>
-</span><span class='line'>  <span class="k">val</span> <span class="n">mux1</span> <span class="k">=</span> <span class="n">mux</span><span class="o">.</span><span class="n">mapPartitions</span><span class="o">(</span><span class="n">itr</span> <span class="k">=&gt;</span> <span class="nc">Iterator</span><span class="o">.</span><span class="n">single</span><span class="o">(</span><span class="n">itr</span><span class="o">.</span><span class="n">next</span><span class="o">.</span><span class="n">_1</span><span class="o">))</span>
-</span><span class='line'>  <span class="k">val</span> <span class="n">mux2</span> <span class="k">=</span> <span class="n">mux</span><span class="o">.</span><span class="n">mapPartitions</span><span class="o">(</span><span class="n">itr</span> <span class="k">=&gt;</span> <span class="nc">Iterator</span><span class="o">.</span><span class="n">single</span><span class="o">(</span><span class="n">itr</span><span class="o">.</span><span class="n">next</span><span class="o">.</span><span class="n">_2</span><span class="o">))</span>
-</span><span class='line'>  <span class="o">(</span><span class="n">mux1</span><span class="o">,</span> <span class="n">mux2</span><span class="o">)</span>
-</span><span class='line'><span class="o">}</span>
-</span><span class='line'>
-</span><span class='line'><span class="k">def</span> <span class="n">flatMuxPartitions</span><span class="o">[</span><span class="kt">U1</span> <span class="kt">:ClassTag</span>, <span class="kt">U2</span> <span class="kt">:ClassTag</span><span class="o">](</span><span class="n">f</span><span class="k">:</span> <span class="o">(</span><span class="kt">Int</span><span class="o">,</span> <span class="kt">Iterator</span><span class="o">[</span><span class="kt">T</span><span class="o">])</span> <span class="k">=&gt;</span> <span class="o">(</span><span class="nc">TraversableOnce</span><span class="o">[</span><span class="kt">U1</span><span class="o">],</span> <span class="nc">TraversableOnce</span><span class="o">[</span><span class="kt">U2</span><span class="o">]),</span>
-</span><span class='line'>  <span class="n">persist</span><span class="k">:</span> <span class="kt">StorageLevel</span><span class="o">)</span><span class="k">:</span> <span class="o">(</span><span class="kt">RDD</span><span class="o">[</span><span class="kt">U1</span><span class="o">],</span> <span class="nc">RDD</span><span class="o">[</span><span class="kt">U2</span><span class="o">])</span> <span class="k">=</span> <span class="o">{</span>
-</span><span class='line'>  <span class="k">val</span> <span class="n">mux</span> <span class="k">=</span> <span class="n">self</span><span class="o">.</span><span class="n">mapPartitionsWithIndex</span> <span class="o">{</span> <span class="k">case</span> <span class="o">(</span><span class="n">id</span><span class="o">,</span> <span class="n">itr</span><span class="o">)</span> <span class="k">=&gt;</span>
-</span><span class='line'>    <span class="nc">Iterator</span><span class="o">.</span><span class="n">single</span><span class="o">(</span><span class="n">f</span><span class="o">(</span><span class="n">id</span><span class="o">,</span> <span class="n">itr</span><span class="o">))</span>
-</span><span class='line'>  <span class="o">}.</span><span class="n">persist</span><span class="o">(</span><span class="n">persist</span><span class="o">)</span>
-</span><span class='line'>  <span class="k">val</span> <span class="n">mux1</span> <span class="k">=</span> <span class="n">mux</span><span class="o">.</span><span class="n">mapPartitions</span><span class="o">(</span><span class="n">itr</span> <span class="k">=&gt;</span> <span class="n">itr</span><span class="o">.</span><span class="n">next</span><span class="o">.</span><span class="n">_1</span><span class="o">.</span><span class="n">toIterator</span><span class="o">)</span>
-</span><span class='line'>  <span class="k">val</span> <span class="n">mux2</span> <span class="k">=</span> <span class="n">mux</span><span class="o">.</span><span class="n">mapPartitions</span><span class="o">(</span><span class="n">itr</span> <span class="k">=&gt;</span> <span class="n">itr</span><span class="o">.</span><span class="n">next</span><span class="o">.</span><span class="n">_2</span><span class="o">.</span><span class="n">toIterator</span><span class="o">)</span>
-</span><span class='line'>  <span class="o">(</span><span class="n">mux1</span><span class="o">,</span> <span class="n">mux2</span><span class="o">)</span>
-</span><span class='line'><span class="o">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>Suppose you wanted to run an input-validation filter on some data, sending the data that pass validation into one RDD, and data that failed into a second RDD, paired with information about the error that occurred.  Data validation is a potentially expensive operation.  With multiplexing, you can easily write the filter to operate in a single efficient pass to obtain both the valid stream and the stream of error-data:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">def</span> <span class="n">validate</span><span class="o">[</span><span class="kt">T</span> <span class="kt">:ClassTag</span><span class="o">](</span><span class="n">rdd</span><span class="k">:</span> <span class="kt">RDD</span><span class="o">[</span><span class="kt">T</span><span class="o">],</span> <span class="n">validator</span><span class="k">:</span> <span class="kt">T</span> <span class="o">=&gt;</span> <span class="nc">Boolean</span><span class="o">)</span> <span class="k">=</span> <span class="o">{</span>
-</span><span class='line'>  <span class="n">rdd</span><span class="o">.</span><span class="n">flatMuxPartitions</span><span class="o">((</span><span class="n">id</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span> <span class="n">data</span><span class="k">:</span> <span class="kt">Iterator</span><span class="o">[</span><span class="kt">T</span><span class="o">])</span> <span class="k">=&gt;</span> <span class="o">{</span>
-</span><span class='line'>    <span class="k">val</span> <span class="n">valid</span> <span class="k">=</span> <span class="n">scala</span><span class="o">.</span><span class="n">collection</span><span class="o">.</span><span class="n">mutable</span><span class="o">.</span><span class="nc">ArrayBuffer</span><span class="o">.</span><span class="n">empty</span><span class="o">[</span><span class="kt">T</span><span class="o">]</span>
-</span><span class='line'>    <span class="k">val</span> <span class="n">bad</span> <span class="k">=</span> <span class="n">scala</span><span class="o">.</span><span class="n">collection</span><span class="o">.</span><span class="n">mutable</span><span class="o">.</span><span class="nc">ArrayBuffer</span><span class="o">.</span><span class="n">empty</span><span class="o">[(</span><span class="kt">T</span>, <span class="kt">Exception</span><span class="o">)]</span>
-</span><span class='line'>    <span class="n">data</span><span class="o">.</span><span class="n">foreach</span> <span class="o">{</span> <span class="n">e</span> <span class="k">=&gt;</span>
-</span><span class='line'>      <span class="k">try</span> <span class="o">{</span>
-</span><span class='line'>        <span class="k">if</span> <span class="o">(!</span><span class="n">validator</span><span class="o">(</span><span class="n">e</span><span class="o">))</span> <span class="k">throw</span> <span class="k">new</span> <span class="nc">Exception</span><span class="o">(</span><span class="s">&quot;returned false&quot;</span><span class="o">)</span>
-</span><span class='line'>        <span class="n">valid</span> <span class="o">+=</span> <span class="n">e</span>
-</span><span class='line'>      <span class="o">}</span> <span class="k">catch</span> <span class="o">{</span>
-</span><span class='line'>        <span class="k">case</span> <span class="n">err</span><span class="k">:</span> <span class="kt">Exception</span> <span class="o">=&gt;</span> <span class="n">bad</span> <span class="o">+=</span> <span class="o">(</span><span class="n">e</span><span class="o">,</span> <span class="n">err</span><span class="o">)</span>
-</span><span class='line'>      <span class="o">}</span>
-</span><span class='line'>    <span class="o">}</span>
-</span><span class='line'>    <span class="o">(</span><span class="n">valid</span><span class="o">,</span> <span class="n">bad</span><span class="o">)</span>
-</span><span class='line'>  <span class="o">})</span>
-</span><span class='line'><span class="o">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>RDD multiplexing is currently a <a href="https://github.com/willb/silex/pull/50">PR against the silex project</a>.  The code I used to run the timing experiments above is <a href="https://github.com/erikerlandson/silex/blob/blog/muxrdd/src/main/scala/com/redhat/et/silex/sample/split.scala#L90">saved for posterity here</a>.</p>
-
-<p>Happy multiplexing!</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/2/">&larr; Older</a>
@@ -1907,6 +1822,10 @@ I intend to keep an eye out for applications of MDL to <em>other</em> learning m
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2016/12/19/converging-monoid-addition-for-t-digest/">Converging Monoid Addition for T-Digest</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2016/09/05/expressing-map-reduce-as-a-left-folding-monoid/">Encoding Map-Reduce As A Monoid With Left Folding</a>
       </li>
     
@@ -1920,10 +1839,6 @@ I intend to keep an eye out for applications of MDL to <em>other</em> learning m
     
       <li class="post">
         <a href="/blog/2016/07/09/approximating-a-pdf-of-distances-with-a-gamma-distribution/">Approximating a PDF of Distances With a Gamma Distribution</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2016/06/15/computing-derivatives-of-the-gamma-function/">Computing Derivatives of the Gamma Function</a>
       </li>
     
   </ul>
