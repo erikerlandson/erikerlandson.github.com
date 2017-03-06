@@ -4,7 +4,7 @@
   <title><![CDATA[Category: monads | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/monads/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2016-12-20T07:54:37-07:00</updated>
+  <updated>2017-03-06T14:40:49-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -18,7 +18,12 @@
     <link href="http://erikerlandson.github.com/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions/"/>
     <updated>2015-01-24T11:54:00-07:00</updated>
     <id>http://erikerlandson.github.com/blog/2015/01/24/monadic-break-and-continue-for-scala-sequence-comprehensions</id>
-    <content type="html"><![CDATA[<p>Author's note: I've since received some excellent feedback from the Scala community, which I included in some <a href="#notes">end notes</a>.</p>
+    <content type="html"><![CDATA[<p><em>Author's note 0:</em> I have come up with better, more correct designs for monadic objects that implement
+<code>break</code> and <code>continue</code> in Scala for-comprehensions.  I'm leaving this blog post up for posterity, but I
+recommend using <a href="https://github.com/erikerlandson/breakable">the <code>breakable</code> project</a>
+if you are interested in break and continue in a Scala framework.</p>
+
+<p>Author's note: I've since received some excellent feedback from the Scala community, which I included in some <a href="#notes">end notes</a>.</p>
 
 <p>Author's note the 2nd: I later realized I could apply an implicit conversion and mediator class to preserve the traditional ordering: the code has been updated with that approach.</p>
 
