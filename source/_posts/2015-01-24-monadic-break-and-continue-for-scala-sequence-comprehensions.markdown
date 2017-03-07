@@ -6,6 +6,11 @@ comments: true
 categories: [ computing, scala, monads, break, continue ]
 ---
 
+**Author's note 0:** I have come up with better, more correct designs for monadic objects that implement
+`break` and `continue` in Scala for-comprehensions.  I'm leaving this blog post up for posterity, but I
+recommend using [the 'breakable' project](https://github.com/erikerlandson/breakable)
+if you are interested in break and continue in a Scala framework.
+
 Author's note: I've since received some excellent feedback from the Scala community, which I included in some [end notes](#notes).
 
 Author's note the 2nd: I later realized I could apply an implicit conversion and mediator class to preserve the traditional ordering: the code has been updated with that approach.
