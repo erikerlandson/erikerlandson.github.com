@@ -1,0 +1,366 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Rethinking the Concept of Release Versioning - tool monkey</title>
+  <meta name="author" content="Erik Erlandson">
+
+  
+  <meta name="description" content="Recently I&#8217;ve been thinking about a few related problems with our current concepts of software release versioning, release dependencies and &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://erikerlandson.github.com/blog/2017/08/23/generalizing-the-concept-of-release-versioning/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="tool monkey" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+
+  <!-- enables inclusion of MathJax LaTeX: http://greglus.com/blog/2011/11/29/integrate-MathJax-LaTeX-and-MathML-Markup-in-Octopress/ -->
+  <script type="text/javascript"
+    src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">tool monkey</a></h1>
+  
+    <h2>adventures of an unfrozen caveman programmer</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:erikerlandson.github.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Rethinking the Concept of Release Versioning</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2017-08-23T17:22:00-07:00" pubdate data-updated="true">Aug 23<span>rd</span>, 2017</time>
+        
+        
+         | <a href="#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>Recently I&#8217;ve been thinking about a few related problems with our current concepts of software release versioning, release dependencies and release building.
+These problems apply to software releases in all languages and build systems that I&#8217;ve experienced,
+but in the interest of keeping this post as simple as possible I&#8217;m going to limit myself to talking about the Maven ecosystem of release management and build tooling.</p>
+
+<p>Consider how we annotate and refer to release builds for a Scala project:
+The <em>version</em> of Scala &#8211; 2.10, 2.11, etc &#8211; that was used to build the project is a <em>qualifier</em> for the release.
+For example, if I am building a project using Scala 2.11, and package P is one of my project dependencies, then the maven build tooling (or sbt, etc) looks for a version of P that was <em>also</em> built using Scala 2.11;
+the build will fail if no such incarnation of P can be located.
+This build constraint propagates recursively throughout the entire dependency tree for a project.</p>
+
+<p>Now consider how we treat the version for the package P dependency itself:
+Our build tooling forces us to specify one exact release version x.y.z for P.
+This is superficially similar to the constraint for building with Scala 2.11, but <em>unlike</em> the Scala constraint, the knowledge about using P x.y.z is not propagated down the tree.</p>
+
+<p>If the dependency for P appears only once in the depenency tree, everything is fine.
+However, as anybody who has ever worked with a large dependency tree for a project knows, package P might very well appear in multiple locations of the dep-tree, as a transitive dependency of different packages.
+Worse, these deps may be specified as <em>different versions</em> of P, which may be mutually incompatible.</p>
+
+<p>Transitive dep incompatibilities are a particularly thorny problem to solve, but there are other annoyances related to release versioning.
+Often a user would like a &#8220;major&#8221; package dependency built against a particular version of that dep.
+For example, packages that use Apache Spark may need to work with a particular build version of Spark (2.1, 2.2, etc).
+If I am the package purveyor, I have no very convenient way to build my package against multiple versions of spark, and then annotate those builds in Maven Central.
+At best I can bake the spark version into the name.
+But what if I want to specify other package dep verions?
+Do I create package names with increasingly-long lists of (package,version) pairs hacked into the name?</p>
+
+<p>Finally, there is simply the annoyance of revving my own package purely for the purpose of building it against the latest versions of my dependencies.
+None of my code has changed, but I am cutting a new release just to pick up current dependency releases.
+And then hoping that my package users will want those particular releases, and that these won&#8217;t break <em>their</em> builds with incompatible transitive deps!</p>
+
+<p>I have been toying with a release and build methodology for avoiding these headaches. What follows is full of vigorous hand-waving,
+but I believe something like it could be formalized in a useful way.</p>
+
+<p>The key idea is that a release <em>build</em> is defined by a <em>build signature</em> which is the union of all <code>(dep, ver)</code> pairs.
+This includes:</p>
+
+<ol>
+<li>The actual release version of the package code, e.g. <code>(mypackage, 1.2.3)</code></li>
+<li>The <code>(dep, ver)</code> for all dependencies (taken over all transitive deps, recursively)</li>
+<li>The <code>(tool, ver)</code> for all impactful build tooling, e.g. <code>(scala, 2.11)</code>, <code>(python, 3.5)</code>, etc</li>
+</ol>
+
+
+<p>For example, if I maintain a package <code>P</code>, whose latest code release is <code>1.2.3</code>,
+built with dependencies <code>(A, 0.5)</code>, <code>(B, 2.5.1)</code> and <code>(C, 1.7.8)</code>, and dependency <code>B</code> built against <code>(Q, 6.7)</code> and <code>(R, 3.3)</code>,
+and <code>C</code> built against <code>(Q, 6.7)</code>
+and all compiled with <code>(scala, 2.11)</code>, then the build signature will be:</p>
+
+<p><code>{ (P, 1.2.3), (A, 0.5), (B, 2.5.1), (C, 1.7.8), (Q, 6.7), (R, 3.3), (scala, 2.11) }</code></p>
+
+<p>Identifying a release build in this way makes several interesting things possible.
+First, it can identify a build with a transitive dependency problem.
+For example, if <code>C</code> had been built against <code>(Q, 7.0)</code>,
+then the resulting build signature would have <em>two</em> pairs for <code>Q</code>; <code>(Q, 6.7)</code> and <code>(Q, 7.0)</code>,
+which is an immediate red flag for a potential problem.</p>
+
+<p>More intriguingly, it could provide a foundation for <em>avoiding</em> builds with incompatible dependencies.
+Suppose that I redefine my build logic so that I only specify dependency package names, and not specific versions.
+Whenever I build a project, the build system automatically searches for the most-recent version of each dependency.
+This already addresses some of the release headaches above.
+As a project builder, I can get the latest versions of packages when I build.
+As a package maintainer, I do not have to rev a release just to update my package deps;
+projects using my package will get the latest by default.
+Moreover, because the latest package release is always pulled, I never get multiple incompatible dependency releases
+in a build.</p>
+
+<p>Suppose that for some reason I <em>need</em> a particular release of some dependency.
+From the example above, imagine that I must use <code>(Q, 6.7)</code>.
+We can imagine augmenting the build specification to allow overriding the default behavior of pulling the most recent release.
+We might either specify a specific version as we do currently, or possibly specify a range of releases, as systems like brew or ruby gemfiles allow.
+In the case where some constraint is placed on releases, this constraint would be propagaged down the tree (or possibly up from the leaves),
+in essentially the same way that the constraint of scala version is already.
+In the event that the total set of constraints over the whole dependency tree is not satisfiable, then the build will fail.</p>
+
+<p>With a build annotation system like the one I just described, one could imagine a new role for registries like Maven Central,
+where different builds are automatically cached.
+The registry could maybe even automatically run CI testing to identify the most-recent versions of package dependencies that satisfy
+any given package build,
+or perhaps valid dependency release ranges.</p>
+
+<p>To conclude, I believe that re-thinking how we describe the dependencies used to build and annotate package releases,
+by generalizing release version to include the release version of all transitive deps (including build tooling as deps),
+may enable more flexible ways to both build software releases and specify them for pulling.</p>
+
+<p>Happy Computing!</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Erik Erlandson</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2017-08-23T17:22:00-07:00" pubdate data-updated="true">Aug 23<span>rd</span>, 2017</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/computing/'>computing</a>, <a class='category' href='/blog/categories/release/'>release</a>, <a class='category' href='/blog/categories/semantic-versioning/'>semantic versioning</a>, <a class='category' href='/blog/categories/software-builds/'>software builds</a>, <a class='category' href='/blog/categories/versioning/'>versioning</a>
+  
+</span>
+
+
+      <br>
+<a id="feedback"></a>Feedback • 
+ 
+    <script type="text/javascript" src="//platform.twitter.com/widgets.js"></script>
+    
+  <a href="https://twitter.com/intent/tweet?text=@manyangled%20re:%20http://erikerlandson.github.com/blog/2017/08/23/generalizing-the-concept-of-release-versioning/">Reply to this post on Twitter</a> • 
+ 
+<a href="mailto:erikerlandson@yahoo.com">Email the author</a>
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://erikerlandson.github.com/blog/2017/08/23/generalizing-the-concept-of-release-versioning/" data-via="manyangled" data-counturl="http://erikerlandson.github.com/blog/2017/08/23/generalizing-the-concept-of-release-versioning/" >Tweet</a>
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2016/12/19/converging-monoid-addition-for-t-digest/" title="Previous Post: Converging Monoid Addition for T-Digest">&laquo; Converging Monoid Addition for T-Digest</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>About The Author</h1>
+  <p>Erik is a senior software engineer on the <a href="http://www.redhat.com">Red Hat</a> Emerging Technologies Group.</p>
+</section>
+<section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2017/08/23/generalizing-the-concept-of-release-versioning/">Rethinking the Concept of Release Versioning</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2016/12/19/converging-monoid-addition-for-t-digest/">Converging Monoid Addition for T-Digest</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2016/09/05/expressing-map-reduce-as-a-left-folding-monoid/">Encoding Map-Reduce As A Monoid With Left Folding</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2016/08/31/supporting-competing-apis-in-scala-can-better-package-factoring-help/">Supporting Competing APIs in Scala -- Can Better Package Factoring Help?</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2016/08/03/x-medoids-using-minimum-description-length-to-identify-the-k-in-k-medoids/">Using Minimum Description Length to Optimize the 'K' in K-Medoids</a>
+      </li>
+    
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/erikerlandson">@erikerlandson</a> on GitHub
+  
+  <script type="text/javascript">
+    $.domReady(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'erikerlandson',
+            count: 0,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+
+<section>
+  <h1>Latest Tweets</h1>
+  <ul id="tweets">
+    <li class="loading">Status updating...</li>
+  </ul>
+  <script type="text/javascript">
+    $.domReady(function(){
+      getTwitterFeed("manyangled", 4, true);
+    });
+  </script>
+  <script src="/javascripts/twitter.js" type="text/javascript"> </script>
+  
+    <a href="http://twitter.com/manyangled" class="twitter-follow-button" data-show-count="false">Follow @manyangled</a>
+  
+</section>
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2017 - Erik Erlandson -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+
+
+
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>

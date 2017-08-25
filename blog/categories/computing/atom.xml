@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2017-03-06T14:43:30-07:00</updated>
+  <updated>2017-08-25T16:18:09-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,99 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Rethinking the Concept of Release Versioning]]></title>
+    <link href="http://erikerlandson.github.com/blog/2017/08/23/generalizing-the-concept-of-release-versioning/"/>
+    <updated>2017-08-23T17:22:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2017/08/23/generalizing-the-concept-of-release-versioning</id>
+    <content type="html"><![CDATA[<p>Recently I've been thinking about a few related problems with our current concepts of software release versioning, release dependencies and release building.
+These problems apply to software releases in all languages and build systems that I've experienced,
+but in the interest of keeping this post as simple as possible I'm going to limit myself to talking about the Maven ecosystem of release management and build tooling.</p>
+
+<p>Consider how we annotate and refer to release builds for a Scala project:
+The <em>version</em> of Scala -- 2.10, 2.11, etc -- that was used to build the project is a <em>qualifier</em> for the release.
+For example, if I am building a project using Scala 2.11, and package P is one of my project dependencies, then the maven build tooling (or sbt, etc) looks for a version of P that was <em>also</em> built using Scala 2.11;
+the build will fail if no such incarnation of P can be located.
+This build constraint propagates recursively throughout the entire dependency tree for a project.</p>
+
+<p>Now consider how we treat the version for the package P dependency itself:
+Our build tooling forces us to specify one exact release version x.y.z for P.
+This is superficially similar to the constraint for building with Scala 2.11, but <em>unlike</em> the Scala constraint, the knowledge about using P x.y.z is not propagated down the tree.</p>
+
+<p>If the dependency for P appears only once in the depenency tree, everything is fine.
+However, as anybody who has ever worked with a large dependency tree for a project knows, package P might very well appear in multiple locations of the dep-tree, as a transitive dependency of different packages.
+Worse, these deps may be specified as <em>different versions</em> of P, which may be mutually incompatible.</p>
+
+<p>Transitive dep incompatibilities are a particularly thorny problem to solve, but there are other annoyances related to release versioning.
+Often a user would like a "major" package dependency built against a particular version of that dep.
+For example, packages that use Apache Spark may need to work with a particular build version of Spark (2.1, 2.2, etc).
+If I am the package purveyor, I have no very convenient way to build my package against multiple versions of spark, and then annotate those builds in Maven Central.
+At best I can bake the spark version into the name.
+But what if I want to specify other package dep verions?
+Do I create package names with increasingly-long lists of (package,version) pairs hacked into the name?</p>
+
+<p>Finally, there is simply the annoyance of revving my own package purely for the purpose of building it against the latest versions of my dependencies.
+None of my code has changed, but I am cutting a new release just to pick up current dependency releases.
+And then hoping that my package users will want those particular releases, and that these won't break <em>their</em> builds with incompatible transitive deps!</p>
+
+<p>I have been toying with a release and build methodology for avoiding these headaches. What follows is full of vigorous hand-waving,
+but I believe something like it could be formalized in a useful way.</p>
+
+<p>The key idea is that a release <em>build</em> is defined by a <em>build signature</em> which is the union of all <code>(dep, ver)</code> pairs.
+This includes:</p>
+
+<ol>
+<li>The actual release version of the package code, e.g. <code>(mypackage, 1.2.3)</code></li>
+<li>The <code>(dep, ver)</code> for all dependencies (taken over all transitive deps, recursively)</li>
+<li>The <code>(tool, ver)</code> for all impactful build tooling, e.g. <code>(scala, 2.11)</code>, <code>(python, 3.5)</code>, etc</li>
+</ol>
+
+
+<p>For example, if I maintain a package <code>P</code>, whose latest code release is <code>1.2.3</code>,
+built with dependencies <code>(A, 0.5)</code>, <code>(B, 2.5.1)</code> and <code>(C, 1.7.8)</code>, and dependency <code>B</code> built against <code>(Q, 6.7)</code> and <code>(R, 3.3)</code>,
+and <code>C</code> built against <code>(Q, 6.7)</code>
+and all compiled with <code>(scala, 2.11)</code>, then the build signature will be:</p>
+
+<p><code>{ (P, 1.2.3), (A, 0.5), (B, 2.5.1), (C, 1.7.8), (Q, 6.7), (R, 3.3), (scala, 2.11) }</code></p>
+
+<p>Identifying a release build in this way makes several interesting things possible.
+First, it can identify a build with a transitive dependency problem.
+For example, if <code>C</code> had been built against <code>(Q, 7.0)</code>,
+then the resulting build signature would have <em>two</em> pairs for <code>Q</code>; <code>(Q, 6.7)</code> and <code>(Q, 7.0)</code>,
+which is an immediate red flag for a potential problem.</p>
+
+<p>More intriguingly, it could provide a foundation for <em>avoiding</em> builds with incompatible dependencies.
+Suppose that I redefine my build logic so that I only specify dependency package names, and not specific versions.
+Whenever I build a project, the build system automatically searches for the most-recent version of each dependency.
+This already addresses some of the release headaches above.
+As a project builder, I can get the latest versions of packages when I build.
+As a package maintainer, I do not have to rev a release just to update my package deps;
+projects using my package will get the latest by default.
+Moreover, because the latest package release is always pulled, I never get multiple incompatible dependency releases
+in a build.</p>
+
+<p>Suppose that for some reason I <em>need</em> a particular release of some dependency.
+From the example above, imagine that I must use <code>(Q, 6.7)</code>.
+We can imagine augmenting the build specification to allow overriding the default behavior of pulling the most recent release.
+We might either specify a specific version as we do currently, or possibly specify a range of releases, as systems like brew or ruby gemfiles allow.
+In the case where some constraint is placed on releases, this constraint would be propagaged down the tree (or possibly up from the leaves),
+in essentially the same way that the constraint of scala version is already.
+In the event that the total set of constraints over the whole dependency tree is not satisfiable, then the build will fail.</p>
+
+<p>With a build annotation system like the one I just described, one could imagine a new role for registries like Maven Central,
+where different builds are automatically cached.
+The registry could maybe even automatically run CI testing to identify the most-recent versions of package dependencies that satisfy
+any given package build,
+or perhaps valid dependency release ranges.</p>
+
+<p>To conclude, I believe that re-thinking how we describe the dependencies used to build and annotate package releases,
+by generalizing release version to include the release version of all transitive deps (including build tooling as deps),
+may enable more flexible ways to both build software releases and specify them for pulling.</p>
+
+<p>Happy Computing!</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Converging Monoid Addition for T-Digest]]></title>
@@ -424,29 +517,6 @@ I intend to keep an eye out for applications of MDL to <em>other</em> learning m
 [1] <a href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.49.1338&amp;rep=rep1&amp;type=pdf">"Novelty Detection Using Extreme Value Statistics"</a>; Stephen J. Roberts; Feb 23, 1999
 <a name="cite2"</a>
 [2] <a href="http://papers.nips.cc/paper/2526-learning-the-k-in-k-means.pdf">"Learning the k in k-means. Advances in neural information processing systems"</a>; Hamerly, G., &amp; Elkan, C.; 2004</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Approximating a PDF of Distances With a Gamma Distribution]]></title>
-    <link href="http://erikerlandson.github.com/blog/2016/07/09/approximating-a-pdf-of-distances-with-a-gamma-distribution/"/>
-    <updated>2016-07-09T11:25:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2016/07/09/approximating-a-pdf-of-distances-with-a-gamma-distribution</id>
-    <content type="html"><![CDATA[<p>In a <a href="http://erikerlandson.github.io/blog/2016/06/08/exploring-the-effects-of-dimensionality-on-a-pdf-of-distances/">previous post</a> I discussed some unintuitive aspects of the distribution of distances as spatial dimension changes.  To help explain this to myself I derived a formula for this distribution, assuming a unit multivariate Gaussian.  For distance (aka radius) r, and spatial dimension d, the PDF of distances is:</p>
-
-<p><img src="/assets/images/dist_dist/gwwv5a5.png" alt="Figure 1" /></p>
-
-<p>Recall that the form of this PDF is the <a href="https://en.wikipedia.org/wiki/Generalized_gamma_distribution">generalized gamma distribution</a>, with scale parameter <nobr>a=sqrt(2),</nobr> shape parameter p=2, and free shape parameter (d) representing the dimensionality.</p>
-
-<p>I was interested in fitting parameters to such a distribution, using some distance data from a clustering algorithm.  <a href="https://www.scipy.org/">SciPy</a> comes with a predefined method for fitting generalized gamma parameters, however I wished to implement something similar using <a href="http://commons.apache.org/proper/commons-math/">Apache Commons Math</a>, which does not have native support for fitting a generalized gamma PDF.  I even went so far as to start working out <a href="http://erikerlandson.github.io/blog/2016/06/15/computing-derivatives-of-the-gamma-function/">some of the math</a> needed to augment the Commons Math <a href="http://commons.apache.org/proper/commons-math/apidocs/org/apache/commons/math3/analysis/differentiation/package-summary.html">Automatic Differentiation libraries</a> with Gamma function differentiation needed to numerically fit my parameters.</p>
-
-<p>Meanwhile, I have been fitting a <em>non generalized</em> <a href="https://en.wikipedia.org/wiki/Gamma_distribution">gamma distribution</a> to the distance data, as a sort of rough cut, using a fast <a href="https://en.wikipedia.org/wiki/Gamma_distribution#Maximum_likelihood_estimation">non-iterative approximation</a> to the parameter optimization.  Consistent with my habit of asking the obvious question last, I tried plotting this gamma approximation against distance data, to see how well it compared against the PDF that I derived.</p>
-
-<p>Surprisingly (at least to me), my approximation using the gamma distribution is a very effective fit for spatial dimensionalities <nobr> >= 2 </nobr>:</p>
-
-<p><img src="/assets/images/gamma_approx/approx_plot.png" alt="Figure 2" /></p>
-
-<p>As the plot shows, only for the 1-dimension case is the gamma approximation substiantially deviating.  In fact, the fit appears to get better as dimensionality increases.  To address the 1D case, I can easily test the fit of a half-gaussian as a possible model.</p>
 ]]></content>
   </entry>
   

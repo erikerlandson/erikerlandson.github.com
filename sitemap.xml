@@ -287,11 +287,17 @@
         <lastmod>2016-12-20T07:50:39-07:00</lastmod>
     </url>
     <url>
+        <loc>
+            http://erikerlandson.github.com/blog/2017/08/23/generalizing-the-concept-of-release-versioning/
+        </loc>
+        <lastmod>2017-08-25T16:17:35-07:00</lastmod>
+    </url>
+    <url>
         <loc>http://erikerlandson.github.com/</loc>
-        <lastmod>2017-03-06T14:43:27-07:00</lastmod>
+        <lastmod>2017-08-25T16:17:35-07:00</lastmod>
     </url>
     <url>
         <loc>http://erikerlandson.github.com/blog/archives/</loc>
-        <lastmod>2017-03-06T14:43:27-07:00</lastmod>
+        <lastmod>2017-08-25T16:17:35-07:00</lastmod>
     </url>
 </urlset>
