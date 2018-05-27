@@ -4,7 +4,7 @@
   <title><![CDATA[tool monkey]]></title>
   <link href="http://erikerlandson.github.com/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2018-05-27T15:29:22-07:00</updated>
+  <updated>2018-05-27T15:40:29-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -22,7 +22,7 @@
 For example, maybe you are doing gradient descent, or convex optimization, etc, and you need a variant on &#8220;maximum&#8221; that has a defined gradient.
 The smooth maximum function has both a defined gradient and Hessian, and in this post I derive them.</p>
 
-<p>I am using the logarith-based definition of smooth-max, shown here:</p>
+<p>I am using the <a href="https://www.johndcook.com/blog/2010/01/13/soft-maximum/">logarithm-based</a> definition of smooth-max, shown here:</p>
 
 <p><img src="http://erikerlandson.github.com/assets/images/smoothmax/eq1.png" alt="eq1" /></p>
 
