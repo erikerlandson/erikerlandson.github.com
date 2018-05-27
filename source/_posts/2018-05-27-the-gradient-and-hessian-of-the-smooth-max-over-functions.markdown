@@ -9,7 +9,7 @@ Suppose you have a set of functions over a vector space, and you are interested 
 For example, maybe you are doing gradient descent, or convex optimization, etc, and you need a variant on "maximum" that has a defined gradient.
 The smooth maximum function has both a defined gradient and Hessian, and in this post I derive them.
 
-I am using the logarith-based definition of smooth-max, shown here:
+I am using the [logarithm-based](https://www.johndcook.com/blog/2010/01/13/soft-maximum/) definition of smooth-max, shown here:
 
 ![eq1](/assets/images/smoothmax/eq1.png)
 
@@ -27,4 +27,3 @@ This last re-grouping of terms allows us to see that we can express the full gra
 ![eq4](/assets/images/smoothmax/eq4.png)
 
 With a gradient and Hessian, we now have the tools we need to use smooth-max in algorithms such as gradient descent and convex optimization. Happy computing!
-
