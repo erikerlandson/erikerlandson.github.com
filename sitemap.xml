@@ -293,11 +293,17 @@
         <lastmod>2017-08-25T16:17:35-07:00</lastmod>
     </url>
     <url>
+        <loc>
+            http://erikerlandson.github.com/blog/2018/05/27/the-gradient-and-hessian-of-the-smooth-max-over-functions/
+        </loc>
+        <lastmod>2018-05-27T15:20:33-07:00</lastmod>
+    </url>
+    <url>
         <loc>http://erikerlandson.github.com/</loc>
-        <lastmod>2017-08-25T16:17:35-07:00</lastmod>
+        <lastmod>2018-05-27T15:20:33-07:00</lastmod>
     </url>
     <url>
         <loc>http://erikerlandson.github.com/blog/archives/</loc>
-        <lastmod>2017-08-25T16:17:35-07:00</lastmod>
+        <lastmod>2018-05-27T15:20:33-07:00</lastmod>
     </url>
 </urlset>
