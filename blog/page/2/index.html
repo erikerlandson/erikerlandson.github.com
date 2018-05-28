@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="In this post I am going to describe some results I obtained for clustering machines by which RPM packages that were installed on them. The clustering &hellip;">
+  <meta name="description" content="When training a decision tree learning model (or an ensemble of such models) it is often nice to have a policy for deciding when a tree node can no &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,563 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2016/05/26/measuring-decision-tree-split-quality-with-test-statistic-p-values/">Measuring Decision Tree Split Quality with Test Statistic P-Values</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2016-05-26T14:39:00-07:00" pubdate data-updated="true">May 26<span>th</span>, 2016</time>
+        
+        
+         | <a href="/blog/2016/05/26/measuring-decision-tree-split-quality-with-test-statistic-p-values/#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>When training a <a href="https://en.wikipedia.org/wiki/Decision_tree_learning">decision tree</a> learning model (or an <a href="https://en.wikipedia.org/wiki/Random_forest">ensemble</a> of such models) it is often nice to have a policy for deciding when a tree node can no longer be usefully split.  There are a variety possibilities.  For example, halting when node population size becomes smaller than some threshold is a simple and effective policy.  Another approach is to halt when some measure of node purity fails to increase by some minimum threshold.  <strong>The underlying concept is to have some measure of split <em>quality</em>, and to halt when no candidate split has sufficient quality.</strong></p>
+
+<p>In this post I am going to discuss some advantages to one of my favorite approaches to measuring split quality, which is to use a <a href="https://en.wikipedia.org/wiki/Statistical_significance">test statistic significance</a> &#8211; aka &#8220;p-value&#8221; &#8211; of the null hypothesis that the left and right sub-populations are the same after the split.  The idea is that if a split is of good quality, then it ought to have caused the sub-populations to the left and right of the split to be <em>meaningfully different</em>.  That is to say: the null hypothesis (that they are the same) should be <em>rejected</em> with high confidence, i.e. a small p-value.  What constitutes &#8220;small&#8221; is always context dependent, but popular p-values from applied statistics are 0.05, 0.01, 0.005, etc.</p>
+
+<blockquote><p>update &#8211; there is now an Apache Spark <a href="https://issues.apache.org/jira/browse/SPARK-15699">JIRA</a> and a <a href="https://github.com/apache/spark/pull/13440">pull request</a> for this feature</p></blockquote>
+
+<p>The remainder of this post is organized in the following sections:</p>
+
+<p><a href="#consistency">Consistency</a> <br>
+<a href="#awareness">Awareness of Sample Sizes</a> <br>
+<a href="#results">Training Results</a> <br>
+<a href="#conclusion">Conclusion</a> <br></p>
+
+<p><a name="consistency"></a></p>
+
+<h5>Consistency</h5>
+
+<p>Test statistic p-values have some appealing properties as a split quality measure.  The test statistic methodology has the advantage of working essentially the same way regardless of the particular test being used.  We begin with two sample populations; in our case, these are the left and right sub-populations created by a candidate split.  We want to assess whether these two populations have the same distribution (the null hypothesis) or different distributions.  We measure some test statistic &#8216;S&#8217; (<a href="https://en.wikipedia.org/wiki/Student's_t-test">Student&#8217;s t</a>, <a href="https://en.wikipedia.org/wiki/Chi-squared_test#Example_chi-squared_test_for_categorical_data">Chi-Squared</a>, etc).  We then compute the probability that |S| >= the value we actually measured.  This probability is commonly referred to as the p-value.  The smaller the p-value, the less likely it is that our two populations are the same.  <strong>In our case, we can interpret this as: a smaller p-value indicates a better quality split.</strong></p>
+
+<p>This consistent methodology has a couple advantages contributing to user experience (UX).  If all measures of split quality work in the same way, then there is a lower cognitive load to move between measures once the user understands the common pattern of use.  A second advantage is better &#8220;unit analysis.&#8221;  Since all such quality measures take the form of p-values, there is no risk of a chosen quality measure getting mis-aligned with a corresponding quality threshold.  They are all probabilities, on the interval [0,1], and &#8220;smaller threshold&#8221; always means &#8220;higher threshold of split quality.&#8221;   By way of comparison, if an application is measuring <a href="https://en.wikipedia.org/wiki/Entropy_%28information_theory%29">entropy</a> and then switches to using <a href="https://en.wikipedia.org/wiki/Decision_tree_learning#Gini_impurity">Gini impurity</a>, these measures are in differing units and care has to be taken that the correct quality threshold is used in each case or the model training policy will be broken.  Switching between differing statistical tests does not come with the same risk.  <strong>A p-value quality threshold will have the same semantic regardless of which statistical test is being applied:</strong> probability that left and right sub-populations are the same, given the particular statistic being measured.</p>
+
+<p><a name="awareness"></a></p>
+
+<h5>Awareness of Sample Size</h5>
+
+<p>Test statistics have another appealing property: many are &#8220;aware&#8221; of sample size in a way that captures the idea that the smaller the sample size, the larger the difference between populations should be to conclude a given significance.  For one example, consider <a href="https://en.wikipedia.org/wiki/Welch's_t-test#Statistical_test">Welch&#8217;s t-test</a>, the two-sample variation of the t distribution that applies well to comparing left and right sub populations of candidate decision tree splits:</p>
+
+<p><img src="/assets/images/pval_halting/figure_1.png" alt="Figure 1" /></p>
+
+<p>Visualizing the effects of sample sizes n1 and n2 on these equations directly is a bit tricky, but assuming equal sample sizes and variances allows the equations to be simplified quite a bit, so that we can observe the effect of sample size:</p>
+
+<p><img src="/assets/images/pval_halting/figure_2.png" alt="Figure 2" /></p>
+
+<p>These simplified equations show clearly that (all else remaining equal) as sample size grows smaller, the measured t-statistic correspondingly grows smaller (proportional to sqrt(n)), and furthermore the corresponding variance of the t distribution to be applied grows larger.  For any given shift in left and right sub-populations, each of these trends yields a larger (i.e. weaker) p-value.   This behavior is desirable for a split quality metric.  <strong>The less data there is at a given candidate split, the less confidence there <em>should</em> be in split quality.</strong>  Put another way: we would like to require a larger difference before a split is measured as being good quality when we have less data to work with, and that is exactly the behavior the t-test provides us.</p>
+
+<p><a name="results"></a></p>
+
+<h5>Training Results</h5>
+
+<p>These propreties are pleasing, but it remains to show that test statistics can actually improve decision tree training in practice.  In the following sections I will compare the effects of training with test statstics with other split quality policies based on entropy and gini index.</p>
+
+<p>To conduct these experiments, I modified a <a href="https://github.com/erikerlandson/spark/blob/pval_halting/mllib/src/main/scala/org/apache/spark/mllib/tree/impurity/ChiSquared.scala">local copy</a> of Apache Spark with the <a href="https://en.wikipedia.org/wiki/Chi-squared_test#Example_chi-squared_test_for_categorical_data">Chi-Squared</a> test statistic for comparing categorical distributions.  The demo script, which I ran in <code>spark-shell</code>, can be viewed <a href="https://github.com/erikerlandson/spark/blob/pval_halting/pval_demo">here</a>.</p>
+
+<p>I generated an example data set that represents a two-class learning problem, where labels may be 0 or 1.  Each sample has 10 clean binary features, such that if the bit is 1, the probability of the label is 90% 1 and 10% 0.  There are 5 noise features, also binary, which are completely random.   There are 50 samples of each clean feature being on, for a total of 500 samples.   There are also 500 samples where all clean features are 0 and the corresponding labels are 90% 0 and 10% 1.  The total number of samples in the data set is 1000.  The shape of the data is illustrated by the following table:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>truth |     features 0 - 9 (one on at a time)     |   random noise
+</span><span class='line'>------+-------------------------------------------+--------------
+</span><span class='line'>90% 1 | 1   0   0   0   0   0   0   0   0   0   0 | 1   0   0   1   0
+</span><span class='line'>90% 1 |  ... 50 samples with feature 0 'on' ...   |   ... noise ...
+</span><span class='line'>90% 1 | 0   1   0   0   0   0   0   0   0   0   0 | 0   1   1   0   0
+</span><span class='line'>90% 1 |  ... 50 samples with feature 1 'on' ...   |   ... noise ...
+</span><span class='line'>90% 1 |  ... 50 samples with feature 2 'on' ...   |   ... noise ...
+</span><span class='line'>90% 1 |  ... 50 samples with feature 3 'on' ...   |   ... noise ...
+</span><span class='line'>90% 1 |  ... 50 samples with feature 4 'on' ...   |   ... noise ...
+</span><span class='line'>90% 1 |  ... 50 samples with feature 5 'on' ...   |   ... noise ...
+</span><span class='line'>90% 1 |  ... 50 samples with feature 6 'on' ...   |   ... noise ...
+</span><span class='line'>90% 1 |  ... 50 samples with feature 7 'on' ...   |   ... noise ...
+</span><span class='line'>90% 1 |  ... 50 samples with feature 8 'on' ...   |   ... noise ...
+</span><span class='line'>90% 1 |  ... 50 samples with feature 9 'on' ...   |   ... noise ...
+</span><span class='line'>90% 0 | 0   0   0   0   0   0   0   0   0   0   0 | 1   1   0   0   1
+</span><span class='line'>90% 0 |  ... 500 samples with all 'off  ...       |   ... noise ...</span></code></pre></td></tr></table></div></figure>
+
+
+<p>For the first run I use my customized chi-squared statistic as the split quality measure.  I used a p-value threshold of 0.01 &#8211; that is, I would like my chi-squared test to conclude that the probability of left and right split populations are the same is &lt;= 0.01, or that split will not be used.  Note, this means I can expect that around 1% of the time, it will conclude a split was good, when it was just luck.  This is a reasonable false-positive rate; random forests are by nature robust to noise, including noise in their own split decisions:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>scala&gt; :load pval_demo
+</span><span class='line'>Loading pval_demo...
+</span><span class='line'>defined module demo
+</span><span class='line'>
+</span><span class='line'>scala&gt; val rf = demo.train("chisquared", 0.01, noise = 0.1)
+</span><span class='line'>  pval= 1.578e-09
+</span><span class='line'>gain= 20.2669
+</span><span class='line'>  pval= 1.578e-09
+</span><span class='line'>gain= 20.2669
+</span><span class='line'>  pval= 1.578e-09
+</span><span class='line'>gain= 20.2669
+</span><span class='line'>  pval= 9.140e-09
+</span><span class='line'>gain= 18.5106
+</span><span class='line'>
+</span><span class='line'>... more tree p-value demo output ...
+</span><span class='line'>
+</span><span class='line'>  pval= 0.7429
+</span><span class='line'>gain= 0.2971
+</span><span class='line'>  pval= 0.9287
+</span><span class='line'>gain= 0.0740
+</span><span class='line'>  pval= 0.2699
+</span><span class='line'>gain= 1.3096
+</span><span class='line'>rf: org.apache.spark.mllib.tree.model.RandomForestModel = 
+</span><span class='line'>TreeEnsembleModel classifier with 1 trees
+</span><span class='line'>
+</span><span class='line'>
+</span><span class='line'>scala&gt; println(rf.trees(0).toDebugString)
+</span><span class='line'>DecisionTreeModel classifier of depth 10 with 21 nodes
+</span><span class='line'>  If (feature 5 in {1.0})
+</span><span class='line'>   Predict: 1.0
+</span><span class='line'>  Else (feature 5 not in {1.0})
+</span><span class='line'>   If (feature 6 in {1.0})
+</span><span class='line'>    Predict: 1.0
+</span><span class='line'>   Else (feature 6 not in {1.0})
+</span><span class='line'>    If (feature 0 in {1.0})
+</span><span class='line'>     Predict: 1.0
+</span><span class='line'>    Else (feature 0 not in {1.0})
+</span><span class='line'>     If (feature 1 in {1.0})
+</span><span class='line'>      Predict: 1.0
+</span><span class='line'>     Else (feature 1 not in {1.0})
+</span><span class='line'>      If (feature 2 in {1.0})
+</span><span class='line'>       Predict: 1.0
+</span><span class='line'>      Else (feature 2 not in {1.0})
+</span><span class='line'>       If (feature 8 in {1.0})
+</span><span class='line'>        Predict: 1.0
+</span><span class='line'>       Else (feature 8 not in {1.0})
+</span><span class='line'>        If (feature 3 in {1.0})
+</span><span class='line'>         Predict: 1.0
+</span><span class='line'>        Else (feature 3 not in {1.0})
+</span><span class='line'>         If (feature 4 in {1.0})
+</span><span class='line'>          Predict: 1.0
+</span><span class='line'>         Else (feature 4 not in {1.0})
+</span><span class='line'>          If (feature 7 in {1.0})
+</span><span class='line'>           Predict: 1.0
+</span><span class='line'>          Else (feature 7 not in {1.0})
+</span><span class='line'>           If (feature 9 in {1.0})
+</span><span class='line'>            Predict: 1.0
+</span><span class='line'>           Else (feature 9 not in {1.0})
+</span><span class='line'>            Predict: 0.0
+</span><span class='line'>
+</span><span class='line'>scala&gt; </span></code></pre></td></tr></table></div></figure>
+
+
+<p>The first thing to observe is that <strong>the resulting decision tree used exactly the 10 clean features 0 through 9, and none of the five noise features.</strong>   The tree splits off each of the clean features to obtain an optimally accurate leaf-node (one with 90% 1s and 10% 0s).  A second observation is that the p-values shown in the demo output are extremely small (i.e. strong) values &#8211; around 1e-9 (one part in a billion) &#8211; for good-quality splits.  We can also see &#8220;weak&#8221; p-values with magnitudes such as 0.7, 0.2, etc.  These are poor quality splits on the noise features that it rejects and does not use in the tree, exactly as we hope to see.</p>
+
+<p>Next, I will show a similar run with the standard available &#8220;entropy&#8221; quality measure, and a minimum gain threshold of 0.035, which is a value I had to determine by trial and error, as what kind of entropy gains one can expect to see, and where to cut them off, is somewhat unintuitive and likely to be very data dependent.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+<span class='line-number'>72</span>
+<span class='line-number'>73</span>
+<span class='line-number'>74</span>
+<span class='line-number'>75</span>
+<span class='line-number'>76</span>
+<span class='line-number'>77</span>
+<span class='line-number'>78</span>
+<span class='line-number'>79</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>scala&gt; val rf = demo.train("entropy", 0.035, noise = 0.1)
+</span><span class='line'>  impurity parent= 0.9970, left= 0.3274 (  50), right= 0.9997 ( 950) weighted= 0.9661
+</span><span class='line'>gain= 0.0310
+</span><span class='line'>  impurity parent= 0.9970, left= 0.1414 (  50), right= 0.9998 ( 950) weighted= 0.9569
+</span><span class='line'>gain= 0.0402
+</span><span class='line'>  impurity parent= 0.9970, left= 0.3274 (  50), right= 0.9997 ( 950) weighted= 0.9661
+</span><span class='line'>gain= 0.0310
+</span><span class='line'>
+</span><span class='line'>... more demo output ...
+</span><span class='line'>
+</span><span class='line'>rf: org.apache.spark.mllib.tree.model.RandomForestModel = 
+</span><span class='line'>TreeEnsembleModel classifier with 1 trees
+</span><span class='line'>
+</span><span class='line'>
+</span><span class='line'>scala&gt; println(rf.trees(0).toDebugString)
+</span><span class='line'>DecisionTreeModel classifier of depth 11 with 41 nodes
+</span><span class='line'>  If (feature 4 in {1.0})
+</span><span class='line'>   If (feature 12 in {1.0})
+</span><span class='line'>    If (feature 11 in {1.0})
+</span><span class='line'>     Predict: 1.0
+</span><span class='line'>    Else (feature 11 not in {1.0})
+</span><span class='line'>     Predict: 1.0
+</span><span class='line'>   Else (feature 12 not in {1.0})
+</span><span class='line'>    Predict: 1.0
+</span><span class='line'>  Else (feature 4 not in {1.0})
+</span><span class='line'>   If (feature 1 in {1.0})
+</span><span class='line'>    If (feature 12 in {1.0})
+</span><span class='line'>     Predict: 1.0
+</span><span class='line'>    Else (feature 12 not in {1.0})
+</span><span class='line'>     Predict: 1.0
+</span><span class='line'>   Else (feature 1 not in {1.0})
+</span><span class='line'>    If (feature 0 in {1.0})
+</span><span class='line'>     If (feature 10 in {0.0})
+</span><span class='line'>      If (feature 14 in {1.0})
+</span><span class='line'>       Predict: 1.0
+</span><span class='line'>      Else (feature 14 not in {1.0})
+</span><span class='line'>       Predict: 1.0
+</span><span class='line'>     Else (feature 10 not in {0.0})
+</span><span class='line'>      If (feature 14 in {0.0})
+</span><span class='line'>       Predict: 1.0
+</span><span class='line'>      Else (feature 14 not in {0.0})
+</span><span class='line'>       Predict: 1.0
+</span><span class='line'>    Else (feature 0 not in {1.0})
+</span><span class='line'>     If (feature 6 in {1.0})
+</span><span class='line'>      Predict: 1.0
+</span><span class='line'>     Else (feature 6 not in {1.0})
+</span><span class='line'>      If (feature 3 in {1.0})
+</span><span class='line'>       Predict: 1.0
+</span><span class='line'>      Else (feature 3 not in {1.0})
+</span><span class='line'>       If (feature 7 in {1.0})
+</span><span class='line'>        If (feature 13 in {1.0})
+</span><span class='line'>         Predict: 1.0
+</span><span class='line'>        Else (feature 13 not in {1.0})
+</span><span class='line'>         Predict: 1.0
+</span><span class='line'>       Else (feature 7 not in {1.0})
+</span><span class='line'>        If (feature 2 in {1.0})
+</span><span class='line'>         Predict: 1.0
+</span><span class='line'>        Else (feature 2 not in {1.0})
+</span><span class='line'>         If (feature 8 in {1.0})
+</span><span class='line'>          Predict: 1.0
+</span><span class='line'>         Else (feature 8 not in {1.0})
+</span><span class='line'>          If (feature 9 in {1.0})
+</span><span class='line'>           If (feature 11 in {1.0})
+</span><span class='line'>            If (feature 13 in {1.0})
+</span><span class='line'>             Predict: 1.0
+</span><span class='line'>            Else (feature 13 not in {1.0})
+</span><span class='line'>             Predict: 1.0
+</span><span class='line'>           Else (feature 11 not in {1.0})
+</span><span class='line'>            If (feature 12 in {1.0})
+</span><span class='line'>             Predict: 1.0
+</span><span class='line'>            Else (feature 12 not in {1.0})
+</span><span class='line'>             Predict: 1.0
+</span><span class='line'>          Else (feature 9 not in {1.0})
+</span><span class='line'>           If (feature 5 in {1.0})
+</span><span class='line'>            Predict: 1.0
+</span><span class='line'>           Else (feature 5 not in {1.0})
+</span><span class='line'>            Predict: 0.0
+</span><span class='line'>
+</span><span class='line'>scala&gt; </span></code></pre></td></tr></table></div></figure>
+
+
+<p>The first observation is that <strong>the resulting tree using entropy as a split quality measure is twice the size of the tree trained using the chi-squared policy.</strong>  Worse, it is using the noise features &#8211; its quality measure is yielding many more false positives.  The entropy-based model is less parsimonious and will also have performance problems since the model has included very noisy features.</p>
+
+<p>Lastly, I ran a similar training using the &#8220;gini&#8221; impurity measure, and a 0.015 quality threshold (again, hopefully optimal value that I had to run multiple experiments to identify).  Its quality is better than the entropy-based measure, but this model is still substantially larger than the chi-squared model, and it still uses some noise features:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>scala&gt; val rf = demo.train("gini", 0.015, noise = 0.1)
+</span><span class='line'>  impurity parent= 0.4999, left= 0.2952 (  50), right= 0.4987 ( 950) weighted= 0.4885
+</span><span class='line'>gain= 0.0113
+</span><span class='line'>  impurity parent= 0.4999, left= 0.2112 (  50), right= 0.4984 ( 950) weighted= 0.4840
+</span><span class='line'>gain= 0.0158
+</span><span class='line'>  impurity parent= 0.4999, left= 0.1472 (  50), right= 0.4981 ( 950) weighted= 0.4806
+</span><span class='line'>gain= 0.0193
+</span><span class='line'>  impurity parent= 0.4999, left= 0.2112 (  50), right= 0.4984 ( 950) weighted= 0.4840
+</span><span class='line'>gain= 0.0158
+</span><span class='line'>
+</span><span class='line'>... more demo output ...
+</span><span class='line'>
+</span><span class='line'>rf: org.apache.spark.mllib.tree.model.RandomForestModel = 
+</span><span class='line'>TreeEnsembleModel classifier with 1 trees
+</span><span class='line'>
+</span><span class='line'>scala&gt; println(rf.trees(0).toDebugString)
+</span><span class='line'>DecisionTreeModel classifier of depth 12 with 31 nodes
+</span><span class='line'>  If (feature 6 in {1.0})
+</span><span class='line'>   Predict: 1.0
+</span><span class='line'>  Else (feature 6 not in {1.0})
+</span><span class='line'>   If (feature 3 in {1.0})
+</span><span class='line'>    Predict: 1.0
+</span><span class='line'>   Else (feature 3 not in {1.0})
+</span><span class='line'>    If (feature 1 in {1.0})
+</span><span class='line'>     Predict: 1.0
+</span><span class='line'>    Else (feature 1 not in {1.0})
+</span><span class='line'>     If (feature 8 in {1.0})
+</span><span class='line'>      Predict: 1.0
+</span><span class='line'>     Else (feature 8 not in {1.0})
+</span><span class='line'>      If (feature 2 in {1.0})
+</span><span class='line'>       If (feature 14 in {0.0})
+</span><span class='line'>        Predict: 1.0
+</span><span class='line'>       Else (feature 14 not in {0.0})
+</span><span class='line'>        Predict: 1.0
+</span><span class='line'>      Else (feature 2 not in {1.0})
+</span><span class='line'>       If (feature 5 in {1.0})
+</span><span class='line'>        Predict: 1.0
+</span><span class='line'>       Else (feature 5 not in {1.0})
+</span><span class='line'>        If (feature 7 in {1.0})
+</span><span class='line'>         Predict: 1.0
+</span><span class='line'>        Else (feature 7 not in {1.0})
+</span><span class='line'>         If (feature 0 in {1.0})
+</span><span class='line'>          If (feature 12 in {1.0})
+</span><span class='line'>           If (feature 10 in {0.0})
+</span><span class='line'>            Predict: 1.0
+</span><span class='line'>           Else (feature 10 not in {0.0})
+</span><span class='line'>            Predict: 1.0
+</span><span class='line'>          Else (feature 12 not in {1.0})
+</span><span class='line'>           Predict: 1.0
+</span><span class='line'>         Else (feature 0 not in {1.0})
+</span><span class='line'>          If (feature 9 in {1.0})
+</span><span class='line'>           Predict: 1.0
+</span><span class='line'>          Else (feature 9 not in {1.0})
+</span><span class='line'>           If (feature 4 in {1.0})
+</span><span class='line'>            If (feature 10 in {0.0})
+</span><span class='line'>             Predict: 1.0
+</span><span class='line'>            Else (feature 10 not in {0.0})
+</span><span class='line'>             If (feature 14 in {0.0})
+</span><span class='line'>              Predict: 1.0
+</span><span class='line'>             Else (feature 14 not in {0.0})
+</span><span class='line'>              Predict: 1.0
+</span><span class='line'>           Else (feature 4 not in {1.0})
+</span><span class='line'>            Predict: 0.0
+</span><span class='line'>
+</span><span class='line'>scala&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p><a name="conclusion"></a></p>
+
+<h5>Conclusion</h5>
+
+<p>In this post I have discussed some advantages of using test statstics and p-values as split quality metrics for decision tree training:</p>
+
+<ul>
+<li>Consistency</li>
+<li>Awareness of sample size</li>
+<li>Higher quality model training</li>
+</ul>
+
+
+<p>I believe they are a useful tool for improved training of decision tree models!  Happy computing!</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1913,269 +2470,6 @@ text-align: center;
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2015/05/06/parallel-k-medoids-using-scala-parseq/">Parallel K-Medoids Using Scala ParSeq</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2015-05-06T16:33:00-07:00" pubdate data-updated="true">May 6<span>th</span>, 2015</time>
-        
-        
-         | <a href="/blog/2015/05/06/parallel-k-medoids-using-scala-parseq/#feedback">Feedback</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Scala supplies a <a href="http://docs.scala-lang.org/overviews/parallel-collections/overview.html">parallel collections library</a> that was designed to make it easy for a programmer to add parallel computing over the elements in a collection.  In this post, I will describe a case study of applying Scala&#8217;s parallel collections to cleanly implement multithreading support for training a K-Medoids clustering model.</p>
-
-<h3>Motivation</h3>
-
-<p><a href="http://en.wikipedia.org/wiki/K-medoids">K-Medoids clustering</a> is a relative of K-Means clustering that does not require an algebra over input data elements.  That is, K-Medoids requires only a distance metric defined on elements in the data space, and can cluster objects which do not have a well-defined concept of addition or division that is necessary for computing the <a href="http://en.wikipedia.org/wiki/Centroid">centroids</a> required by K-Means.  For example, K-Medoids can cluster character strings, which have a notion of <a href="http://en.wikipedia.org/wiki/Edit_distance">distance</a>, but no notion of summation that could be used to compute a geometric centroid.</p>
-
-<p>This additional generality comes at a cost.  The medoid of a collection of elements is the member of the collection that minimizes some function F of the distances from that element to all the other elements in the collection.  For example, F might be the sum of distances from one element to all the elements, or perhaps the maximum distance, etc.  <strong>It is not hard to see that the cost of computing a medoid of (n) elements is quadratic in (n)</strong>: Evaluating F is linear in (n) and F in turn must be evaluated with respect to each element.  Furthermore, unlike centroid-based computations used in K-Means, computing a medoid does not naturally lend itself to common scale-out computing formalisms such as Spark RDDs, due to the full-cross-product nature of the computation.</p>
-
-<p>With this in mind, a more traditional multithreading approach is a good candidate to achieve some practical parallelism on modern multi-core hardware.  I&#8217;ll demonstrate that this is easy to implement in Scala with parallel sequences.</p>
-
-<h3>Non-Parallel Code</h3>
-
-<p>Consider a baseline non-parallel implementation of K-Medoids, as in the following example skeleton code.  (A working version of this code, under review at the time of this post, can be <a href="https://github.com/erikerlandson/silex/blob/parseq_blog/src/main/scala/com/redhat/et/silex/cluster/KMedoids.scala">viewed here</a>)</p>
-
-<figure class='code'><figcaption><span>A skeleton K-Medoids implementation </span></figcaption>
- <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-<span class='line-number'>44</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">class</span> <span class="nc">KMedoids</span><span class="o">[</span><span class="kt">T</span><span class="o">](</span><span class="n">k</span><span class="k">:</span> <span class="kt">Int</span><span class="o">,</span> <span class="n">metric</span><span class="k">:</span> <span class="o">(</span><span class="kt">T</span><span class="o">,</span> <span class="kt">T</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="nc">Double</span><span class="o">)</span> <span class="o">{</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="c1">// Train a K-Medoids cluster on some input data</span>
-</span><span class='line'>  <span class="k">def</span> <span class="n">train</span><span class="o">[</span><span class="kt">T</span><span class="o">](</span><span class="n">data</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">T</span><span class="o">])</span> <span class="o">{</span>
-</span><span class='line'>    <span class="k">var</span> <span class="n">current</span> <span class="k">=</span> <span class="c1">// randomly select k data elements as initial cluster</span>
-</span><span class='line'>
-</span><span class='line'>    <span class="k">var</span> <span class="n">model_converged</span> <span class="k">=</span> <span class="kc">false</span>
-</span><span class='line'>    <span class="k">while</span> <span class="o">(!</span><span class="n">model_converged</span><span class="o">)</span> <span class="o">{</span>
-</span><span class='line'>      <span class="c1">// assign each element to its closest medoid</span>
-</span><span class='line'>      <span class="k">val</span> <span class="n">clusters</span> <span class="k">=</span> <span class="n">data</span><span class="o">.</span><span class="n">groupBy</span><span class="o">(</span><span class="n">medoidIdx</span><span class="o">(</span><span class="k">_</span><span class="o">,</span> <span class="n">current</span><span class="o">)).</span><span class="n">map</span><span class="o">(</span><span class="k">_</span><span class="o">.</span><span class="n">_2</span><span class="o">)</span>
-</span><span class='line'>
-</span><span class='line'>      <span class="c1">// recompute the medoid from the latest cluster elements</span>
-</span><span class='line'>      <span class="k">val</span> <span class="n">next</span> <span class="k">=</span> <span class="n">benchmark</span><span class="o">(</span><span class="s">&quot;medoids&quot;</span><span class="o">)</span> <span class="o">{</span>
-</span><span class='line'>        <span class="n">clusters</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="n">medoid</span><span class="o">)</span>
-</span><span class='line'>      <span class="o">}</span>
-</span><span class='line'>
-</span><span class='line'>      <span class="n">model_converged</span> <span class="k">=</span> <span class="c1">// test for model convergence</span>
-</span><span class='line'>
-</span><span class='line'>      <span class="n">current</span> <span class="k">=</span> <span class="n">next</span>
-</span><span class='line'>    <span class="o">}</span>
-</span><span class='line'>  <span class="o">}</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="c1">// Return the medoid of some collection of elements</span>
-</span><span class='line'>  <span class="k">def</span> <span class="n">medoid</span><span class="o">(</span><span class="n">data</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">T</span><span class="o">])</span> <span class="k">=</span> <span class="o">{</span>
-</span><span class='line'>    <span class="n">benchmark</span><span class="o">(</span><span class="n">s</span><span class="s">&quot;medoid: n= ${data.length}&quot;</span><span class="o">)</span> <span class="o">{</span>
-</span><span class='line'>      <span class="n">data</span><span class="o">.</span><span class="n">minBy</span><span class="o">(</span><span class="n">medoidCost</span><span class="o">(</span><span class="k">_</span><span class="o">,</span> <span class="n">data</span><span class="o">)</span>
-</span><span class='line'>    <span class="o">}</span>
-</span><span class='line'>  <span class="o">}</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="c1">// The sum of an element&#39;s distance to all the elements in its cluster</span>
-</span><span class='line'>  <span class="k">def</span> <span class="n">medoidCost</span><span class="o">(</span><span class="n">e</span><span class="k">:</span> <span class="kt">T</span><span class="o">,</span> <span class="n">data</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">T</span><span class="o">])</span> <span class="k">=</span> <span class="n">data</span><span class="o">.</span><span class="n">iterator</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="n">metric</span><span class="o">(</span><span class="n">e</span><span class="o">,</span> <span class="k">_</span><span class="o">)).</span><span class="n">sum</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="c1">// Index of the closest medoid to an element</span>
-</span><span class='line'>  <span class="k">def</span> <span class="n">medoidIdx</span><span class="o">(</span><span class="n">e</span><span class="k">:</span> <span class="kt">T</span><span class="o">,</span> <span class="n">mv</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">T</span><span class="o">])</span> <span class="k">=</span> <span class="n">mv</span><span class="o">.</span><span class="n">iterator</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="n">metric</span><span class="o">(</span><span class="n">e</span><span class="o">,</span> <span class="k">_</span><span class="o">)).</span><span class="n">zipWithIndex</span><span class="o">.</span><span class="n">min</span><span class="o">.</span><span class="n">_2</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="c1">// Output a benchmark timing of some expression</span>
-</span><span class='line'>  <span class="k">def</span> <span class="n">benchmark</span><span class="o">[</span><span class="kt">T</span><span class="o">](</span><span class="n">label</span><span class="k">:</span> <span class="kt">String</span><span class="o">)(</span><span class="n">blk</span><span class="k">:</span> <span class="o">=&gt;</span> <span class="n">T</span><span class="o">)</span> <span class="k">=</span> <span class="o">{</span>
-</span><span class='line'>    <span class="k">val</span> <span class="n">t0</span> <span class="k">=</span> <span class="nc">System</span><span class="o">.</span><span class="n">nanoTime</span>
-</span><span class='line'>    <span class="k">val</span> <span class="n">t</span> <span class="k">=</span> <span class="n">blk</span>
-</span><span class='line'>    <span class="k">val</span> <span class="n">sec</span> <span class="k">=</span> <span class="o">(</span><span class="nc">System</span><span class="o">.</span><span class="n">nanoTime</span> <span class="o">-</span> <span class="n">t0</span><span class="o">)</span> <span class="o">/</span> <span class="mi">1</span><span class="n">e9</span>
-</span><span class='line'>    <span class="n">println</span><span class="o">(</span><span class="n">f</span><span class="s">&quot;Run time for $label = $sec%.1f&quot;</span><span class="o">);</span> <span class="nc">System</span><span class="o">.</span><span class="n">out</span><span class="o">.</span><span class="n">flush</span>
-</span><span class='line'>    <span class="n">t</span>
-</span><span class='line'>  <span class="o">}</span>
-</span><span class='line'><span class="o">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>If we run the code above (de-skeletonized), then we might see something like this output from our benchmarking, where I clustered a dataset of 40,000 randomly-generated (x,y,z) points by Gaussian sampling around 5 chosen centers.  (This data is numeric, but I provide only a distance metric on the points.  K-Medoids has no knowledge of the data except that it can run the given metric function on it):</p>
-
-<figure class='code'><figcaption><span>One iteration of a clustering run (k = 5) </span></figcaption>
-<div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Run time for medoid: n= 8299 = 7.7
-</span><span class='line'>Run time for medoid: n= 3428 = 1.2
-</span><span class='line'>Run time for medoid: n= 12581 = 17.0
-</span><span class='line'>Run time for medoid: n= 5731 = 3.3
-</span><span class='line'>Run time for medoid: n= 9961 = 10.2
-</span><span class='line'>Run time for medoids = 39.8</span></code></pre></td></tr></table></div></figure>
-
-
-<p>Observe that cluster sizes are generally not the same, and we can see the time per cluster varying quadratically with respect to cluster size.</p>
-
-<h3>A First Take On Parallel K-Medoids</h3>
-
-<p>Studying our non-parallel code above, we can see that the computation of each new medoid is independent, which makes it a likely place to inject some parallelism. A Scala sequence can be transformed into a corresponding parallel sequence using the <code>par</code> method, and so parallelizing our code is literally this simple:</p>
-
-<figure class='code'><figcaption><span>Parallelizing a collection with .par </span></figcaption>
- <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'>      <span class="c1">// recompute the medoid from the latest cluster elements</span>
-</span><span class='line'>      <span class="k">val</span> <span class="n">next</span> <span class="k">=</span> <span class="n">benchmark</span><span class="o">(</span><span class="s">&quot;medoids&quot;</span><span class="o">)</span> <span class="o">{</span>
-</span><span class='line'>        <span class="n">clusters</span><span class="o">.</span><span class="n">par</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="n">medoid</span><span class="o">).</span><span class="n">seq</span>
-</span><span class='line'>      <span class="o">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>In this block, I also apply <code>.seq</code> at the end, which is not always necessary but can avoid type mismatches between <code>Seq[T]</code> and <code>ParSeq[T]</code> under some circumstances.</p>
-
-<p>In my case I also wish to exercise some control over the threading used by the parallelism, and so I explicitly assign a <code>ForkJoinPool</code> thread pool to the sequence:</p>
-
-<figure class='code'><figcaption><span>Set the threading used by a Scala ParSeq </span></figcaption>
- <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'>      <span class="c1">// establish a thread pool for use by K-Medoids</span>
-</span><span class='line'>      <span class="k">val</span> <span class="n">threadPool</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">ForkJoinPool</span><span class="o">(</span><span class="n">numThreads</span><span class="o">)</span>
-</span><span class='line'>
-</span><span class='line'>      <span class="c1">// ...</span>
-</span><span class='line'>
-</span><span class='line'>      <span class="c1">// recompute the medoid from the latest cluster elements</span>
-</span><span class='line'>      <span class="k">val</span> <span class="n">next</span> <span class="k">=</span> <span class="n">benchmark</span><span class="o">(</span><span class="s">&quot;medoids&quot;</span><span class="o">)</span> <span class="o">{</span>
-</span><span class='line'>        <span class="k">val</span> <span class="n">pseq</span> <span class="k">=</span> <span class="n">clusters</span><span class="o">.</span><span class="n">par</span>
-</span><span class='line'>        <span class="n">pseq</span><span class="o">.</span><span class="n">tasksupport</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">ForkJoinTaskSupport</span><span class="o">(</span><span class="n">threadPool</span><span class="o">)</span>
-</span><span class='line'>        <span class="n">pseq</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="n">medoid</span><span class="o">).</span><span class="n">seq</span>
-</span><span class='line'>      <span class="o">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>Minor grievance: it would be nice if Scala supported some &#8216;in-line&#8217; methods, like <code>seq.par(n)...</code> and <code>seq.par(threadPool)...</code>, instead of requiring the programmer to break the flow of the code to invoke <code>tasksupport =</code>, which returns <code>Unit</code>.</p>
-
-<p>Now that we&#8217;ve parallelized our K-Medoids training, we should see how well it responds to additional threads.  I ran the above parallelized version using <code>{1, 2, 4, 8, 16, 32}</code> threads, on a machine with 40 cores, so that my benchmarking would not be impacted by attempting to run more threads than there are cores to support them.  I also ran two versions of test data.  The first I generated with clusters of equal size (5 clusters of ~8000 elements), and the second with one cluster being twice as large (1 cluster of ~13300 and 4 clusters of ~6700).  Following is a plot of throughput (iterations / second) versus threads:</p>
-
-<p><img class="left" src="/assets/images/parseq/by_cluster_1.png" title="Throughput As A Function Of Threads" ></p>
-
-<p>In the best of all possible worlds, our throughput would increase linearly with the number of threads; double the threads, double our iterations per second.  Instead, our throughput starts to increase nicely as we add threads, but hits a hard ceiling at 8 threads.  It is not hard to see why: our parallelism is limited by the number of elements in our collection of clusters.  In our case that is k = 5, and so we reach our ceiling at 8 threads, the first thread number >= 5.  Furthermore, we see that when the size of clusters is unequal, the throughput suffers even more.  The time required to complete the clustering is dominated by the most expensive element.  In our case, the cluster that is twice the size of other clusters:</p>
-
-<figure class='code'><figcaption><span>Run time is dominated by largest cluster </span></figcaption>
-<div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Run time for medoid: n= 6695 = 5.1
-</span><span class='line'>Run time for medoid: n= 6686 = 5.2
-</span><span class='line'>Run time for medoid: n= 6776 = 5.3
-</span><span class='line'>Run time for medoid: n= 6682 = 5.4
-</span><span class='line'>Run time for medoid: n= 13161 = 19.9
-</span><span class='line'>Run time for medoids = 19.9</span></code></pre></td></tr></table></div></figure>
-
-
-<h3>Take 2: Improving The Use Of Threads</h3>
-
-<p>Fortunately it is not hard to improve on this situation.  If parallelizing by cluster is too coarse, we can try pushing our parallelism down one level of granularity.  In our case, that means parallelizing the outer loop of our medoid function, and it is just as easy as before:</p>
-
-<figure class='code'><figcaption><span>Parallelize the outer loop of medoid computation </span></figcaption>
- <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'>  <span class="c1">// Return the medoid of some collection of elements</span>
-</span><span class='line'>  <span class="k">def</span> <span class="n">medoid</span><span class="o">(</span><span class="n">data</span><span class="k">:</span> <span class="kt">Seq</span><span class="o">[</span><span class="kt">T</span><span class="o">])</span> <span class="k">=</span> <span class="o">{</span>
-</span><span class='line'>    <span class="n">benchmark</span><span class="o">(</span><span class="n">s</span><span class="s">&quot;medoid: n= ${data.length}&quot;</span><span class="o">)</span> <span class="o">{</span>
-</span><span class='line'>      <span class="k">val</span> <span class="n">pseq</span> <span class="k">=</span> <span class="n">data</span><span class="o">.</span><span class="n">par</span>
-</span><span class='line'>      <span class="n">pseq</span><span class="o">.</span><span class="n">tasksupport</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">ForkJoinTaskSupport</span><span class="o">(</span><span class="n">threadPool</span><span class="o">)</span>
-</span><span class='line'>      <span class="n">pseq</span><span class="o">.</span><span class="n">minBy</span><span class="o">(</span><span class="n">medoidCost</span><span class="o">(</span><span class="k">_</span><span class="o">,</span> <span class="n">data</span><span class="o">)</span>
-</span><span class='line'>    <span class="o">}</span>
-</span><span class='line'>  <span class="o">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>Note that I retained the previous parallelism at the cluster level, otherwise the algorithm would execute parallel medoids, but one cluster at a time.  Also observe that we are applying the same thread pool we supplied to the ParSeq at the cluster level.  Scala&#8217;s parallel logic can utilize the same thread pool at multiple granularities without blocking.  This makes it very clean to control the total number of threads used by some computation, by simply re-using the same threadpool across all points of parallelism.</p>
-
-<p>Now, when we re-run our experiment, we see that our throughput continues to increase as we add threads.  The following plot illustrates the throughput increasing in comparison to the previous ceiling, and also that throughput is less sensitive to the cluster size, as threads can be allocated flexibly across clusters as they are available:</p>
-
-<p><img class="left" src="/assets/images/parseq/all_1.png" title="Thread utilization improves at finer granularity" ></p>
-
-<p>I hope this short case study has demonstrated how easy it is to add multithreading to computations with Scala parallel sequences, and some considerations for making the best use of available threads.  Happy Parallel Programming!</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/3/">&larr; Older</a>
@@ -2197,6 +2491,10 @@ text-align: center;
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2018/05/28/computing-smooth-max-and-its-gradients-without-over-and-underflow/">Computing Smooth Max and its Gradients Without Over- and Underflow</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2018/05/27/the-gradient-and-hessian-of-the-smooth-max-over-functions/">The Gradient and Hessian of the Smooth Max Over Functions</a>
       </li>
     
@@ -2210,10 +2508,6 @@ text-align: center;
     
       <li class="post">
         <a href="/blog/2016/09/05/expressing-map-reduce-as-a-left-folding-monoid/">Encoding Map-Reduce As A Monoid With Left Folding</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2016/08/31/supporting-competing-apis-in-scala-can-better-package-factoring-help/">Supporting Competing APIs in Scala &#8211; Can Better Package Factoring Help?</a>
       </li>
     
   </ul>
