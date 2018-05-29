@@ -3,7 +3,7 @@ layout: post
 title: "Computing Smooth Max and its Gradients Without Over- and Underflow"
 date: 2018-05-28 08:13
 comments: true
-categories: 
+categories: [ computing, convex optimization, gradient descent, optimization, math, smooth max, soft max, gradient, hessian ]
 ---
 In my [previous post](http://erikerlandson.github.io/blog/2018/05/27/the-gradient-and-hessian-of-the-smooth-max-over-functions/) I derived the gradient and Hessian for the smooth max function.
 The [Notorious JDC](https://www.johndcook.com/blog/) wrote a helpful companion post that describes [computational issues](https://www.johndcook.com/blog/2010/01/20/how-to-compute-the-soft-maximum/) of overflow and underflow with smooth max;

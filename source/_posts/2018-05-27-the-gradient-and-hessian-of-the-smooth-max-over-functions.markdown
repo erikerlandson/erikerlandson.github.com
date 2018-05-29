@@ -3,7 +3,7 @@ layout: post
 title: "The Gradient and Hessian of the Smooth Max Over Functions"
 date: 2018-05-27 09:36
 comments: true
-categories: 
+categories: [ computing, convex optimization, gradient descent, optimization, math, smooth max, soft max, gradient, hessian ]
 ---
 Suppose you have a set of functions over a vector space, and you are interested in taking the smooth-maximum over those functions.
 For example, maybe you are doing gradient descent, or convex optimization, etc, and you need a variant on "maximum" that has a defined gradient.
