@@ -42,9 +42,9 @@ of the planar surface is feasible!
 
 Thinking about these issues made me wonder if a more direct approach was possible.
 Another way to think about this problem is to minimize the maximum f<sub>k</sub>;
-If there is a minimum < 0 at a point x, then x is a feasible point satisfying all f<sub>k</sub>.
-If the minimum is > 0, then we have definitive proof that no feasible point exists, and
-our constraints can't be met.
+If the maximum f<sub>k</sub> is < 0 at a point x, then x is a feasible point satisfying all f<sub>k</sub>.
+If the smallest-possible maximum f<sub>k</sub> is > 0, then we have definitive proof that no
+feasible point exists, and our constraints can't be satisfied.
 
 Taking a maximum preserves convexity, which is a good start, but maximum isn't differentiable everywhere.
 The boundaries between regions where different functions are the maximum are not smooth, and along
