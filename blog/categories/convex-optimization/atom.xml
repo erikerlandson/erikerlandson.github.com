@@ -4,7 +4,7 @@
   <title><![CDATA[Category: convex optimization | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/convex-optimization/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2018-06-03T20:23:54-07:00</updated>
+  <updated>2018-06-04T07:28:04-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -55,9 +55,9 @@ of the planar surface is feasible!</p>
 
 <p>Thinking about these issues made me wonder if a more direct approach was possible.
 Another way to think about this problem is to minimize the maximum f<sub>k</sub>;
-If there is a minimum &lt; 0 at a point x, then x is a feasible point satisfying all f<sub>k</sub>.
-If the minimum is > 0, then we have definitive proof that no feasible point exists, and
-our constraints can't be met.</p>
+If the maximum f<sub>k</sub> is &lt; 0 at a point x, then x is a feasible point satisfying all f<sub>k</sub>.
+If the smallest-possible maximum f<sub>k</sub> is > 0, then we have definitive proof that no
+feasible point exists, and our constraints can't be satisfied.</p>
 
 <p>Taking a maximum preserves convexity, which is a good start, but maximum isn't differentiable everywhere.
 The boundaries between regions where different functions are the maximum are not smooth, and along
