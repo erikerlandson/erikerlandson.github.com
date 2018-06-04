@@ -1,0 +1,462 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Solving Feasible Points With Smooth-Max - tool monkey</title>
+  <meta name="author" content="Erik Erlandson">
+
+  
+  <meta name="description" content="Overture Lately I have been fooling around with an implementation of the Barrier Method for convex optimization with constraints.
+One of the &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://erikerlandson.github.com/blog/2018/06/03/solving-feasible-points-with-smooth-max/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="tool monkey" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+
+  <!-- enables inclusion of MathJax LaTeX: http://greglus.com/blog/2011/11/29/integrate-MathJax-LaTeX-and-MathML-Markup-in-Octopress/ -->
+  <script type="text/javascript"
+    src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">tool monkey</a></h1>
+  
+    <h2>adventures of an unfrozen caveman programmer</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:erikerlandson.github.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Solving Feasible Points With Smooth-Max</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2018-06-03T14:21:00-07:00" pubdate data-updated="true">Jun 3<span>rd</span>, 2018</time>
+        
+        
+         | <a href="#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><h3>Overture</h3>
+
+<p>Lately I have been fooling around with an <a href="https://github.com/erikerlandson/gibbous">implementation</a> of the <a href="#cite1">Barrier Method</a> for convex optimization with constraints.
+One of the characteristics of the Barrier Method is that it requires an initial-guess from inside the
+<em>feasible region</em>: that is, a point which is known to satisfy all of the inequality constraints provided
+by the user.
+For some optimization problems, it is straightforward to find such a point by using knowledge about the problem
+domain, but in many situations it is not at all obvious how to identify such a point, or even if a
+feasible point exists. The feasible region might be empty!</p>
+
+<p>Boyd and Vandenberghe discuss a couple approaches to finding feasible points in §11.4 of <a href="#cite1">[1]</a>.
+These methods require you to set up an &#8220;augmented&#8221; minimization problem:
+<img src="/assets/images/feasible/y9czf8u7.png" alt="eq1" /></p>
+
+<p>As you can see from the above, you have to set up an &#8220;augmented&#8221; space x+s, where (s) represents an additional
+dimension, and constraint functions are augmented to f<sub>k</sub>-s</p>
+
+<h3>The Problem</h3>
+
+<p>I experimented a little with these, and while I am confident they work for most problems having multiple
+inequality constraints, my unit testing tripped over an ironic deficiency:
+when I attempted to solve a feasible point for a single planar constraint, the numerics went a bit haywire.
+Specifically, a linear constraint function happens to have a singular Hessian of all zeroes.
+The final Hessian, coming out of the log barrier function, could be consumed by SVD to get a search direction
+but the resulting gradients behaved poorly.</p>
+
+<p>Part of the problem seems to be that the nature of this augmented minimization problem forces the algorithms
+to push (s) ever downward, but letting (s) transitively push the f<sub>k</sub> with the augmented constraint
+functions f<sub>k</sub>-s. When only a single linear constraint function is in play, the resulting gradient
+caused augmented dimension (s) to converge <em>against</em> the movement of the remaining (unaugmented) sub-space.
+The minimization did not converge to a feasible point, even though literally half of the space on one side
+of the planar surface is feasible!</p>
+
+<h3>Smooth Max</h3>
+
+<p>Thinking about these issues made me wonder if a more direct approach was possible.
+Another way to think about this problem is to minimize the maximum f<sub>k</sub>;
+If there is a minimum &lt; 0 at a point x, then x is a feasible point satisfying all f<sub>k</sub>.
+If the minimum is > 0, then we have definitive proof that no feasible point exists, and
+our constraints can&#8217;t be met.</p>
+
+<p>Taking a maximum preserves convexity, which is a good start, but maximum isn&#8217;t differentiable everywhere.
+The boundaries between regions where different functions are the maximum are not smooth, and along
+those boundaries there is no gradient, and therefore no Hessian either.</p>
+
+<p>However, there is a variation on this idea, known as smooth-max, defined like so:</p>
+
+<p><img src="/assets/images/feasible/y8cgykuc.png" alt="eq2" /></p>
+
+<p>Smooth-max has a well defined <a href="http://erikerlandson.github.io/blog/2018/05/27/the-gradient-and-hessian-of-the-smooth-max-over-functions/">gradient and Hessian</a>, and furthermore can be computed in a <a href="http://erikerlandson.github.io/blog/2018/05/28/computing-smooth-max-and-its-gradients-without-over-and-underflow/">numerically stable</a> way.
+The sum inside the logarithm above is a sum of exponentials of convex functions.
+This is good news; exponentials of convex functions are log-convex, and a sum of log-convex functions is also
+log-convex.</p>
+
+<p>That means I have the necessary tools to set up the my mini-max problem:
+For a given set of convex constraint functions f<sub>k</sub>, I create a functions which is the soft-max of
+these, and I minimize it.</p>
+
+<h3>Go Directly to Jail</h3>
+
+<p>I set about implementing my smooth-max idea, and immediately ran into almost the same problem as before.
+If I try to solve for a single planar constraint, my Hessian degenerates to all-zeros!
+When I unpacked the smoothmax-formula for a single constraint f<sub>k</sub>, it indeed is just f<sub>k</sub>,
+zero Hessian and all!</p>
+
+<h3>More is More</h3>
+
+<p>What to do?
+Well you know what form of constraint <em>always</em> has a well behaved Hessian? A circle, that&#8217;s what.
+More technically, an n-dimensional ball, or n-ball.
+What if I add a new constraint of the form:</p>
+
+<p><img src="/assets/images/feasible/yd8xg64k.png" alt="eq3" /></p>
+
+<p>This constraint equation is quadratic, and its Hessian is I<sub>n</sub>.
+If I include this in my set of constraints, my smooth-max Hessian will be non-singular!</p>
+
+<p>Since I do not know a priori where my feasible point might lie, I start with my n-ball centered at
+my initial guess, and minimize. The result might look something like this:</p>
+
+<p><img src="/assets/images/feasible/fig1.png" alt="fig1" /></p>
+
+<p>Because the optimization is minimizing the maximum f<sub>k</sub>, the optimal point may not be feasible,
+but if not it <em>will</em> end up closer to the feasible region than before.
+This suggests an iterative algorithm, where I update the location of the n-ball at each iteration,
+until the resulting optimized point lies on the intersection of my original constraints and my
+additional n-ball constraint:</p>
+
+<p><img src="/assets/images/feasible/fig2.png" alt="fig2" /></p>
+
+<h3>Caught in the Underflow</h3>
+
+<p>I implemented the iterative algorithm above (you can see what this loop looks like <a href="https://github.com/erikerlandson/gibbous/blob/blog/feasible-points/src/main/java/com/manyangled/gibbous/optim/convex/ConvexOptimizer.java#L134">here</a>),
+and it worked exactly as I hoped&#8230;
+at least on my initial tests.
+However, eventually I started playing with its convergence behavior by moving my constraint region farther
+from the initial guess, to see how it would cope.
+Suddenly the algorithm began failing again.
+When I drilled down on why, I was taken aback to discover that my Hessian matrix was once again showing
+up as all zeros!</p>
+
+<p>The reason was interesting.
+Recall that I used a <a href="http://erikerlandson.github.io/blog/2018/05/28/computing-smooth-max-and-its-gradients-without-over-and-underflow/">modified formula</a> to stabilize my smooth-max computations.
+In particular, the &#8220;stabilized&#8221; formula for the Hessian looks like this:</p>
+
+<p><img src="/assets/images/smoothmax/eq3b.png" alt="eq4" /></p>
+
+<p>So, what was going on?
+As I started moving my feasible region farther away, the corresponding constraint function started to
+dominate the exponential terms in the equation above.
+In other words, the distance to the feasible region became the (z) in these equations, and
+this z value was large enough to drive the terms corresponding to my n-ball constraint to zero!</p>
+
+<p>However, I have a lever to mitigate this problem.
+If I make the α parameter <em>small</em> enough, it will compress these exponent ranges and prevent my
+n-ball Hessian terms from washing out.
+Decreasing α makes smooth-max more rounded-out, and decreases the sharpness of the approximation to the true max,
+but minimizing smooth-max still yields the same minimum <em>location</em> as true maximum, and so playing this
+trick does not undermine my results.</p>
+
+<p>How small is small enough?
+α is essentially a free parameter, but I found that if I set it at each iteration,
+such that I make sure that my n-ball Hessian coefficient never drops below 1e-3 (but may be larger),
+then my Hessian is always well behaved.
+Note that as my iterations grow closer to the true feasible region, I can gradually allow α to
+grow larger.
+Currently, I don&#8217;t increase α larger than 1, to avoid creating curvatures too large, but I have not
+experimented deeply with what actually happens if it were allowed to grow larger.
+You can see what this looks like in my current implementation <a href="https://github.com/erikerlandson/gibbous/blob/blog/feasible-points/src/main/java/com/manyangled/gibbous/optim/convex/ConvexOptimizer.java#L153">here</a>.</p>
+
+<h3>Convergence</h3>
+
+<p>Tuning the smooth-max α parameter gave me numeric stability, but I noticed that as the feasible region
+grew more distant from my initial guess, the algorithm&#8217;s time to converge grew larger fairly quickly.
+When I studied its behavior, I saw that at large distances, the quadratic &#8220;cost&#8221; of my n-ball constraint
+effectively pulled the optimal point fairly close to my n-ball center.
+This doesn&#8217;t prevent the algorithm from finding a solution, but it does prevent it from going long distances
+very fast.
+To solve this adaptively, I added a scaling factor s to my n-ball constraint function.
+The scaled version of the function looks like:</p>
+
+<p><img src="/assets/images/feasible/y9gndl2f.png" alt="eq5" /></p>
+
+<p>In my case, when my distances to a feasible region grow large, I want s to become small, so that it
+causes the cost of the n-ball constraint to grow more slowly, and allow the optimization to move
+farther, faster.
+The following diagram illustrates this intuition:</p>
+
+<p><img src="/assets/images/feasible/fig3.png" alt="fig3" /></p>
+
+<p>In my algorithm, I set s = 1/σ, where σ represents the
+&#8220;scale&#8221; of the current distance to feasible region.
+The n-ball function grows as the square of the distance to the ball center; therefore I
+set σ=(k)sqrt(s), so that it grows proportionally to the square root of the current largest user constraint
+cost.
+Here, (k) is a proportionality constant.
+It too is a somewhat magic free parameter, but I have found that k=1.5 yields fast convergences and
+good results.
+One last trick I play is that I prevent σ from becoming less than a minimum value, currently 10.
+This ensures that my n-ball constraint never dominates the total constraint sum, even as the
+optimization converges close to the feasible region.
+I want my &#8220;true&#8221; user constraints to dominate the behavior near the optimum, since those are the
+constraints that matter.
+The code is shorter than the explaination: you can see it <a href="https://github.com/erikerlandson/gibbous/blob/blog/feasible-points/src/main/java/com/manyangled/gibbous/optim/convex/ConvexOptimizer.java#L143">here</a></p>
+
+<h3>Conclusion</h3>
+
+<p>After applying all these intuitions, the resulting algorithm appears to be numerically stable and also
+converges pretty quickly even when the initial guess is very far from the true feasible region.
+To review, you can look at the main loop of this algorithm starting <a href="https://github.com/erikerlandson/gibbous/blob/blog/feasible-points/src/main/java/com/manyangled/gibbous/optim/convex/ConvexOptimizer.java#L128">here</a>.</p>
+
+<p>I&#8217;ve learned a lot about convex optimization and feasible point solving from working through practical
+problems as I made mistakes and fixed them.
+I&#8217;m fairly new to the whole arena of convex optimization, and I expect I&#8217;ll learn a lot more as I go.
+Happy Computing!</p>
+
+<h3>References</h3>
+
+<p><a name="cite1"</a>
+[1] §11.3 of <em>Convex Optimization</em>, Boyd and Vandenberghe, Cambridge University Press, 2008</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Erik Erlandson</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2018-06-03T14:21:00-07:00" pubdate data-updated="true">Jun 3<span>rd</span>, 2018</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/computing/'>computing</a>, <a class='category' href='/blog/categories/convex-optimization/'>convex optimization</a>, <a class='category' href='/blog/categories/feasible-point/'>feasible point</a>, <a class='category' href='/blog/categories/math/'>math</a>, <a class='category' href='/blog/categories/optimization/'>optimization</a>
+  
+</span>
+
+
+      <br>
+<a id="feedback"></a>Feedback • 
+ 
+    <script type="text/javascript" src="//platform.twitter.com/widgets.js"></script>
+    
+  <a href="https://twitter.com/intent/tweet?text=@manyangled%20re:%20http://erikerlandson.github.com/blog/2018/06/03/solving-feasible-points-with-smooth-max/">Reply to this post on Twitter</a> • 
+ 
+<a href="mailto:erikerlandson@yahoo.com">Email the author</a>
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://erikerlandson.github.com/blog/2018/06/03/solving-feasible-points-with-smooth-max/" data-via="manyangled" data-counturl="http://erikerlandson.github.com/blog/2018/06/03/solving-feasible-points-with-smooth-max/" >Tweet</a>
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2018/05/28/computing-smooth-max-and-its-gradients-without-over-and-underflow/" title="Previous Post: Computing Smooth Max and its Gradients Without Over- and Underflow">&laquo; Computing Smooth Max and its Gradients Without Over- and Underflow</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>About The Author</h1>
+  <p>Erik is a software engineer at <a href="http://www.redhat.com">Red Hat</a> where he contributes to the <a href="https://radanalytics.io/">radanalytics.io</a> upstream community.
+</section>
+<section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2018/06/03/solving-feasible-points-with-smooth-max/">Solving Feasible Points With Smooth-Max</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2018/05/28/computing-smooth-max-and-its-gradients-without-over-and-underflow/">Computing Smooth Max and its Gradients Without Over- and Underflow</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2018/05/27/the-gradient-and-hessian-of-the-smooth-max-over-functions/">The Gradient and Hessian of the Smooth Max Over Functions</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2017/08/23/generalizing-the-concept-of-release-versioning/">Rethinking the Concept of Release Versioning</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2016/12/19/converging-monoid-addition-for-t-digest/">Converging Monoid Addition for T-Digest</a>
+      </li>
+    
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/erikerlandson">@erikerlandson</a> on GitHub
+  
+  <script type="text/javascript">
+    $.domReady(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'erikerlandson',
+            count: 0,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+
+<section>
+  <h1>Latest Tweets</h1>
+  <ul id="tweets">
+    <li class="loading">Status updating...</li>
+  </ul>
+  <script type="text/javascript">
+    $.domReady(function(){
+      getTwitterFeed("manyangled", 4, true);
+    });
+  </script>
+  <script src="/javascripts/twitter.js" type="text/javascript"> </script>
+  
+    <a href="http://twitter.com/manyangled" class="twitter-follow-button" data-show-count="false">Follow @manyangled</a>
+  
+</section>
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2018 - Erik Erlandson -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+
+
+
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>

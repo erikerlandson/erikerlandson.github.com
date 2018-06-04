@@ -4,7 +4,7 @@
   <title><![CDATA[Category: optimization | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/optimization/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2018-05-29T06:31:05-07:00</updated>
+  <updated>2018-06-03T20:23:54-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,194 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Solving Feasible Points With Smooth-Max]]></title>
+    <link href="http://erikerlandson.github.com/blog/2018/06/03/solving-feasible-points-with-smooth-max/"/>
+    <updated>2018-06-03T14:21:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2018/06/03/solving-feasible-points-with-smooth-max</id>
+    <content type="html"><![CDATA[<h3>Overture</h3>
+
+<p>Lately I have been fooling around with an <a href="https://github.com/erikerlandson/gibbous">implementation</a> of the <a href="#cite1">Barrier Method</a> for convex optimization with constraints.
+One of the characteristics of the Barrier Method is that it requires an initial-guess from inside the
+<em>feasible region</em>: that is, a point which is known to satisfy all of the inequality constraints provided
+by the user.
+For some optimization problems, it is straightforward to find such a point by using knowledge about the problem
+domain, but in many situations it is not at all obvious how to identify such a point, or even if a
+feasible point exists. The feasible region might be empty!</p>
+
+<p>Boyd and Vandenberghe discuss a couple approaches to finding feasible points in §11.4 of <a href="#cite1">[1]</a>.
+These methods require you to set up an "augmented" minimization problem:
+<img src="/assets/images/feasible/y9czf8u7.png" alt="eq1" /></p>
+
+<p>As you can see from the above, you have to set up an "augmented" space x+s, where (s) represents an additional
+dimension, and constraint functions are augmented to f<sub>k</sub>-s</p>
+
+<h3>The Problem</h3>
+
+<p>I experimented a little with these, and while I am confident they work for most problems having multiple
+inequality constraints, my unit testing tripped over an ironic deficiency:
+when I attempted to solve a feasible point for a single planar constraint, the numerics went a bit haywire.
+Specifically, a linear constraint function happens to have a singular Hessian of all zeroes.
+The final Hessian, coming out of the log barrier function, could be consumed by SVD to get a search direction
+but the resulting gradients behaved poorly.</p>
+
+<p>Part of the problem seems to be that the nature of this augmented minimization problem forces the algorithms
+to push (s) ever downward, but letting (s) transitively push the f<sub>k</sub> with the augmented constraint
+functions f<sub>k</sub>-s. When only a single linear constraint function is in play, the resulting gradient
+caused augmented dimension (s) to converge <em>against</em> the movement of the remaining (unaugmented) sub-space.
+The minimization did not converge to a feasible point, even though literally half of the space on one side
+of the planar surface is feasible!</p>
+
+<h3>Smooth Max</h3>
+
+<p>Thinking about these issues made me wonder if a more direct approach was possible.
+Another way to think about this problem is to minimize the maximum f<sub>k</sub>;
+If there is a minimum &lt; 0 at a point x, then x is a feasible point satisfying all f<sub>k</sub>.
+If the minimum is > 0, then we have definitive proof that no feasible point exists, and
+our constraints can't be met.</p>
+
+<p>Taking a maximum preserves convexity, which is a good start, but maximum isn't differentiable everywhere.
+The boundaries between regions where different functions are the maximum are not smooth, and along
+those boundaries there is no gradient, and therefore no Hessian either.</p>
+
+<p>However, there is a variation on this idea, known as smooth-max, defined like so:</p>
+
+<p><img src="/assets/images/feasible/y8cgykuc.png" alt="eq2" /></p>
+
+<p>Smooth-max has a well defined <a href="http://erikerlandson.github.io/blog/2018/05/27/the-gradient-and-hessian-of-the-smooth-max-over-functions/">gradient and Hessian</a>, and furthermore can be computed in a <a href="http://erikerlandson.github.io/blog/2018/05/28/computing-smooth-max-and-its-gradients-without-over-and-underflow/">numerically stable</a> way.
+The sum inside the logarithm above is a sum of exponentials of convex functions.
+This is good news; exponentials of convex functions are log-convex, and a sum of log-convex functions is also
+log-convex.</p>
+
+<p>That means I have the necessary tools to set up the my mini-max problem:
+For a given set of convex constraint functions f<sub>k</sub>, I create a functions which is the soft-max of
+these, and I minimize it.</p>
+
+<h3>Go Directly to Jail</h3>
+
+<p>I set about implementing my smooth-max idea, and immediately ran into almost the same problem as before.
+If I try to solve for a single planar constraint, my Hessian degenerates to all-zeros!
+When I unpacked the smoothmax-formula for a single constraint f<sub>k</sub>, it indeed is just f<sub>k</sub>,
+zero Hessian and all!</p>
+
+<h3>More is More</h3>
+
+<p>What to do?
+Well you know what form of constraint <em>always</em> has a well behaved Hessian? A circle, that's what.
+More technically, an n-dimensional ball, or n-ball.
+What if I add a new constraint of the form:</p>
+
+<p><img src="/assets/images/feasible/yd8xg64k.png" alt="eq3" /></p>
+
+<p>This constraint equation is quadratic, and its Hessian is I<sub>n</sub>.
+If I include this in my set of constraints, my smooth-max Hessian will be non-singular!</p>
+
+<p>Since I do not know a priori where my feasible point might lie, I start with my n-ball centered at
+my initial guess, and minimize. The result might look something like this:</p>
+
+<p><img src="/assets/images/feasible/fig1.png" alt="fig1" /></p>
+
+<p>Because the optimization is minimizing the maximum f<sub>k</sub>, the optimal point may not be feasible,
+but if not it <em>will</em> end up closer to the feasible region than before.
+This suggests an iterative algorithm, where I update the location of the n-ball at each iteration,
+until the resulting optimized point lies on the intersection of my original constraints and my
+additional n-ball constraint:</p>
+
+<p><img src="/assets/images/feasible/fig2.png" alt="fig2" /></p>
+
+<h3>Caught in the Underflow</h3>
+
+<p>I implemented the iterative algorithm above (you can see what this loop looks like <a href="https://github.com/erikerlandson/gibbous/blob/blog/feasible-points/src/main/java/com/manyangled/gibbous/optim/convex/ConvexOptimizer.java#L134">here</a>),
+and it worked exactly as I hoped...
+at least on my initial tests.
+However, eventually I started playing with its convergence behavior by moving my constraint region farther
+from the initial guess, to see how it would cope.
+Suddenly the algorithm began failing again.
+When I drilled down on why, I was taken aback to discover that my Hessian matrix was once again showing
+up as all zeros!</p>
+
+<p>The reason was interesting.
+Recall that I used a <a href="http://erikerlandson.github.io/blog/2018/05/28/computing-smooth-max-and-its-gradients-without-over-and-underflow/">modified formula</a> to stabilize my smooth-max computations.
+In particular, the "stabilized" formula for the Hessian looks like this:</p>
+
+<p><img src="/assets/images/smoothmax/eq3b.png" alt="eq4" /></p>
+
+<p>So, what was going on?
+As I started moving my feasible region farther away, the corresponding constraint function started to
+dominate the exponential terms in the equation above.
+In other words, the distance to the feasible region became the (z) in these equations, and
+this z value was large enough to drive the terms corresponding to my n-ball constraint to zero!</p>
+
+<p>However, I have a lever to mitigate this problem.
+If I make the α parameter <em>small</em> enough, it will compress these exponent ranges and prevent my
+n-ball Hessian terms from washing out.
+Decreasing α makes smooth-max more rounded-out, and decreases the sharpness of the approximation to the true max,
+but minimizing smooth-max still yields the same minimum <em>location</em> as true maximum, and so playing this
+trick does not undermine my results.</p>
+
+<p>How small is small enough?
+α is essentially a free parameter, but I found that if I set it at each iteration,
+such that I make sure that my n-ball Hessian coefficient never drops below 1e-3 (but may be larger),
+then my Hessian is always well behaved.
+Note that as my iterations grow closer to the true feasible region, I can gradually allow α to
+grow larger.
+Currently, I don't increase α larger than 1, to avoid creating curvatures too large, but I have not
+experimented deeply with what actually happens if it were allowed to grow larger.
+You can see what this looks like in my current implementation <a href="https://github.com/erikerlandson/gibbous/blob/blog/feasible-points/src/main/java/com/manyangled/gibbous/optim/convex/ConvexOptimizer.java#L153">here</a>.</p>
+
+<h3>Convergence</h3>
+
+<p>Tuning the smooth-max α parameter gave me numeric stability, but I noticed that as the feasible region
+grew more distant from my initial guess, the algorithm's time to converge grew larger fairly quickly.
+When I studied its behavior, I saw that at large distances, the quadratic "cost" of my n-ball constraint
+effectively pulled the optimal point fairly close to my n-ball center.
+This doesn't prevent the algorithm from finding a solution, but it does prevent it from going long distances
+very fast.
+To solve this adaptively, I added a scaling factor s to my n-ball constraint function.
+The scaled version of the function looks like:</p>
+
+<p><img src="/assets/images/feasible/y9gndl2f.png" alt="eq5" /></p>
+
+<p>In my case, when my distances to a feasible region grow large, I want s to become small, so that it
+causes the cost of the n-ball constraint to grow more slowly, and allow the optimization to move
+farther, faster.
+The following diagram illustrates this intuition:</p>
+
+<p><img src="/assets/images/feasible/fig3.png" alt="fig3" /></p>
+
+<p>In my algorithm, I set s = 1/σ, where σ represents the
+"scale" of the current distance to feasible region.
+The n-ball function grows as the square of the distance to the ball center; therefore I
+set σ=(k)sqrt(s), so that it grows proportionally to the square root of the current largest user constraint
+cost.
+Here, (k) is a proportionality constant.
+It too is a somewhat magic free parameter, but I have found that k=1.5 yields fast convergences and
+good results.
+One last trick I play is that I prevent σ from becoming less than a minimum value, currently 10.
+This ensures that my n-ball constraint never dominates the total constraint sum, even as the
+optimization converges close to the feasible region.
+I want my "true" user constraints to dominate the behavior near the optimum, since those are the
+constraints that matter.
+The code is shorter than the explaination: you can see it <a href="https://github.com/erikerlandson/gibbous/blob/blog/feasible-points/src/main/java/com/manyangled/gibbous/optim/convex/ConvexOptimizer.java#L143">here</a></p>
+
+<h3>Conclusion</h3>
+
+<p>After applying all these intuitions, the resulting algorithm appears to be numerically stable and also
+converges pretty quickly even when the initial guess is very far from the true feasible region.
+To review, you can look at the main loop of this algorithm starting <a href="https://github.com/erikerlandson/gibbous/blob/blog/feasible-points/src/main/java/com/manyangled/gibbous/optim/convex/ConvexOptimizer.java#L128">here</a>.</p>
+
+<p>I've learned a lot about convex optimization and feasible point solving from working through practical
+problems as I made mistakes and fixed them.
+I'm fairly new to the whole arena of convex optimization, and I expect I'll learn a lot more as I go.
+Happy Computing!</p>
+
+<h3>References</h3>
+
+<p><a name="cite1"</a>
+[1] §11.3 of <em>Convex Optimization</em>, Boyd and Vandenberghe, Cambridge University Press, 2008</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Computing Smooth Max and its Gradients Without Over- and Underflow]]></title>
@@ -310,297 +498,6 @@ data.foreach { e =&gt;
 <p>RDD multiplexing is currently a <a href="https://github.com/willb/silex/pull/50">PR against the silex project</a>.  The code I used to run the timing experiments above is <a href="https://github.com/erikerlandson/silex/blob/blog/muxrdd/src/main/scala/com/redhat/et/silex/sample/split.scala#L90">saved for posterity here</a>.</p>
 
 <p>Happy multiplexing!</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[A Bi-directional Variation of the O(NP) Edit Distance Algorithm]]></title>
-    <link href="http://erikerlandson.github.com/blog/2014/02/20/a-bi-directional-variation-of-the-o-np-edit-distance-algorithm/"/>
-    <updated>2014-02-20T19:51:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2014/02/20/a-bi-directional-variation-of-the-o-np-edit-distance-algorithm</id>
-    <content type="html"><![CDATA[<p>The O(ND) edit distance algorithm <a href="#ref1">[1]</a> is a standard for efficient computation of the edit distance between two sequences, appearing in applications such as the GNU diff tool.  There is also a variation <a href="#ref2">[2]</a> that operates in O(NP) time, where P is the number of deletions in the shortest edit path, and which has lower computational complexity, since P &lt;= D (and may be &lt;&lt; D in some circumstances).  In order to apply these algorithms to obtain an <em>edit script</em> in linear space, they must be adapted into a bidirectional form that enables recursive divide-and-conquer.   The basic principles of a bidirectional adaptation of the O(ND) algorithm are described in <a href="#ref1">[1]</a>.   However, no such discussion of a bidirectional O(NP) algorithm is provided in <a href="#ref2">[2]</a>.  Understanding this adaptation involves some observations that aren't immediately obvious.  In this post, I will describe these key observations.</p>
-
-<h3>Notation</h3>
-
-<p>My code segments are written as C/C++, however written in a simplified style I hope will be clear regardless of what languages the reader is familiar with.  If you wish to port this (pseudo-ish)code, it may be worth keeping in mind that indexing is zero-based in C/C++.</p>
-
-<h3>Sequence Lengths</h3>
-
-<p>A brief note on the O(NP) algorithm and sequence lengths: the algorithm assumes that the length of its second sequence argument is >= its first (that is, N >= M).   In the following discussions, I will be making the same assumption, however the modification to address N &lt; M is relatively easy, and can be seen in the references to actual source code below.</p>
-
-<h3>Indexing</h3>
-
-<p>A note on naming:  In <a href="#ref2">[2]</a>, the authors use 'fp' for the name of the array holding path endpoints.  I will use 'Vf' for the array holding forward endpoints, and 'Vr' for the corresponding array holding reverse endpoints.</p>
-
-<p>The O(ND) and O(NP) algorithms operate by iteratively extending the frontier of edit paths through the implicit graph of possible paths, where each iteration is computed as a function of the previous.  In the O(NP) algorithm, this computation has to proceed from the outside in, as described in the paper:</p>
-
-<pre><code>for (k = -P;  k &lt; delta;  k += 1) {
-    y = max(Vf[k-1] + 1, Vf[k+1]);
-    Vf[k] = snake(y-k, y);
-}
-for (k = P + delta;  k &gt;= delta;  k -= 1) {
-    y = max(Vf[k-1] + 1, Vf[k+1]);
-    Vf[k] = snake(y-k, y);
-}
-</code></pre>
-
-<p>In order to implement a bi-directional algorithm, we must also run the algorithm in reverse, beginning at the "lower right corner" of the graph (M,N) and working backward to the origin (0,0).  The indexing is the mirror image of the above:</p>
-
-<pre><code>for (k = P+delta;  k &gt; 0;  k -= 1) {
-    y = min(Vr[k-1], Vr[k+1] - 1);
-    Vr[k] = rsnake(y-k, y);
-}
-for (k = -P;  k &lt;= 0;  k += 1) {
-    y = min(Vr[k-1], Vr[k+1] - 1);
-    Vr[k] = rsnake(y-k, y);
-}
-</code></pre>
-
-<p>In the above, 'rsnake' is the reverse-direction snake function.  A note on initialization:  whereas the forward algorithm initializes its Vf array to (-1), the symmetric initial value for the reverse algorithm Vr array is (N+1) (In the general case, 1 plus the length of the longest sequence).</p>
-
-<h3>Detecting Path Overlap</h3>
-
-<p>The uni-directional O(NP) algorithm halts when Vf[delta] == N.  However, the bi-directional algorithms halt when shortest opposing paths meet -- or overlap -- each other, as described in the O(ND) paper <a href="#ref1">[1]</a>.  The semantics of storing paths in working arrays is the same in both algorithms, with the exception that in the O(NP) algorithm it is the (y) values that are stored.  Myers describes the predicate for detecting meeting paths in O(ND) as: (x >= u)  &amp;&amp;  (x-y == u-v), where (x,y) are forward endpoints and (u,v) are reverse endpoints.  Observe that since y = x-k, then (x-y == u-v) is equivalent to "forward-k == reverse-k".  However, in operation one always checks the opposing path with the <em>same</em> k index, and so this clause is redundant.  It is sufficient to check that (x >= u), or in the case of O(NP), that (y >= v).  In the code, this looks something like:</p>
-
-<pre><code>y = max(Vf[k-1] + 1, Vf[k+1]);
-if (y &gt;= Vr[k]) {
-    // overlapping paths detected 
-}
-</code></pre>
-
-<p>The other checks for forward and reverse are similar.  Note that these checks happen at the <em>beginning</em> of each 'snake', that is prior to invoking the snake extension logic.  The semantic is that the opposing path overlaps the run (snake) one is about to start.</p>
-
-<h3>Computing Distance</h3>
-
-<p>When two overlapping paths are detected, we must compute the path distance associated with their union.  In the O(ND) algorithm, we know that distance implicitly, as the paths are extended over successive iterations of D.  In the O(NP) algorithm, however, the current path endpoints are associated with a particular value of P, and so we must consider how to obtain the actual distance.</p>
-
-<p>A little algebra comes to the rescue.  At iteration P, consider the number of deletions along the forward-path at the kth endpoint, which I will denote as 'vf' (the authors refer to it as V(x,y)).  In <a href="#ref2">[2]</a>, the authors show that P == vf when k &lt; delta, and P == vf+k-delta, when k > delta (note that either formula applies for k == delta).  Solving for vf, we have:   vf == P for k &lt; delta and vf == P+delta-k for k > delta.  The authors also show that: vf = (df-k)/2, where df is the total edit distance along the path up to the current endpoint (the authors refer to df as D(x,y)).   Therefore, we have: df = 2(vf)+k, where we can obtain vf from the expression we just derived.</p>
-
-<p>It remains to derive the expressions for the reverse direction, where we want 'vr' and 'dr'.  Here, I note that the mirror-image indexing of the reverse algorithm implies that the expressions above work if we transform k --> delta-k.  Making that transform gives us:   vr == P for k > 0 and vr == P+k for k &lt; 0 (again, either applies for k == 0).  And dr = 2(vr)+delta-k.</p>
-
-<p>And so the actual edit distance covered by our overlapping paths is:  d == (df+dr) == 2(vf+vr)+delta.  Note now pleasing this is, as vf+vr is the number of deletions of the combined paths, and so this corresponds to the original formula D == 2P+delta, where P is the number of deletions over the entire pathway.  We also see from the above that at a given Pth iteration, P does <em>not</em> equal the number of deletions in all paths with endpoints at the current iteration.  The true number of deletions for a given endpoint is a function of P, k and delta.</p>
-
-<p>A note on implementation: when one is advancing forward paths, an overlapping reverse-path will be from previous iteration (P-1), as the reverse paths for (P) have not happened yet.  That will show up in the distance formula for (vr) by using (P-1) in place of P, as in this example code:</p>
-
-<pre><code>y = max(Vf[k-1] + 1, Vf[k+1]);
-if (y &gt;= Vr[k]) {
-    // we found overlapping path, so compute corresponding edit distance
-    vf = (k&gt;delta) ? (P + delta - k) : P;
-    // use (P-1) for reverse paths:
-    vr = (k&lt;0) ? (P-1 + k) : P-1;
-    d = 2*(vf+vr)+delta;
-}
-
-// ....
-
-y = min(Vr[k-1], Vr[k+1] - 1);
-if (y &lt;= Vf[k]) {
-    // we can use P for both since forward-paths have been advanced:
-    vf = (k&gt;delta) ? (P + delta - k) : P;
-    vr = (k&lt;0) ? (P + k) : P;
-    d = 2*(vf+vr)+delta;
-}
-</code></pre>
-
-<h3>Shortest Path</h3>
-
-<p>With respect to halting conditions, the O(NP) algorithm differs in one imporant way from the O(ND) algorithm: The O(ND) algorithm maintains path endpoints corresponding to increasing <em>distance</em> (D) values.  Therefore, when two paths meet, they form a shortest-distance path by definition, and the algorithm can halt on the first such overlap it detects.</p>
-
-<p>The same is <em>not true</em> for the O(NP) algorithm.  It stores endpoints at a particular P value.  However, at a given value of P, actual <em>distances</em> may vary considerably.  On a given iteration over P, actual path distances may vary from 2(P-1)+delta up to 4P+delta.</p>
-
-<p>This problem is dealt with by maintaining a best-known distance, 'Dbest', which is initialized to its maximum possible value of N+M, the sum of both sequence lengths.  Whenever two overlapping paths are detected, their corresponding distance 'd' is computed as described earlier, and the running minimum is maintainted:  Dbest = min(Dbest,d).  As mentioned above, we know that the mimimum possible distance at a given iteration is Dmin = 2(P-1)+delta, and so when Dmin >= Dbest, we halt and return Dbest as our result.</p>
-
-<h3>Loop Bounding</h3>
-
-<p>Some important computational efficiency can be obtained by reorganizing the looping over the endpoints.   As mentioned above, conceptually the looping proceeds from the outside, inward.  Suppose we organize the looping over k values such that we explore k = {-P, P+delta, -P+1, P+delta-1, -P+2, P+delta-2 ... }  Note that the symmetry breaks a bit when we get to k==delta, as here we stop iterating backward, but continue iterating forward until we hit delta from below.  In the code, this looping pattern looks something like:</p>
-
-<pre><code>// advance forward paths: reverse path looping is similar
-for (ku = -P, kd = P+delta;  ku &lt;= delta;  ku += 1) {
-    // advance diagonals from -P, upwards:
-    y = max(1+Vf[ku-1], Vf[ku+1]);
-
-    // check for overlapping path
-
-    Vf[ku] = snake(y-ku, y);
-
-    // stop searching backward past here:
-    if (kd &lt;= delta) continue;
-
-    // advance diagonals from P+delta, downwards:
-    y = max(1+Vf[kd-1], Vf[kd+1]);
-
-    // check for overlapping path
-
-    Vf[kd] = snake(y-kd, y);
-    kd -= 1;
-}
-</code></pre>
-
-<p>There is method to this madness.  Observe that for any particular P value, the smallest edit distances are at the outside, and get larger as one moves inward.  The minimum distance 2P+delta is always when k == -P, and k == P+delta.  As we proceed inward, the corresponding edit distance increases towards its maximum of 4P+delta.   This allows <em>two</em> optimizations.  The first is that if we hit an overlapping path, we can now exit the loop immediately, as we know that any other such overlapping paths to our inside will have a larger edit distance, and so do not need to be considered.</p>
-
-<p>The second optimization is to recall that path distances are a function of P, k and delta.  We can use this information to solve for k and obtain a useful adaptive bound on how far we loop.  From previous sections, also recall we are keeping a best-known distance Dbest.  We know that we do not have to explore any paths whose distance is >= Dbest.  So, we can set up the following inequality: 2(vf+vr)+delta &lt; Dbest, where vf = P, and vr = (P-1)+k, where k &lt; 0, which is the region where distance is growing.  Therefore, we have 2(P+(P-1)+k)+delta &lt; Dbest.  Solving for k, we have:  k &lt; ((Dbest-delta)/2)-2P+1.  The looping wants to use '&lt;=', so we can rewrite as: k &lt;= ((Dbest-delta-1)/2)-2P+1.  For the reverse-path looping, we can set up a similar inequality:  2(P+P+delta-k)+delta &lt; Dbest, which yields:  k >= ((1+delta-Dbest)/2)+delta+2P.</p>
-
-<p>Note that if these bound expressions evaluate to a value past the nominal bound, then the nominal bound remains in effect: e.g. the operative forward looping bound = min(delta, ((Dbest-delta)/2)-2P).   Also note that these constraints do not break the computation of the endpoints, because when the bounds move, they always retreat toward the outside by 2 on each iteration of P.  Since computation proceeds outside in, that means the necessary values are always correctly populated from the previous iteration.</p>
-
-<p>In the code, the forward path looping looks like this:</p>
-
-<pre><code>// compute our adaptive loop bound (using P-1 for reverse)
-bound = min(delta, ((Dbest-delta-1)/2)-(2*P)+1);
-
-// constrain our search by bound:
-for (ku = -P, kd = P+delta;  ku &lt;= bound;  ku += 1) {
-    y = max(1+Vf[ku-1], Vf[ku+1]);
-    if (y &gt;= Vr[k]) {
-        vf = (k&gt;delta) ? (P + delta - k) : P;
-        vr = (k&lt;0) ? (P-1 + k) : P-1;
-
-        // maintain minimum distance:
-        Dbest = min(Dbest, 2*(vf+vr)+delta);
-
-        // we can now halt this loop immediately:
-        break;
-    }
-
-    Vf[ku] = snake(y-ku, y);
-
-    if (kd &lt;= delta) continue;
-
-    y = max(1+Vf[kd-1], Vf[kd+1]);
-    if (y &gt;= Vr[k]) {
-        vf = (k&gt;delta) ? (P + delta - k) : P;
-        vr = (k&lt;0) ? (P-1 + k) : P-1;
-
-        // maintain minimum distance:
-        Dbest = min(Dbest, 2*(vf+vr)+delta);
-
-        // we can now halt this loop immediately:
-        break;
-    }
-
-    Vf[kd] = snake(y-kd, y);
-    kd -= 1;
-}
-</code></pre>
-
-<h3>Implementation</h3>
-
-<p>In conclusion, I will display a code segment with all of the ideas presented above, coming together.  This segment was taken from my <a href="https://github.com/erikerlandson/algorithm/blob/order_np_alg/include/boost/algorithm/sequence/detail/edit_distance.hpp#L342">working prototype code</a>, with some syntactic clutter removed and variable names changed to conform a bit more closely to <a href="#ref2">[2]</a>.  The implementation of O(NP) below is performing about 25% faster than the corresponding O(ND) algorithm in my benchmarking tests, and also uses substantially less memory.</p>
-
-<pre><code>// initialize this with the maximum possible distance:
-Dbest = M+N;
-
-P = 0;
-while (true) {
-    // the minimum possible distance for the current P value
-    Dmin = 2*(P-1) + delta;
-
-    // if the minimum possible distance is &gt;= our best-known distance, we can halt
-    if (Dmin &gt;= Dbest) return Dbest;
-
-    // adaptive bound for the forward looping
-    bound = min(delta, ((Dbest-delta-1)/2)-(2*P)+1);
-
-    // advance forward diagonals
-    for (ku = -P, kd = P+delta;  ku &lt;= bound;  ku += 1) {
-        y = max(1+Vf[ku-1], Vf[ku+1]);
-        x = y-ku;
-
-        // path overlap detected
-        if (y &gt;= Vr[ku]) {
-            vf = (ku&gt;delta) ? (P + delta - ku) : P;
-            vr = (ku&lt;0) ? (P-1 + ku) : P-1;
-            Dbest = min(Dbest, 2*(vf+vr)+delta);
-            break;
-        }
-
-        // extend forward snake
-        if (N &gt;= M) {
-            while (x &lt; M  &amp;&amp;  y &lt; N  &amp;&amp;  equal(S1[x], S2[y])) { x += 1;  y += 1; }
-        } else {
-            while (x &lt; N  &amp;&amp;  y &lt; M  &amp;&amp;  equal(S1[y], S2[x])) { x += 1;  y += 1; }
-        }
-
-        Vf[ku] = y;
-
-        if (kd &lt;= delta) continue;
-
-        y = max(1+Vf[kd-1], Vf[kd+1]);
-        x = y-kd;
-
-        // path overlap detected
-        if (y &gt;= Vr[kd]) {
-            vf = (kd&gt;delta) ? (P + delta - kd) : P;
-            vr = (kd&lt;0) ? (P-1 + kd) : P-1;
-            Dbest = min(Dbest, 2*(vf+vr)+delta);
-            break;
-        }
-
-        // extend forward snake
-        if (N &gt;= M) {
-            while (x &lt; M  &amp;&amp;  y &lt; N  &amp;&amp;  equal(S1[x], S2[y])) { x += 1;  y += 1; }
-        } else {
-            while (x &lt; N  &amp;&amp;  y &lt; M  &amp;&amp;  equal(S1[y], S2[x])) { x += 1;  y += 1; }
-        }
-
-        Vf[kd] = y;
-        kd -= 1;
-    }
-
-    // adaptive bound for the reverse looping
-    bound = max(0, ((1+delta-Dbest)/2)+delta+(2*P));
-
-    // advance reverse-path diagonals:
-    for (kd=P+delta, ku=-P;  kd &gt;= bound;  kd -= 1) {
-        y = min(Vr[kd-1], Vr[kd+1]-1);
-        x = y-kd;
-
-        // path overlap detected
-        if (y &lt;= Vf[kd]) {
-            vf = (kd&gt;delta) ? (P + delta - kd) : P;
-            vr = (kd&lt;0) ? (P + kd) : P;
-            Dbest = min(Dbest, 2*(vf+vr)+delta);
-            break;
-        }
-
-        // extend reverse snake
-        if (N &gt;= M) {
-            while (x &gt; 0  &amp;&amp;  y &gt; 0  &amp;&amp;  equal(S1[x-1], S2[y-1])) { x -= 1;  y -= 1; }
-        } else {
-            while (x &gt; 0  &amp;&amp;  y &gt; 0  &amp;&amp;  equal(S1[y-1], S2[x-1])) { x -= 1;  y -= 1; }
-        }
-
-        Vr[kd] = y;
-
-        if (ku &gt;= 0) continue;
-
-        y = min(Vr[ku-1], Vr[ku+1]-1);
-        x = y-ku;
-
-        // path overlap detected
-        if (y &lt;= Vf[ku]) {
-            vf = (ku&gt;delta) ? (P + delta - ku) : P;
-            vr = (ku&lt;0) ? (P + ku) : P;
-            Dbest = min(Dbest, 2*(vf+vr)+delta);
-            break;
-        }
-
-        // extend reverse snake
-        if (N &gt;= M) {
-            while (x &gt; 0  &amp;&amp;  y &gt; 0  &amp;&amp;  equal(S1[x-1], S2[y-1])) { x -= 1;  y -= 1; }
-        } else {
-            while (x &gt; 0  &amp;&amp;  y &gt; 0  &amp;&amp;  equal(S1[y-1], S2[x-1])) { x -= 1;  y -= 1; }
-        }
-
-        Vr[ku] = y;
-        ku += 1;
-    }
-}
-</code></pre>
-
-<h3>References</h3>
-
-<p><a name="anchor1" id="ref1">[1] </a><a href="http://www.xmailserver.org/diff2.pdf">An O(ND) Difference Algorithm and its Variations</a>, Eugene W. Myers<br>
-<a name="anchor2" id="ref2">[2] </a><a href="http://www.itu.dk/stud/speciale/bepjea/xwebtex/litt/an-onp-sequence-comparison-algorithm.pdf">An O(NP) Sequence Comparison Algorithm</a>, Sun Wu, Udi Manber, Gene Myers</p>
 ]]></content>
   </entry>
   

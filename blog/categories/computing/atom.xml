@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2018-05-29T06:31:05-07:00</updated>
+  <updated>2018-06-03T20:23:54-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,194 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Solving Feasible Points With Smooth-Max]]></title>
+    <link href="http://erikerlandson.github.com/blog/2018/06/03/solving-feasible-points-with-smooth-max/"/>
+    <updated>2018-06-03T14:21:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2018/06/03/solving-feasible-points-with-smooth-max</id>
+    <content type="html"><![CDATA[<h3>Overture</h3>
+
+<p>Lately I have been fooling around with an <a href="https://github.com/erikerlandson/gibbous">implementation</a> of the <a href="#cite1">Barrier Method</a> for convex optimization with constraints.
+One of the characteristics of the Barrier Method is that it requires an initial-guess from inside the
+<em>feasible region</em>: that is, a point which is known to satisfy all of the inequality constraints provided
+by the user.
+For some optimization problems, it is straightforward to find such a point by using knowledge about the problem
+domain, but in many situations it is not at all obvious how to identify such a point, or even if a
+feasible point exists. The feasible region might be empty!</p>
+
+<p>Boyd and Vandenberghe discuss a couple approaches to finding feasible points in §11.4 of <a href="#cite1">[1]</a>.
+These methods require you to set up an "augmented" minimization problem:
+<img src="/assets/images/feasible/y9czf8u7.png" alt="eq1" /></p>
+
+<p>As you can see from the above, you have to set up an "augmented" space x+s, where (s) represents an additional
+dimension, and constraint functions are augmented to f<sub>k</sub>-s</p>
+
+<h3>The Problem</h3>
+
+<p>I experimented a little with these, and while I am confident they work for most problems having multiple
+inequality constraints, my unit testing tripped over an ironic deficiency:
+when I attempted to solve a feasible point for a single planar constraint, the numerics went a bit haywire.
+Specifically, a linear constraint function happens to have a singular Hessian of all zeroes.
+The final Hessian, coming out of the log barrier function, could be consumed by SVD to get a search direction
+but the resulting gradients behaved poorly.</p>
+
+<p>Part of the problem seems to be that the nature of this augmented minimization problem forces the algorithms
+to push (s) ever downward, but letting (s) transitively push the f<sub>k</sub> with the augmented constraint
+functions f<sub>k</sub>-s. When only a single linear constraint function is in play, the resulting gradient
+caused augmented dimension (s) to converge <em>against</em> the movement of the remaining (unaugmented) sub-space.
+The minimization did not converge to a feasible point, even though literally half of the space on one side
+of the planar surface is feasible!</p>
+
+<h3>Smooth Max</h3>
+
+<p>Thinking about these issues made me wonder if a more direct approach was possible.
+Another way to think about this problem is to minimize the maximum f<sub>k</sub>;
+If there is a minimum &lt; 0 at a point x, then x is a feasible point satisfying all f<sub>k</sub>.
+If the minimum is > 0, then we have definitive proof that no feasible point exists, and
+our constraints can't be met.</p>
+
+<p>Taking a maximum preserves convexity, which is a good start, but maximum isn't differentiable everywhere.
+The boundaries between regions where different functions are the maximum are not smooth, and along
+those boundaries there is no gradient, and therefore no Hessian either.</p>
+
+<p>However, there is a variation on this idea, known as smooth-max, defined like so:</p>
+
+<p><img src="/assets/images/feasible/y8cgykuc.png" alt="eq2" /></p>
+
+<p>Smooth-max has a well defined <a href="http://erikerlandson.github.io/blog/2018/05/27/the-gradient-and-hessian-of-the-smooth-max-over-functions/">gradient and Hessian</a>, and furthermore can be computed in a <a href="http://erikerlandson.github.io/blog/2018/05/28/computing-smooth-max-and-its-gradients-without-over-and-underflow/">numerically stable</a> way.
+The sum inside the logarithm above is a sum of exponentials of convex functions.
+This is good news; exponentials of convex functions are log-convex, and a sum of log-convex functions is also
+log-convex.</p>
+
+<p>That means I have the necessary tools to set up the my mini-max problem:
+For a given set of convex constraint functions f<sub>k</sub>, I create a functions which is the soft-max of
+these, and I minimize it.</p>
+
+<h3>Go Directly to Jail</h3>
+
+<p>I set about implementing my smooth-max idea, and immediately ran into almost the same problem as before.
+If I try to solve for a single planar constraint, my Hessian degenerates to all-zeros!
+When I unpacked the smoothmax-formula for a single constraint f<sub>k</sub>, it indeed is just f<sub>k</sub>,
+zero Hessian and all!</p>
+
+<h3>More is More</h3>
+
+<p>What to do?
+Well you know what form of constraint <em>always</em> has a well behaved Hessian? A circle, that's what.
+More technically, an n-dimensional ball, or n-ball.
+What if I add a new constraint of the form:</p>
+
+<p><img src="/assets/images/feasible/yd8xg64k.png" alt="eq3" /></p>
+
+<p>This constraint equation is quadratic, and its Hessian is I<sub>n</sub>.
+If I include this in my set of constraints, my smooth-max Hessian will be non-singular!</p>
+
+<p>Since I do not know a priori where my feasible point might lie, I start with my n-ball centered at
+my initial guess, and minimize. The result might look something like this:</p>
+
+<p><img src="/assets/images/feasible/fig1.png" alt="fig1" /></p>
+
+<p>Because the optimization is minimizing the maximum f<sub>k</sub>, the optimal point may not be feasible,
+but if not it <em>will</em> end up closer to the feasible region than before.
+This suggests an iterative algorithm, where I update the location of the n-ball at each iteration,
+until the resulting optimized point lies on the intersection of my original constraints and my
+additional n-ball constraint:</p>
+
+<p><img src="/assets/images/feasible/fig2.png" alt="fig2" /></p>
+
+<h3>Caught in the Underflow</h3>
+
+<p>I implemented the iterative algorithm above (you can see what this loop looks like <a href="https://github.com/erikerlandson/gibbous/blob/blog/feasible-points/src/main/java/com/manyangled/gibbous/optim/convex/ConvexOptimizer.java#L134">here</a>),
+and it worked exactly as I hoped...
+at least on my initial tests.
+However, eventually I started playing with its convergence behavior by moving my constraint region farther
+from the initial guess, to see how it would cope.
+Suddenly the algorithm began failing again.
+When I drilled down on why, I was taken aback to discover that my Hessian matrix was once again showing
+up as all zeros!</p>
+
+<p>The reason was interesting.
+Recall that I used a <a href="http://erikerlandson.github.io/blog/2018/05/28/computing-smooth-max-and-its-gradients-without-over-and-underflow/">modified formula</a> to stabilize my smooth-max computations.
+In particular, the "stabilized" formula for the Hessian looks like this:</p>
+
+<p><img src="/assets/images/smoothmax/eq3b.png" alt="eq4" /></p>
+
+<p>So, what was going on?
+As I started moving my feasible region farther away, the corresponding constraint function started to
+dominate the exponential terms in the equation above.
+In other words, the distance to the feasible region became the (z) in these equations, and
+this z value was large enough to drive the terms corresponding to my n-ball constraint to zero!</p>
+
+<p>However, I have a lever to mitigate this problem.
+If I make the α parameter <em>small</em> enough, it will compress these exponent ranges and prevent my
+n-ball Hessian terms from washing out.
+Decreasing α makes smooth-max more rounded-out, and decreases the sharpness of the approximation to the true max,
+but minimizing smooth-max still yields the same minimum <em>location</em> as true maximum, and so playing this
+trick does not undermine my results.</p>
+
+<p>How small is small enough?
+α is essentially a free parameter, but I found that if I set it at each iteration,
+such that I make sure that my n-ball Hessian coefficient never drops below 1e-3 (but may be larger),
+then my Hessian is always well behaved.
+Note that as my iterations grow closer to the true feasible region, I can gradually allow α to
+grow larger.
+Currently, I don't increase α larger than 1, to avoid creating curvatures too large, but I have not
+experimented deeply with what actually happens if it were allowed to grow larger.
+You can see what this looks like in my current implementation <a href="https://github.com/erikerlandson/gibbous/blob/blog/feasible-points/src/main/java/com/manyangled/gibbous/optim/convex/ConvexOptimizer.java#L153">here</a>.</p>
+
+<h3>Convergence</h3>
+
+<p>Tuning the smooth-max α parameter gave me numeric stability, but I noticed that as the feasible region
+grew more distant from my initial guess, the algorithm's time to converge grew larger fairly quickly.
+When I studied its behavior, I saw that at large distances, the quadratic "cost" of my n-ball constraint
+effectively pulled the optimal point fairly close to my n-ball center.
+This doesn't prevent the algorithm from finding a solution, but it does prevent it from going long distances
+very fast.
+To solve this adaptively, I added a scaling factor s to my n-ball constraint function.
+The scaled version of the function looks like:</p>
+
+<p><img src="/assets/images/feasible/y9gndl2f.png" alt="eq5" /></p>
+
+<p>In my case, when my distances to a feasible region grow large, I want s to become small, so that it
+causes the cost of the n-ball constraint to grow more slowly, and allow the optimization to move
+farther, faster.
+The following diagram illustrates this intuition:</p>
+
+<p><img src="/assets/images/feasible/fig3.png" alt="fig3" /></p>
+
+<p>In my algorithm, I set s = 1/σ, where σ represents the
+"scale" of the current distance to feasible region.
+The n-ball function grows as the square of the distance to the ball center; therefore I
+set σ=(k)sqrt(s), so that it grows proportionally to the square root of the current largest user constraint
+cost.
+Here, (k) is a proportionality constant.
+It too is a somewhat magic free parameter, but I have found that k=1.5 yields fast convergences and
+good results.
+One last trick I play is that I prevent σ from becoming less than a minimum value, currently 10.
+This ensures that my n-ball constraint never dominates the total constraint sum, even as the
+optimization converges close to the feasible region.
+I want my "true" user constraints to dominate the behavior near the optimum, since those are the
+constraints that matter.
+The code is shorter than the explaination: you can see it <a href="https://github.com/erikerlandson/gibbous/blob/blog/feasible-points/src/main/java/com/manyangled/gibbous/optim/convex/ConvexOptimizer.java#L143">here</a></p>
+
+<h3>Conclusion</h3>
+
+<p>After applying all these intuitions, the resulting algorithm appears to be numerically stable and also
+converges pretty quickly even when the initial guess is very far from the true feasible region.
+To review, you can look at the main loop of this algorithm starting <a href="https://github.com/erikerlandson/gibbous/blob/blog/feasible-points/src/main/java/com/manyangled/gibbous/optim/convex/ConvexOptimizer.java#L128">here</a>.</p>
+
+<p>I've learned a lot about convex optimization and feasible point solving from working through practical
+problems as I made mistakes and fixed them.
+I'm fairly new to the whole arena of convex optimization, and I expect I'll learn a lot more as I go.
+Happy Computing!</p>
+
+<h3>References</h3>
+
+<p><a name="cite1"</a>
+[1] §11.3 of <em>Convex Optimization</em>, Boyd and Vandenberghe, Cambridge University Press, 2008</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Computing Smooth Max and its Gradients Without Over- and Underflow]]></title>
@@ -263,153 +451,6 @@ Happy sketching!</p>
 <p><img src="/assets/images/tdsum/plot3.png" alt="plot3" /></p>
 
 <p><img src="/assets/images/tdsum/plot4.png" alt="plot4" /></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Encoding Map-Reduce As A Monoid With Left Folding]]></title>
-    <link href="http://erikerlandson.github.com/blog/2016/09/05/expressing-map-reduce-as-a-left-folding-monoid/"/>
-    <updated>2016-09-05T10:31:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2016/09/05/expressing-map-reduce-as-a-left-folding-monoid</id>
-    <content type="html"><![CDATA[<p>In a <a href="http://erikerlandson.github.io/blog/2015/11/24/the-prepare-operation-considered-harmful-in-algebird/">previous post</a> I discussed some scenarios where traditional map-reduce (directly applying a map function, followed by some monoidal reduction) could be inefficient.
-To review, the source of inefficiency is in situations where the <code>map</code> operation is creating some non-trivial monoid that represents a single element of the input type.
-For example, if the monoidal type is <code>Set[Int]</code>, then the mapping function ('prepare' in algebird) maps every input integer <code>k</code> into <code>Set(k)</code>, which is somewhat expensive.</p>
-
-<p>In that discussion, I was focusing on map-reduce as embodied by the algebird <code>Aggregator</code> type, where <code>map</code> appears as the <code>prepare</code> function.
-However, it is easy to see that <em>any</em> map-reduce implementation may be vulnerable to the same inefficiency.</p>
-
-<p>I wondered if there were a way to represent map-reduce using some alternative formulation that avoids this vulnerability.
-There is such a formulation, which I will talk about in this post.</p>
-
-<p>I'll begin by reviewing a standard map-reduce implementation.
-The following scala code sketches out the definition of a monoid over a type <code>B</code> and a map-reduce interface.
-As this code suggests, the <code>map</code> function maps input data of some type <code>A</code> into some <em>monoidal</em> type <code>B</code>, which can be reduced (aka "aggregated") in a way that is amenable to parallelization:</p>
-
-<p>``` scala
-trait Monoid[B] {
-  // aka 'combine' aka '++'
-  def plus: (B, B) => B</p>
-
-<p>  // aka 'empty' aka 'identity'
-  def e: B
-}</p>
-
-<p>trait MapReduce[A, B] {
-  // monoid embodies the reducible type
-  def monoid: Monoid[B]</p>
-
-<p>  // mapping function from input type A to reducible type B
-  def map: A => B</p>
-
-<p>  // the basic map-reduce operation
-  def apply(data: Seq[A]): B = data.map(map).fold(monoid.e)(monoid.plus)</p>
-
-<p>  // map-reduce parallelized over data partitions
-  def apply(data: ParSeq[Seq[A]]): B =</p>
-
-<pre><code>data.map { part =&gt;
-  part.map(map).fold(monoid.e)(monoid.plus)
-}
-.fold(monoid.e)(monoid.plus)
-</code></pre>
-
-<p>}
-```</p>
-
-<p>In the parallel version of map-reduce above, you can see that map and reduce are executed on each data partition (which may occur in parallel) to produce a monoidal <code>B</code> value, followed by a final reduction of those intermediate results.
-This is the classic form of map-reduce popularized by tools such as Hadoop and Apache Spark, where inidividual data partitions may reside across highly parallel commodity clusters.</p>
-
-<p>Next I will present an alternative definition of map-reduce.
-In this implementation, the <code>map</code> function is replaced by a <code>foldL</code> function, which executes a single "left-fold" of an input object with type <code>A</code> into the monoid object with type <code>B</code>:</p>
-
-<p>``` scala
-// a map reduce operation based on a monoid with left folding
-trait MapReduceLF[A, B] extends MapReduce[A, B] {
-  def monoid: Monoid[B]</p>
-
-<p>  // left-fold an object with type A into the monoid B
-  // obeys type law: foldL(b, a) = b ++ foldL(e, a)
-  def foldL: (B, A) => B</p>
-
-<p>  // foldL(e, a) embodies the role of map(a) in standard map-reduce
-  def map = (a: A) => foldL(monoid.e, a)</p>
-
-<p>  // map-reduce operation is now a single fold-left operation
-  override def apply(data: Seq[A]): B = data.foldLeft(monoid.e)(foldL)</p>
-
-<p>  // map-reduce parallelized over data partitions
-  override def apply(data: ParSeq[Seq[A]]): B =</p>
-
-<pre><code>data.map { part =&gt;
-  part.foldLeft(monoid.e)(foldL)
-}
-.fold(monoid.e)(monoid.plus)
-</code></pre>
-
-<p>}
-```</p>
-
-<p>As the comments above indicate, the left-folding function <code>foldL</code> is assumed to obey the law <code>foldL(b, a) = b ++ foldL(e, a)</code>.
-This law captures the idea that folding <code>a</code> into <code>b</code> should be the analog of reducing <code>b</code> with a monoid corresponding to the single element <code>a</code>.
-Referring to my earlier example, if type <code>A</code> is <code>Int</code> and <code>B</code> is <code>Set[Int]</code>, then <code>foldL(b, a) =&gt; b + a</code>.
-Note that <code>b + a</code> is directly inserting single element <code>a</code> into <code>b</code>, which is significantly more efficient than <code>b ++ Set(a)</code>, which is how a typical map-reduce implementation would be required to operate.</p>
-
-<p>This law also gives us the corresponding definition of <code>map(a)</code>, which is <code>foldL(e, a)</code>, or in my example: <code>Set.empty[Int] ++ a</code> or just: <code>Set(a)</code></p>
-
-<p>In this formulation, the basic map-reduce operation is now a single <code>foldLeft</code> operation, instead of a mapping followed by a monoidal reduction.
-The parallel version is analoglous.
-Each partition uses the new <code>foldLeft</code> operation, and the final reduction of intermediate monoidal results remains the same as before.</p>
-
-<p>The <code>foldLeft</code> function is potentially a much more general operation, and it raises the question of whether this new encoding is indeed parallelizable as before.
-I will conclude with a proof that this encoding is also parallelizable;
-Note that the law <code>foldL(b, a) = b ++ foldL(e, a)</code> is a significant component of this proof, as it represents the constraint that <code>foldL</code> behaves like an analog of reducing <code>b</code> with a monoidal representation of element <code>a</code>.</p>
-
-<p>In the following proof I used a scala-like pseudo code, described in the introduction:</p>
-
-<p>```
-// given an object mr of type MapReduceFL[A, B]
-// and using notation:
-// f &lt;==> mr.foldL
-// for b1,b2 of type B: b1 ++ b2 &lt;==> mr.plus(b1, b2)
-// e &lt;==> mr.e
-// [...] &lt;==> Seq(...)
-// d1, d2 are of type Seq[A]</p>
-
-<p>// Proof that map-reduce with left-folding is parallelizable
-// i.e. mr(d1 ++ d2) == mr(d1) ++ mr(d2)
-mr(d1 ++ d2)
-== (d1 ++ d2).foldLeft(e)(f)  // definition of map-reduce operation
-== d1.foldLeft(e)(f) ++ d2.foldLeft(e)(f)  // Lemma A
-== mr(d1) ++ mr(d2)  // definition of map-reduce (QED)</p>
-
-<p>// Proof of Lemma A
-// i.e. (d1 ++ d2).foldLeft(e)(f) == d1.foldLeft(e)(f) ++ d2.foldLeft(e)(f)</p>
-
-<p>// proof is by induction on the length of data sequence d2</p>
-
-<p>// case d2 where length is zero, i.e. d2 == []
-(d1 ++ []).foldLeft(e)(f)
-== d1.foldLeft(e)(f)  // definition of empty sequence []
-== d1.foldLeft(e)(f) ++ e  // definition of identity e
-== d1.foldLeft(e)(f) ++ [].foldLeft(e)(f)  // definition of foldLeft</p>
-
-<p>// case d2 where length is 1, i.e. d2 == [a] for some a of type A
-(d1 ++ [a]).foldLeft(e)(f)
-== f(d1.foldLeft(e)(f), a)  // definition of foldLeft and f
-== d1.foldLeft(e)(f) ++ f(e, a)  // the type-law f(b, a) == b ++ f(e, a)
-== d1.foldLeft(e)(f) ++ [a].foldLeft(e)(f)  // definition of foldLeft</p>
-
-<p>// inductive step, assuming proof for d2' of length &lt;= n
-// consider d2 of length n+1, i.e. d2 == d2' ++ [a], where d2' has length n
-(d1 ++ d2).foldLeft(e)(f)
-== (d1 ++ d2' ++ [a]).foldLeft(e)(f)  // definition of d2, d2', [a]
-== f((d1 ++ d2').foldLeft(e)(f), a)  // definition of foldLeft and f
-== (d1 ++ d2').foldLeft(e)(f) ++ f(e, a)  // type-law f(b, a) == b ++ f(e, a)
-== d1.foldLeft(e)(f) ++ d2'.foldLeft(e)(f) ++ f(e, a)  // induction
-== d1.foldLeft(e)(f) ++ d2'.foldLeft(e)(f) ++ [a].foldLeft(e)(f)  // def'n of foldLeft
-== d1.foldLeft(e)(f) ++ (d2' ++ [a]).foldLeft(e)(f)  // induction
-== d1.foldLeft(e)(f) ++ d2.foldLeft(e)(f)  // definition of d2 (QED)
-```</p>
 ]]></content>
   </entry>
   
