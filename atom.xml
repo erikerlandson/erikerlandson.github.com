@@ -4,7 +4,7 @@
   <title><![CDATA[tool monkey]]></title>
   <link href="http://erikerlandson.github.com/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2018-08-14T17:47:05-07:00</updated>
+  <updated>2018-09-02T18:27:04-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,64 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Putting Cubic B-Splines into Standard Polynomial Form]]></title>
+    <link href="http://erikerlandson.github.com/blog/2018/09/02/putting-cubic-b-splines-into-standard-polynomial-form/"/>
+    <updated>2018-09-02T11:07:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2018/09/02/putting-cubic-b-splines-into-standard-polynomial-form</id>
+    <content type="html"><![CDATA[<p>Lately I have been working on an implementation of monotone smoothing splines, based on <a href="#ref1">[1]</a>. As the title suggests, this technique is based on a univariate cubic <a href="https://en.wikipedia.org/wiki/B-splines">B-spline</a>. The form of the spline function used in the paper is as follows:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/bspline/yd2guhxt.png" alt="eq1" /></p>
+
+<p>The You can see that the constant α normalizes knot intervals to 1, and that the four <nobr>N<sub>i</sub>(t)</nobr> are defined in this transformed space of unit-separated knots.</p>
+
+<p>I&#8217;m interested in providing an interpolated splines using the Apache Commons Math API, in particular the <a href="https://commons.apache.org/proper/commons-math/javadocs/api-3.6/org/apache/commons/math3/analysis/polynomials/PolynomialSplineFunction.html">PolynomialSplineFunction</a> class. In principle the above is clearly such a polynomial, but there are a few hitches.</p>
+
+<ol>
+<li><code>PolynomialSplineFunction</code> wants its knot intervals in closed standard polynomial form <nobr>ax<sup>3</sup> + bx<sup>2</sup> + cx + d</nobr></li>
+<li>It wants each such polynomial expressed in transformed space <nobr>(x-K<sub>j</sub>)</nobr>, where K<sub>j</sub> is the greatest knot point that is &lt;= x.</li>
+<li>The actual domain of S(x) is <nobr>K<sub>0</sub> &#8230; K<sub>m-1</sub></nobr>. The first 3 &#8220;negative&#8221; knots are there to make the summation for S(x) cleaner. <code>PolynomialSplineFunction</code> needs its functions to be defined purely on the actual domain.</li>
+</ol>
+
+
+<p>If you study the definition of <nobr>B<sub>3</sub>(t)</nobr> above, you can see that if x lands in the interval <nobr>[K<sub>j</sub>, K<sub>j+1</sub>)</nobr> then it is the four knot points <nobr>K<sub>j-3</sub> &#8230; K<sub>j</sub></nobr> that contribute to its value. This suggests a way to manipulate the equations into a standard form.</p>
+
+<p>For a value x and its appropriate <nobr>K<sub>j</sub></nobr>, S(x) has four non-zero terms:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/bspline/y9tpgfqj.png" alt="eq2" /></p>
+
+<p>Consider the first term for (j-3). Recalling that knots are equally spaced by 1/α:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/bspline/y79occ29.png" alt="eq3" /></p>
+
+<p>We can apply similar logic for each term to get:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/bspline/ya6gsrjy.png" alt="eq4" /></p>
+
+<p>and by plugging in the appropriate <nobr>N<sub>i</sub></nobr> for each term, we arrive at:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/bspline/yc6grwxe.png" alt="eq5" /></p>
+
+<p>Now, <code>PolynomialSplineFunction</code> is going to automatically identify the appropriate <nobr>K<sub>j</sub></nobr> and subtract it, and so I can define that transform as <nobr>u = x -  K<sub>j</sub></nobr>, which gives:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/bspline/y9p3vgqt.png" alt="eq6" /></p>
+
+<p>I substitute αu into the definitions of the four <nobr>N<sub>i</sub></nobr> to obtain:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/bspline/y8apdoqy.png" alt="eq7" /></p>
+
+<p>Lastly, collecting like terms gives me the standard-form coefficients that I need for <code>PolynomialSplineFunction</code>:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/bspline/y7eon7kc.png" alt="eq8" /></p>
+
+<p>Now I am equipped to return a <code>PolynomialSplineFunction</code> to my users, which implements the cubic B-spline that I fit to their data. Happy computing!</p>
+
+<h4>References</h4>
+
+<p><a name="anchor1" id="ref1">[1] </a>H. Fujioka and H. Kano: <a href="https://github.com/erikerlandson/snowball/blob/master/monotone-cubic-B-splines-2013.pdf">Monotone smoothing spline curves using normalized uniform cubic B-splines</a>, Trans. Institute of Systems, Control and Information Engineers, Vol. 26, No. 11, pp. 389–397, 2013</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Solving Feasible Points With Smooth-Max]]></title>
@@ -2927,90 +2985,6 @@ text-align: center;
 <h5>Conclusions</h5>
 
 <p>In this post I&#8217;ve laid out some advantages of defining lightweight non-negative numeric types, in particular using <code>NonNegInt</code> as a working example.  Clearly, if you want to apply this idea, you&#8217;d want to also define <code>NonNegLong</code>, <code>NonNegDouble</code>, <code>NonNegFloat</code> and for that matter <code>PosInt</code>, <code>PosLong</code>, etc.  Happy computing!</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[The Reservoir Sampling Gap Distribution]]></title>
-    <link href="http://erikerlandson.github.com/blog/2015/08/17/the-reservoir-sampling-gap-distribution/"/>
-    <updated>2015-08-17T07:35:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2015/08/17/the-reservoir-sampling-gap-distribution</id>
-    <content type="html"><![CDATA[<p>In a <a href="http://erikerlandson.github.io/blog/2014/09/11/faster-random-samples-with-gap-sampling/">previous post</a>, I showed that random Bernoulli and Poisson sampling could be made much faster by modeling the <em>sampling gap distribution</em> - that is, directly drawing random samples from the distribution of how many elements would be skipped over between actual samples taken.</p>
-
-<p>Another popular sampling algorithm is <a href="https://en.wikipedia.org/wiki/Reservoir_sampling">Reservoir Sampling</a>.  Its sampling logic is a bit more complicated than Bernoulli or Poisson sampling, in the sense that the probability of sampling any given (jth) element <em>changes</em>. For a sampling reservoir of size R, and all j>R, the probability of choosing element (j) is R/j.  You can see that the potential payoff for gap-sampling is big, particularly as data size becomes large; as (j) approaches infinity, the probability R/j goes to zero, and the corresponding gaps between samples grow without bound.</p>
-
-<p>Modeling a sampling gap distribution is a powerful tool for optimizing a sampling algorithm, but it requires that (1) you actually <em>know</em> the sampling distribution, and (2) that you can effectively draw values from that distribution faster than just applying a random process to drawing each data element.</p>
-
-<p>With that goal in mind, I derived the probability mass function (pmf) and cumulative distribution function (cdf) for the sampling gap distribution of reservoir sampling.  In this post I will show the derivations.</p>
-
-<h3>The Sampling Gap Distribution</h3>
-
-<p>In the interest of making it easy to get at the actual answers, here are the pmf and cdf for the Reservoir Sampling Gap Distribution.  For a sampling reservoir of size (R), starting at data element (j), the probability distribution of the sampling gap is:</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/figure6.png" title="Figure 6" alt="Figure 6" /></p>
-
-<h3>Conventions</h3>
-
-<p>In the derivations that follow, I will keep to some conventions:</p>
-
-<ul>
-<li>R = the sampling reservoir size.  R > 0.</li>
-<li>j = the index of a data element being considered for sampling.  j > R.</li>
-<li>k = the size of a gap between samples.  k >= 0.</li>
-</ul>
-
-
-<p>P(k) is the probability that the gap between one sample and the next is of size k.  The support for P(k) is over all k>=0.  I will generally assume that j>R, as the first R samples are always loaded into the reservoir and the actual random sampling logic starts at j=R+1.  The constraint j>R will also be relevant to many binomial coefficient expressions, where it ensures the coefficient is well defined.</p>
-
-<h3>Deriving the Probability Mass Function, P(k)</h3>
-
-<p>Suppose we just chose (randomly) to sample data element (j-1).  Now we are interested in the probability distribution of the next sampling gap.  That is, the probability P(k) that we will <em>not</em> sample the next (k) elements {j,j+1,&#8230;j+k-1}, and sample element (j+k):</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/figure1.png" title="Figure 1" alt="Figure 1" /></p>
-
-<p>By arranging the product terms in descending order as above, you can see that they can be written as factorial quotients:</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/figure2.png" title="Figure 2" alt="Figure 2" /></p>
-
-<p>Now we apply <a href="#LemmaA">Lemma A</a>.  The 2nd case (a&lt;=b) of the Lemma applies, since (j-1-R)&lt;=j, so we have:</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/figure3.png" title="Figure 3" alt="Figure 3" /></p>
-
-<p>And so we have now derived a compact, closed-form expression for P(k).</p>
-
-<h3>Deriving the Cumulative Distribution Function, F(k)</h3>
-
-<p>Now that we have a derivation for the pmf P(k), we can tackle a derivation for the cdf.  First I will make note of this <a href="https://en.wikipedia.org/wiki/Binomial_coefficient#Series_involving_binomial_coefficients">useful identity</a> that I scraped off of Wikipedia (I substituted (x) => (a) and (k) => (b)):</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/identity1.png" title="identity 1" alt="identity 1" /></p>
-
-<p>The cumulative distribution function for the sampling gap, F(k), is of course just the sum over P(t), for (t) from 0 up to (k):</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/figure4.png" title="Figure 4" alt="Figure 4" /></p>
-
-<p>This is a closed-form solution, but we can apply a bit more simplification:</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/figure5.png" title="Figure 5" alt="Figure 5" /></p>
-
-<h3>Conclusions</h3>
-
-<p>We have derived closed-form expressions for the pmf and cdf of the Reservoir Sampling gap distribution:</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/figure6.png" title="Figure 6" alt="Figure 6" /></p>
-
-<p>In order to apply these results to a practical gap-sampling implementation of Reservoir Sampling, we would next need a way to efficiently sample from P(k), to obtain gap sizes to skip over.  How to accomplish this is an open question, but knowing a formula for P(k) and F(k) is a start.</p>
-
-<h3>Acknowledgements</h3>
-
-<p>Many thanks to <a href="http://rnowling.github.io/">RJ Nowling</a> and <a href="http://chapeau.freevariable.com/">Will Benton</a> for proof reading and moral support!  Any remaining errors are my own fault.</p>
-
-<p><a name="LemmaA"></a></p>
-
-<h3>Lemma A, And Its Proof</h3>
-
-<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/lemmaA.png" title="Lemma A" alt="Lemma A" /></p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/lemmaAproof.png" title="Lemma A Proof" alt="Lemma A Proof" /></p>
 ]]></content>
   </entry>
   

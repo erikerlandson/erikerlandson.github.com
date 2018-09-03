@@ -4,7 +4,7 @@
   <title><![CDATA[Category: math | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/math/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2018-08-14T17:47:05-07:00</updated>
+  <updated>2018-09-02T18:27:04-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,64 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Putting Cubic B-Splines into Standard Polynomial Form]]></title>
+    <link href="http://erikerlandson.github.com/blog/2018/09/02/putting-cubic-b-splines-into-standard-polynomial-form/"/>
+    <updated>2018-09-02T11:07:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2018/09/02/putting-cubic-b-splines-into-standard-polynomial-form</id>
+    <content type="html"><![CDATA[<p>Lately I have been working on an implementation of monotone smoothing splines, based on <a href="#ref1">[1]</a>. As the title suggests, this technique is based on a univariate cubic <a href="https://en.wikipedia.org/wiki/B-splines">B-spline</a>. The form of the spline function used in the paper is as follows:</p>
+
+<p><img src="/assets/images/bspline/yd2guhxt.png" alt="eq1" /></p>
+
+<p>The You can see that the constant α normalizes knot intervals to 1, and that the four <nobr>N<sub>i</sub>(t)</nobr> are defined in this transformed space of unit-separated knots.</p>
+
+<p>I'm interested in providing an interpolated splines using the Apache Commons Math API, in particular the <a href="https://commons.apache.org/proper/commons-math/javadocs/api-3.6/org/apache/commons/math3/analysis/polynomials/PolynomialSplineFunction.html">PolynomialSplineFunction</a> class. In principle the above is clearly such a polynomial, but there are a few hitches.</p>
+
+<ol>
+<li><code>PolynomialSplineFunction</code> wants its knot intervals in closed standard polynomial form <nobr>ax<sup>3</sup> + bx<sup>2</sup> + cx + d</nobr></li>
+<li>It wants each such polynomial expressed in transformed space <nobr>(x-K<sub>j</sub>)</nobr>, where K<sub>j</sub> is the greatest knot point that is &lt;= x.</li>
+<li>The actual domain of S(x) is <nobr>K<sub>0</sub> ... K<sub>m-1</sub></nobr>. The first 3 "negative" knots are there to make the summation for S(x) cleaner. <code>PolynomialSplineFunction</code> needs its functions to be defined purely on the actual domain.</li>
+</ol>
+
+
+<p>If you study the definition of <nobr>B<sub>3</sub>(t)</nobr> above, you can see that if x lands in the interval <nobr>[K<sub>j</sub>, K<sub>j+1</sub>)</nobr> then it is the four knot points <nobr>K<sub>j-3</sub> ... K<sub>j</sub></nobr> that contribute to its value. This suggests a way to manipulate the equations into a standard form.</p>
+
+<p>For a value x and its appropriate <nobr>K<sub>j</sub></nobr>, S(x) has four non-zero terms:</p>
+
+<p><img src="/assets/images/bspline/y9tpgfqj.png" alt="eq2" /></p>
+
+<p>Consider the first term for (j-3). Recalling that knots are equally spaced by 1/α:</p>
+
+<p><img src="/assets/images/bspline/y79occ29.png" alt="eq3" /></p>
+
+<p>We can apply similar logic for each term to get:</p>
+
+<p><img src="/assets/images/bspline/ya6gsrjy.png" alt="eq4" /></p>
+
+<p>and by plugging in the appropriate <nobr>N<sub>i</sub></nobr> for each term, we arrive at:</p>
+
+<p><img src="/assets/images/bspline/yc6grwxe.png" alt="eq5" /></p>
+
+<p>Now, <code>PolynomialSplineFunction</code> is going to automatically identify the appropriate <nobr>K<sub>j</sub></nobr> and subtract it, and so I can define that transform as <nobr>u = x -  K<sub>j</sub></nobr>, which gives:</p>
+
+<p><img src="/assets/images/bspline/y9p3vgqt.png" alt="eq6" /></p>
+
+<p>I substitute αu into the definitions of the four <nobr>N<sub>i</sub></nobr> to obtain:</p>
+
+<p><img src="/assets/images/bspline/y8apdoqy.png" alt="eq7" /></p>
+
+<p>Lastly, collecting like terms gives me the standard-form coefficients that I need for <code>PolynomialSplineFunction</code>:</p>
+
+<p><img src="/assets/images/bspline/y7eon7kc.png" alt="eq8" /></p>
+
+<p>Now I am equipped to return a <code>PolynomialSplineFunction</code> to my users, which implements the cubic B-spline that I fit to their data. Happy computing!</p>
+
+<h4>References</h4>
+
+<p><a name="anchor1" id="ref1">[1] </a>H. Fujioka and H. Kano: <a href="https://github.com/erikerlandson/snowball/blob/master/monotone-cubic-B-splines-2013.pdf">Monotone smoothing spline curves using normalized uniform cubic B-splines</a>, Trans. Institute of Systems, Control and Information Engineers, Vol. 26, No. 11, pp. 389–397, 2013</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Solving Feasible Points With Smooth-Max]]></title>
@@ -281,43 +339,6 @@ Applying the chain rule gives the ith partial gradient of smooth-max:</p>
 <p><img src="/assets/images/gamma_approx/approx_plot.png" alt="Figure 2" /></p>
 
 <p>As the plot shows, only for the 1-dimension case is the gamma approximation substiantially deviating.  In fact, the fit appears to get better as dimensionality increases.  To address the 1D case, I can easily test the fit of a half-gaussian as a possible model.</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Computing Derivatives of the Gamma Function]]></title>
-    <link href="http://erikerlandson.github.com/blog/2016/06/15/computing-derivatives-of-the-gamma-function/"/>
-    <updated>2016-06-15T16:37:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2016/06/15/computing-derivatives-of-the-gamma-function</id>
-    <content type="html"><![CDATA[<p>In this post I'll describe a simple algorithm to compute the kth derivatives of the <a href="https://en.wikipedia.org/wiki/Gamma_function">Gamma function</a>.</p>
-
-<p>I'll start by showing a simple recursion relation for these derivatives, and then gives its derivation.  The kth derivative of Gamma(x) can be computed as follows:</p>
-
-<p><img src="/assets/images/dgamma/hvqtl52.png" alt="Equation 1" /></p>
-
-<p>The recursive formula for the D<sub>k</sub> functions has an easy inductive proof:</p>
-
-<p><img src="/assets/images/dgamma/h79ued9.png" alt="Equation 2" /></p>
-
-<p>Computing the next value D<sub>k</sub> requires knowledge of D<sub>k-1</sub> but also derivative D'<sub>k-1</sub>.  If we start expanding terms, we see the following:</p>
-
-<p><img src="/assets/images/dgamma/hhvonpa.png" alt="Equation 3" /></p>
-
-<p>Continuing the process above it is not hard to see that we can continue expanding until we are left only with terms of <nobr>D<sub>1</sub><sup>(*)</sup>(x);</nobr> that is, various derivatives of <nobr>D<sub>1</sub>(x)</nobr>.  Furthermore, each layer of substitutions adds an order to the derivatives, so that we will eventually be left with terms involving the derivatives of <nobr>D<sub>1</sub>(x)</nobr> up to the (k-1)th derivative. Note that these will all be successive orders of the <a href="https://en.wikipedia.org/wiki/Polygamma_function">polygamma function</a>.</p>
-
-<p>What we want, to do these computations systematically, is a formula for computing the nth derivative of a term <nobr>D<sub>k</sub>(x)</nobr>.  Examining the first few such derivatives suggests a pattern:</p>
-
-<p><img src="/assets/images/dgamma/jqwqpzy.png" alt="Equation 4" /></p>
-
-<p>Generalizing from the above, we see that the formula for the nth derivative is:</p>
-
-<p><img src="/assets/images/dgamma/jamccnh.png" alt="Equation 5" /></p>
-
-<p>We are now in a position to fill in the triangular table of values, culminating in the value of <nobr>D<sub>k</sub>(x):</nobr></p>
-
-<p><img src="/assets/images/dgamma/jj9ph5l.png" alt="Equation 6" /></p>
-
-<p>As previously mentioned, the basis row of values <nobr>D<sub>1</sub><sup>(*)</sup>(x)</nobr> are the <a href="https://en.wikipedia.org/wiki/Polygamma_function">polygamma functions</a> where <nobr>D<sub>1</sub><sup>(n)</sup>(x) = polygamma<sup>(n)</sup>(x)</nobr>.  The first two polygammas, order 0 and 1, are simply the digamma and trigamma functions, respectively, and are available with most numeric libraries.  Computing the general polygamma is a project, and blog post, for another time, but the standard polynomial approximation for the digamma function can of course be differentiated...  Happy Computing!</p>
 ]]></content>
   </entry>
   

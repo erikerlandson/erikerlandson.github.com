@@ -1,0 +1,331 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Putting Cubic B-Splines into Standard Polynomial Form - tool monkey</title>
+  <meta name="author" content="Erik Erlandson">
+
+  
+  <meta name="description" content="Lately I have been working on an implementation of monotone smoothing splines, based on [1]. As the title suggests, this technique is based on a &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://erikerlandson.github.com/blog/2018/09/02/putting-cubic-b-splines-into-standard-polynomial-form/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="tool monkey" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+
+  <!-- enables inclusion of MathJax LaTeX: http://greglus.com/blog/2011/11/29/integrate-MathJax-LaTeX-and-MathML-Markup-in-Octopress/ -->
+  <script type="text/javascript"
+    src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">tool monkey</a></h1>
+  
+    <h2>adventures of an unfrozen caveman programmer</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:erikerlandson.github.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Putting Cubic B-Splines into Standard Polynomial Form</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2018-09-02T11:07:00-07:00" pubdate data-updated="true">Sep 2<span>nd</span>, 2018</time>
+        
+        
+         | <a href="#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>Lately I have been working on an implementation of monotone smoothing splines, based on <a href="#ref1">[1]</a>. As the title suggests, this technique is based on a univariate cubic <a href="https://en.wikipedia.org/wiki/B-splines">B-spline</a>. The form of the spline function used in the paper is as follows:</p>
+
+<p><img src="/assets/images/bspline/yd2guhxt.png" alt="eq1" /></p>
+
+<p>The You can see that the constant α normalizes knot intervals to 1, and that the four <nobr>N<sub>i</sub>(t)</nobr> are defined in this transformed space of unit-separated knots.</p>
+
+<p>I&#8217;m interested in providing an interpolated splines using the Apache Commons Math API, in particular the <a href="https://commons.apache.org/proper/commons-math/javadocs/api-3.6/org/apache/commons/math3/analysis/polynomials/PolynomialSplineFunction.html">PolynomialSplineFunction</a> class. In principle the above is clearly such a polynomial, but there are a few hitches.</p>
+
+<ol>
+<li><code>PolynomialSplineFunction</code> wants its knot intervals in closed standard polynomial form <nobr>ax<sup>3</sup> + bx<sup>2</sup> + cx + d</nobr></li>
+<li>It wants each such polynomial expressed in transformed space <nobr>(x-K<sub>j</sub>)</nobr>, where K<sub>j</sub> is the greatest knot point that is &lt;= x.</li>
+<li>The actual domain of S(x) is <nobr>K<sub>0</sub> &#8230; K<sub>m-1</sub></nobr>. The first 3 &#8220;negative&#8221; knots are there to make the summation for S(x) cleaner. <code>PolynomialSplineFunction</code> needs its functions to be defined purely on the actual domain.</li>
+</ol>
+
+
+<p>If you study the definition of <nobr>B<sub>3</sub>(t)</nobr> above, you can see that if x lands in the interval <nobr>[K<sub>j</sub>, K<sub>j+1</sub>)</nobr> then it is the four knot points <nobr>K<sub>j-3</sub> &#8230; K<sub>j</sub></nobr> that contribute to its value. This suggests a way to manipulate the equations into a standard form.</p>
+
+<p>For a value x and its appropriate <nobr>K<sub>j</sub></nobr>, S(x) has four non-zero terms:</p>
+
+<p><img src="/assets/images/bspline/y9tpgfqj.png" alt="eq2" /></p>
+
+<p>Consider the first term for (j-3). Recalling that knots are equally spaced by 1/α:</p>
+
+<p><img src="/assets/images/bspline/y79occ29.png" alt="eq3" /></p>
+
+<p>We can apply similar logic for each term to get:</p>
+
+<p><img src="/assets/images/bspline/ya6gsrjy.png" alt="eq4" /></p>
+
+<p>and by plugging in the appropriate <nobr>N<sub>i</sub></nobr> for each term, we arrive at:</p>
+
+<p><img src="/assets/images/bspline/yc6grwxe.png" alt="eq5" /></p>
+
+<p>Now, <code>PolynomialSplineFunction</code> is going to automatically identify the appropriate <nobr>K<sub>j</sub></nobr> and subtract it, and so I can define that transform as <nobr>u = x -  K<sub>j</sub></nobr>, which gives:</p>
+
+<p><img src="/assets/images/bspline/y9p3vgqt.png" alt="eq6" /></p>
+
+<p>I substitute αu into the definitions of the four <nobr>N<sub>i</sub></nobr> to obtain:</p>
+
+<p><img src="/assets/images/bspline/y8apdoqy.png" alt="eq7" /></p>
+
+<p>Lastly, collecting like terms gives me the standard-form coefficients that I need for <code>PolynomialSplineFunction</code>:</p>
+
+<p><img src="/assets/images/bspline/y7eon7kc.png" alt="eq8" /></p>
+
+<p>Now I am equipped to return a <code>PolynomialSplineFunction</code> to my users, which implements the cubic B-spline that I fit to their data. Happy computing!</p>
+
+<h4>References</h4>
+
+<p><a name="anchor1" id="ref1">[1] </a>H. Fujioka and H. Kano: <a href="https://github.com/erikerlandson/snowball/blob/master/monotone-cubic-B-splines-2013.pdf">Monotone smoothing spline curves using normalized uniform cubic B-splines</a>, Trans. Institute of Systems, Control and Information Engineers, Vol. 26, No. 11, pp. 389–397, 2013</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Erik Erlandson</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2018-09-02T11:07:00-07:00" pubdate data-updated="true">Sep 2<span>nd</span>, 2018</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/computing/'>computing</a>, <a class='category' href='/blog/categories/math/'>math</a>, <a class='category' href='/blog/categories/polynomial/'>polynomial</a>, <a class='category' href='/blog/categories/polynomials/'>polynomials</a>, <a class='category' href='/blog/categories/spline/'>spline</a>, <a class='category' href='/blog/categories/splines/'>splines</a>
+  
+</span>
+
+
+      <br>
+<a id="feedback"></a>Feedback • 
+ 
+    <script type="text/javascript" src="//platform.twitter.com/widgets.js"></script>
+    
+  <a href="https://twitter.com/intent/tweet?text=@manyangled%20re:%20http://erikerlandson.github.com/blog/2018/09/02/putting-cubic-b-splines-into-standard-polynomial-form/">Reply to this post on Twitter</a> • 
+ 
+<a href="mailto:erikerlandson@yahoo.com">Email the author</a>
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://erikerlandson.github.com/blog/2018/09/02/putting-cubic-b-splines-into-standard-polynomial-form/" data-via="manyangled" data-counturl="http://erikerlandson.github.com/blog/2018/09/02/putting-cubic-b-splines-into-standard-polynomial-form/" >Tweet</a>
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2018/06/03/solving-feasible-points-with-smooth-max/" title="Previous Post: Solving Feasible Points With Smooth-Max">&laquo; Solving Feasible Points With Smooth-Max</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>About The Author</h1>
+  <p>Erik is a software engineer at <a href="http://www.redhat.com">Red Hat</a> where he contributes to the <a href="https://radanalytics.io/">radanalytics.io</a> upstream community.
+</section>
+<section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2018/09/02/putting-cubic-b-splines-into-standard-polynomial-form/">Putting Cubic B-Splines into Standard Polynomial Form</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2018/06/03/solving-feasible-points-with-smooth-max/">Solving Feasible Points With Smooth-Max</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2018/05/28/computing-smooth-max-and-its-gradients-without-over-and-underflow/">Computing Smooth Max and its Gradients Without Over- and Underflow</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2018/05/27/the-gradient-and-hessian-of-the-smooth-max-over-functions/">The Gradient and Hessian of the Smooth Max Over Functions</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2017/08/23/generalizing-the-concept-of-release-versioning/">Rethinking the Concept of Release Versioning</a>
+      </li>
+    
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/erikerlandson">@erikerlandson</a> on GitHub
+  
+  <script type="text/javascript">
+    $.domReady(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'erikerlandson',
+            count: 0,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+
+<section>
+  <h1>Latest Tweets</h1>
+  <ul id="tweets">
+    <li class="loading">Status updating...</li>
+  </ul>
+  <script type="text/javascript">
+    $.domReady(function(){
+      getTwitterFeed("manyangled", 4, true);
+    });
+  </script>
+  <script src="/javascripts/twitter.js" type="text/javascript"> </script>
+  
+    <a href="http://twitter.com/manyangled" class="twitter-follow-button" data-show-count="false">Follow @manyangled</a>
+  
+</section>
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2018 - Erik Erlandson -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+
+
+
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>

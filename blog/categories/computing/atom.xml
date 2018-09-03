@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2018-08-14T17:47:05-07:00</updated>
+  <updated>2018-09-02T18:27:04-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,64 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Putting Cubic B-Splines into Standard Polynomial Form]]></title>
+    <link href="http://erikerlandson.github.com/blog/2018/09/02/putting-cubic-b-splines-into-standard-polynomial-form/"/>
+    <updated>2018-09-02T11:07:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2018/09/02/putting-cubic-b-splines-into-standard-polynomial-form</id>
+    <content type="html"><![CDATA[<p>Lately I have been working on an implementation of monotone smoothing splines, based on <a href="#ref1">[1]</a>. As the title suggests, this technique is based on a univariate cubic <a href="https://en.wikipedia.org/wiki/B-splines">B-spline</a>. The form of the spline function used in the paper is as follows:</p>
+
+<p><img src="/assets/images/bspline/yd2guhxt.png" alt="eq1" /></p>
+
+<p>The You can see that the constant α normalizes knot intervals to 1, and that the four <nobr>N<sub>i</sub>(t)</nobr> are defined in this transformed space of unit-separated knots.</p>
+
+<p>I'm interested in providing an interpolated splines using the Apache Commons Math API, in particular the <a href="https://commons.apache.org/proper/commons-math/javadocs/api-3.6/org/apache/commons/math3/analysis/polynomials/PolynomialSplineFunction.html">PolynomialSplineFunction</a> class. In principle the above is clearly such a polynomial, but there are a few hitches.</p>
+
+<ol>
+<li><code>PolynomialSplineFunction</code> wants its knot intervals in closed standard polynomial form <nobr>ax<sup>3</sup> + bx<sup>2</sup> + cx + d</nobr></li>
+<li>It wants each such polynomial expressed in transformed space <nobr>(x-K<sub>j</sub>)</nobr>, where K<sub>j</sub> is the greatest knot point that is &lt;= x.</li>
+<li>The actual domain of S(x) is <nobr>K<sub>0</sub> ... K<sub>m-1</sub></nobr>. The first 3 "negative" knots are there to make the summation for S(x) cleaner. <code>PolynomialSplineFunction</code> needs its functions to be defined purely on the actual domain.</li>
+</ol>
+
+
+<p>If you study the definition of <nobr>B<sub>3</sub>(t)</nobr> above, you can see that if x lands in the interval <nobr>[K<sub>j</sub>, K<sub>j+1</sub>)</nobr> then it is the four knot points <nobr>K<sub>j-3</sub> ... K<sub>j</sub></nobr> that contribute to its value. This suggests a way to manipulate the equations into a standard form.</p>
+
+<p>For a value x and its appropriate <nobr>K<sub>j</sub></nobr>, S(x) has four non-zero terms:</p>
+
+<p><img src="/assets/images/bspline/y9tpgfqj.png" alt="eq2" /></p>
+
+<p>Consider the first term for (j-3). Recalling that knots are equally spaced by 1/α:</p>
+
+<p><img src="/assets/images/bspline/y79occ29.png" alt="eq3" /></p>
+
+<p>We can apply similar logic for each term to get:</p>
+
+<p><img src="/assets/images/bspline/ya6gsrjy.png" alt="eq4" /></p>
+
+<p>and by plugging in the appropriate <nobr>N<sub>i</sub></nobr> for each term, we arrive at:</p>
+
+<p><img src="/assets/images/bspline/yc6grwxe.png" alt="eq5" /></p>
+
+<p>Now, <code>PolynomialSplineFunction</code> is going to automatically identify the appropriate <nobr>K<sub>j</sub></nobr> and subtract it, and so I can define that transform as <nobr>u = x -  K<sub>j</sub></nobr>, which gives:</p>
+
+<p><img src="/assets/images/bspline/y9p3vgqt.png" alt="eq6" /></p>
+
+<p>I substitute αu into the definitions of the four <nobr>N<sub>i</sub></nobr> to obtain:</p>
+
+<p><img src="/assets/images/bspline/y8apdoqy.png" alt="eq7" /></p>
+
+<p>Lastly, collecting like terms gives me the standard-form coefficients that I need for <code>PolynomialSplineFunction</code>:</p>
+
+<p><img src="/assets/images/bspline/y7eon7kc.png" alt="eq8" /></p>
+
+<p>Now I am equipped to return a <code>PolynomialSplineFunction</code> to my users, which implements the cubic B-spline that I fit to their data. Happy computing!</p>
+
+<h4>References</h4>
+
+<p><a name="anchor1" id="ref1">[1] </a>H. Fujioka and H. Kano: <a href="https://github.com/erikerlandson/snowball/blob/master/monotone-cubic-B-splines-2013.pdf">Monotone smoothing spline curves using normalized uniform cubic B-splines</a>, Trans. Institute of Systems, Control and Information Engineers, Vol. 26, No. 11, pp. 389–397, 2013</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Solving Feasible Points With Smooth-Max]]></title>
@@ -351,106 +409,6 @@ by generalizing release version to include the release version of all transitive
 may enable more flexible ways to both build software releases and specify them for pulling.</p>
 
 <p>Happy Computing!</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Converging Monoid Addition for T-Digest]]></title>
-    <link href="http://erikerlandson.github.com/blog/2016/12/19/converging-monoid-addition-for-t-digest/"/>
-    <updated>2016-12-19T13:29:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2016/12/19/converging-monoid-addition-for-t-digest</id>
-    <content type="html"><![CDATA[<blockquote><p>In the days when Sussman was a novice,
-Minsky once came to him as he sat hacking at the PDP-6.
-"What are you doing?", asked Minsky.
-"I am training a randomly wired neural net to play Tic-tac-toe", Sussman replied.
-"Why is the net wired randomly?", asked Minsky.
-"I do not want it to have any preconceptions of how to play", Sussman said.
-Minsky then shut his eyes.
-"Why do you close your eyes?" Sussman asked his teacher.
-"So that the room will be empty."
-At that moment, Sussman was enlightened.</p></blockquote>
-
-<p>Recently I've been doing some work with the <a href="https://github.com/isarn/isarn-sketches">t-digest sketching</a> algorithm, from the
-<a href="https://github.com/tdunning/t-digest/blob/master/docs/t-digest-paper/histo.pdf">paper by Ted Dunning and Omar Ertl</a>.
-One of the appealing properties of t-digest sketches is that you can "add" them together in the monoid sense to produce a combined sketch from two separate sketches.
-This property is crucial for sketching data across data partitions in scale-out parallel computing platforms such as Apache Spark or Map-Reduce.</p>
-
-<p>In the original Dunning/Ertl paper, they describe an algorithm for monoidal combination of t-digests based on randomized cluster recombination.  The clusters of the two input sketches are collected together, then randomly shuffled, and inserted into a new t-digest in that randomized order.  In Scala code, this algorithm might look like the following:</p>
-
-<p>```scala
-def combine(ltd: TDigest, rtd: TDigest): TDigest = {
-  // randomly shuffle input clusters and re-insert to a new t-digest
-  shuffle(ltd.clusters.toVector ++ rtd.clusters.toVector)</p>
-
-<pre><code>.foldLeft(TDigest.empty)((d, e) =&gt; d + e)
-</code></pre>
-
-<p>}
-```</p>
-
-<p>I implemented this algorithm and used it until I noticed that a sum over multiple sketches seemed to behave noticeably differently than either the individual inputs, or the nominal underlying distribution.</p>
-
-<p>To get a closer look at what was going on, I generated some random samples from a Normal distribution ~N(0,1).
-I then generated t-digest sketches of each sample, took a cumulative monoid sum, and kept track of how closely each successive sum adhered to the original ~N(0,1) distribution.
-As a measure of the difference between a t-digest sketch and the original distribution, I computed the Kolmogorov-Smirnov <a href="https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test#Kolmogorov.E2.80.93Smirnov_statistic">D-statistic</a>, which yields a distance between two cumulative distribution functions.
-(Code for my data collections can be viewed <a href="https://github.com/erikerlandson/isarn-sketches-algebird-api/blob/blog/t_digest_sum/src/main/scala/org/isarnproject/sketchesAlgebirdAPI/AlgebirdFactory.scala#L65">here</a>)
-I ran multiple data collections and subsequent cumulative sums and used those multiple measurements to generate the following box-plot.
-The result was surprising and a bit disturbing:</p>
-
-<p><img src="/assets/images/tdsum/plot1.png" alt="plot1" /></p>
-
-<p>As the plot shows, the t-digest sketch distributions are gradually <em>diverging</em> from the underlying "true" distribution ~N(0,1).
-This is a potentially significant problem for the stability of monoidal t-digest sums, and by extension any parallel sketching based on combining the partial sketches on data partitions in map-reduce-like environments.</p>
-
-<p>Seeing this divergence motivated me to think about ways to avoid it.
-One property of t-digest insertion logic is that the results of inserting new data can differ depending on what clusters are already present.
-I wondered if the results might be more stable if the largest clusters were inserted first.
-The t-digest algorithm allows clusters closest to the distribution median to grow the largest.
-Combining input clusters from largest to smallest would be like building the combined distribution from the middle outwards, toward the distribution tails.
-In the case where one t-digest had larger weights, it would also somewhat approximate inserting the smaller sketch into the larger one.
-In Scala code, this alternative monoid addition looks like so:</p>
-
-<p>```scala
-def combine(ltd: TDigest, rtd: TDigest): TDigest = {
-  // insert clusters from largest to smallest
-  (ltd.clusters.toVector ++ rtd.clusters.toVector).sortWith((a, b) => a.<em>2 > b.</em>2)</p>
-
-<pre><code>.foldLeft(TDigest.empty(delta))((d, e) =&gt; d + e)
-</code></pre>
-
-<p>}
-```</p>
-
-<p>As a second experiment, for each data sampling I compared the original monoid addition with the alternative method using largest-to-smallest cluster insertion.
-When I plotted the resulting progression of D-statistics side-by-side, the results were surprising:</p>
-
-<p><img src="/assets/images/tdsum/plot2a.png" alt="plot2a" /></p>
-
-<p>As the plot demonstrates, not only was large-to-small insertion more stable, its D-statistics appeared to be getting <em>smaller</em> instead of larger.
-To see if this trend was sustained over longer cumulative sums, I plotted the D-stats for cumulative sums over 100 samples:</p>
-
-<p><img src="/assets/images/tdsum/plot2.png" alt="plot2" /></p>
-
-<p>The results were even more dramatic;
-These longer sums show that the standard randomized-insertion method continues to diverge,
-but in the case of large-to-small insertion the cumulative t-digest sums continue to converge
-towards the underlying distribution!</p>
-
-<p>To test whether this effect might be dependent on particular shapes of distribution, I ran similar experiments using a Uniform distribution (no "tails") and an Exponential distribution (one tail).
-I included the corresponding plots in the appendix.
-The convergence of this alternative monoid addition doesn't seem to be sensitive to shape of distribution.</p>
-
-<p>I have upgraded my <a href="https://github.com/isarn/isarn-sketches#t-digest">implementation of t-digest sketching</a> to use this new definition of monoid addition for t-digests.
-As you can see, it is easy to change one implementation for another.
-One or two lines of code may be sufficient.
-I hope this idea may be useful for any other implementations in the community.
-Happy sketching!</p>
-
-<h3>Appendix: Plots with Alternate Distributions</h3>
-
-<p><img src="/assets/images/tdsum/plot3.png" alt="plot3" /></p>
-
-<p><img src="/assets/images/tdsum/plot4.png" alt="plot4" /></p>
 ]]></content>
   </entry>
   
