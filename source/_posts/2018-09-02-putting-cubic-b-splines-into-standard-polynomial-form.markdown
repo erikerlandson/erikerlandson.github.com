@@ -5,7 +5,7 @@ date: 2018-09-02 11:07
 comments: true
 categories: [ computing, math, spline, splines, polynomial, polynomials ]
 ---
-Lately I have been working on an implementation of monotone smoothing splines, based on [[1]](#ref1). As the title suggests, this technique is based on a univariate cubic [B-spline](https://en.wikipedia.org/wiki/B-splines). The form of the spline function used in the paper is as follows:
+Lately I have been working on an [implementation](https://github.com/erikerlandson/snowball) of monotone smoothing splines, based on [[1]](#ref1). As the title suggests, this technique is based on a univariate cubic [B-spline](https://en.wikipedia.org/wiki/B-splines). The form of the spline function used in the paper is as follows:
 
 ![eq1](/assets/images/bspline/yd2guhxt.png)
 
