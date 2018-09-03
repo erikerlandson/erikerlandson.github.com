@@ -9,7 +9,7 @@ Lately I have been working on an [implementation](https://github.com/erikerlands
 
 ![eq1](/assets/images/bspline/yd2guhxt.png)
 
-The You can see that the constant α normalizes knot intervals to 1, and that the four <nobr>N<sub>i</sub>(t)</nobr> are defined in this transformed space of unit-separated knots.
+You can see that the constant α normalizes knot intervals to 1, and that the four <nobr>N<sub>i</sub>(t)</nobr> are defined in this transformed space of unit-separated knots.
 
 I'm interested in providing an interpolated splines using the Apache Commons Math API, in particular the [PolynomialSplineFunction](https://commons.apache.org/proper/commons-math/javadocs/api-3.6/org/apache/commons/math3/analysis/polynomials/PolynomialSplineFunction.html) class. In principle the above is clearly such a polynomial, but there are a few hitches.
 
