@@ -4,7 +4,7 @@
   <title><![CDATA[Category: math | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/math/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2018-09-02T19:43:53-07:00</updated>
+  <updated>2018-09-03T07:06:30-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -22,7 +22,7 @@
 
 <p><img src="/assets/images/bspline/yd2guhxt.png" alt="eq1" /></p>
 
-<p>The You can see that the constant α normalizes knot intervals to 1, and that the four <nobr>N<sub>i</sub>(t)</nobr> are defined in this transformed space of unit-separated knots.</p>
+<p>You can see that the constant α normalizes knot intervals to 1, and that the four <nobr>N<sub>i</sub>(t)</nobr> are defined in this transformed space of unit-separated knots.</p>
 
 <p>I'm interested in providing an interpolated splines using the Apache Commons Math API, in particular the <a href="https://commons.apache.org/proper/commons-math/javadocs/api-3.6/org/apache/commons/math3/analysis/polynomials/PolynomialSplineFunction.html">PolynomialSplineFunction</a> class. In principle the above is clearly such a polynomial, but there are a few hitches.</p>
 
