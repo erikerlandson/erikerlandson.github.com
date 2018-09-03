@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2018-09-02T18:27:04-07:00</updated>
+  <updated>2018-09-02T18:29:06-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -18,7 +18,7 @@
     <link href="http://erikerlandson.github.com/blog/2018/09/02/putting-cubic-b-splines-into-standard-polynomial-form/"/>
     <updated>2018-09-02T11:07:00-07:00</updated>
     <id>http://erikerlandson.github.com/blog/2018/09/02/putting-cubic-b-splines-into-standard-polynomial-form</id>
-    <content type="html"><![CDATA[<p>Lately I have been working on an implementation of monotone smoothing splines, based on <a href="#ref1">[1]</a>. As the title suggests, this technique is based on a univariate cubic <a href="https://en.wikipedia.org/wiki/B-splines">B-spline</a>. The form of the spline function used in the paper is as follows:</p>
+    <content type="html"><![CDATA[<p>Lately I have been working on an <a href="https://github.com/erikerlandson/snowball">implementation</a> of monotone smoothing splines, based on <a href="#ref1">[1]</a>. As the title suggests, this technique is based on a univariate cubic <a href="https://en.wikipedia.org/wiki/B-splines">B-spline</a>. The form of the spline function used in the paper is as follows:</p>
 
 <p><img src="/assets/images/bspline/yd2guhxt.png" alt="eq1" /></p>
 
