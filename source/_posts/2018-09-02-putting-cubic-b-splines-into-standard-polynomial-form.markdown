@@ -45,7 +45,7 @@ I substitute αu into the definitions of the four <nobr>N<sub>i</sub></nobr> to 
 
 Lastly, collecting like terms gives me the standard-form coefficients that I need for `PolynomialSplineFunction`:
 
-![eq8](/assets/images/bspline/y7eon7kc.png)
+![eq8](/assets/images/bspline/ya74mlsf.png)
 
 Now I am equipped to return a `PolynomialSplineFunction` to my users, which implements the cubic B-spline that I fit to their data. Happy computing!
 
