@@ -4,7 +4,7 @@
   <title><![CDATA[Category: math | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/math/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2018-09-02T18:29:06-07:00</updated>
+  <updated>2018-09-02T19:43:53-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -61,7 +61,7 @@
 
 <p>Lastly, collecting like terms gives me the standard-form coefficients that I need for <code>PolynomialSplineFunction</code>:</p>
 
-<p><img src="/assets/images/bspline/y7eon7kc.png" alt="eq8" /></p>
+<p><img src="/assets/images/bspline/ya74mlsf.png" alt="eq8" /></p>
 
 <p>Now I am equipped to return a <code>PolynomialSplineFunction</code> to my users, which implements the cubic B-spline that I fit to their data. Happy computing!</p>
 
