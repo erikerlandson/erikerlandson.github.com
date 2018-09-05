@@ -39,7 +39,7 @@ Now, `PolynomialSplineFunction` is going to automatically identify the appropria
 
 ![eq6](/assets/images/bspline/y9p3vgqt.png)
 
-I substitute the value (αu) into the definitions of the four <nobr>N<sub>i</sub></nobr> to obtain:
+I substitute the argument (αu) into the definitions of the four <nobr>N<sub>i</sub></nobr> to obtain:
 
 ![eq7](/assets/images/bspline/y8apdoqy.png)
 
