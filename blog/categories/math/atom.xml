@@ -4,7 +4,7 @@
   <title><![CDATA[Category: math | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/math/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2018-09-03T07:06:30-07:00</updated>
+  <updated>2018-09-05T06:35:21-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -22,28 +22,28 @@
 
 <p><img src="/assets/images/bspline/yd2guhxt.png" alt="eq1" /></p>
 
-<p>You can see that the constant α normalizes knot intervals to 1, and that the four <nobr>N<sub>i</sub>(t)</nobr> are defined in this transformed space of unit-separated knots.</p>
+<p>The knot points <nobr>K<sub>j</sub></nobr> are all equally spaced by 1/α, and so α normalizes knot intervals to 1. The function <nobr>B<sub>3</sub>(t)</nobr> and the four <nobr>N<sub>i</sub>(t)</nobr> are defined in this transformed space, t, of unit-separated knots.</p>
 
 <p>I'm interested in providing an interpolated splines using the Apache Commons Math API, in particular the <a href="https://commons.apache.org/proper/commons-math/javadocs/api-3.6/org/apache/commons/math3/analysis/polynomials/PolynomialSplineFunction.html">PolynomialSplineFunction</a> class. In principle the above is clearly such a polynomial, but there are a few hitches.</p>
 
 <ol>
 <li><code>PolynomialSplineFunction</code> wants its knot intervals in closed standard polynomial form <nobr>ax<sup>3</sup> + bx<sup>2</sup> + cx + d</nobr></li>
-<li>It wants each such polynomial expressed in transformed space <nobr>(x-K<sub>j</sub>)</nobr>, where K<sub>j</sub> is the greatest knot point that is &lt;= x.</li>
+<li>It wants each such polynomial expressed in the translated space <nobr>(x-K<sub>j</sub>)</nobr>, where <nobr>K<sub>j</sub></nobr> is the greatest knot point that is &lt;= x.</li>
 <li>The actual domain of S(x) is <nobr>K<sub>0</sub> ... K<sub>m-1</sub></nobr>. The first 3 "negative" knots are there to make the summation for S(x) cleaner. <code>PolynomialSplineFunction</code> needs its functions to be defined purely on the actual domain.</li>
 </ol>
 
 
-<p>If you study the definition of <nobr>B<sub>3</sub>(t)</nobr> above, you can see that if x lands in the interval <nobr>[K<sub>j</sub>, K<sub>j+1</sub>)</nobr> then it is the four knot points <nobr>K<sub>j-3</sub> ... K<sub>j</sub></nobr> that contribute to its value. This suggests a way to manipulate the equations into a standard form.</p>
+<p>Consider the arguments to <nobr>B<sub>3</sub></nobr>, for two adjacent knots <nobr>K<sub>j-1</sub></nobr> and <nobr>K<sub>j</sub></nobr>, where <nobr>K<sub>j</sub></nobr> is greatest knot point that is &lt;= x. Recalling that knot points are all equally spaced by 1/α, we have the following relationship in the transformed space t:</p>
 
-<p>For a value x and its appropriate <nobr>K<sub>j</sub></nobr>, S(x) has four non-zero terms:</p>
+<p><img src="/assets/images/bspline/ydcb2ao3.png" alt="eq" /></p>
+
+<p>We can apply this same manipulation to show that the arguments to <nobr>B<sub>3</sub></nobr>, as centered around knot <nobr>K<sub>j</sub></nobr>, are simply <nobr>{... t+2, t+1, t, t-1, t-2 ...}</nobr>.</p>
+
+<p>By the definition of <nobr>B<sub>3</sub></nobr> above, you can see that <nobr>B<sub>3</sub>(t)</nobr> is non-zero only for t in <nobr>[0,4)</nobr>, and so the four corresponding knot points <nobr>K<sub>j-3</sub> ... K<sub>j</sub></nobr> contribute to its value:</p>
 
 <p><img src="/assets/images/bspline/y9tpgfqj.png" alt="eq2" /></p>
 
-<p>Consider the first term for (j-3). Recalling that knots are equally spaced by 1/α:</p>
-
-<p><img src="/assets/images/bspline/y79occ29.png" alt="eq3" /></p>
-
-<p>We can apply similar logic for each term to get:</p>
+<p>This suggests a way to manipulate the equations into a standard form. In the transformed space t, the four nonzero terms are:</p>
 
 <p><img src="/assets/images/bspline/ya6gsrjy.png" alt="eq4" /></p>
 
@@ -51,7 +51,7 @@
 
 <p><img src="/assets/images/bspline/yc6grwxe.png" alt="eq5" /></p>
 
-<p>Now, <code>PolynomialSplineFunction</code> is going to automatically identify the appropriate <nobr>K<sub>j</sub></nobr> and subtract it, and so I can define that transform as <nobr>u = x -  K<sub>j</sub></nobr>, which gives:</p>
+<p>Now, <code>PolynomialSplineFunction</code> is going to automatically identify the appropriate <nobr>K<sub>j</sub></nobr> and subtract it, and so I can define <em>that</em> transform as <nobr>u = x -  K<sub>j</sub></nobr>, which gives:</p>
 
 <p><img src="/assets/images/bspline/y9p3vgqt.png" alt="eq6" /></p>
 
