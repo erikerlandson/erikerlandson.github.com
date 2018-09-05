@@ -4,7 +4,7 @@
   <title><![CDATA[tool monkey]]></title>
   <link href="http://erikerlandson.github.com/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2018-09-05T06:35:53-07:00</updated>
+  <updated>2018-09-05T07:04:00-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -55,7 +55,7 @@
 
 <p><img src="http://erikerlandson.github.com/assets/images/bspline/y9p3vgqt.png" alt="eq6" /></p>
 
-<p>I substitute αu into the definitions of the four <nobr>N<sub>i</sub></nobr> to obtain:</p>
+<p>I substitute the value (αu) into the definitions of the four <nobr>N<sub>i</sub></nobr> to obtain:</p>
 
 <p><img src="http://erikerlandson.github.com/assets/images/bspline/y8apdoqy.png" alt="eq7" /></p>
 
