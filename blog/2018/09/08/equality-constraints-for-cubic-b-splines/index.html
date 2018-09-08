@@ -1,0 +1,314 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Equality Constraints for Cubic B-Splines - tool monkey</title>
+  <meta name="author" content="Erik Erlandson">
+
+  
+  <meta name="description" content="In my previous post
+I derived the standard-form polynomial coefficients for cubic B-splines.
+As part of the same project,
+I also need to add a &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://erikerlandson.github.com/blog/2018/09/08/equality-constraints-for-cubic-b-splines/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="tool monkey" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+
+  <!-- enables inclusion of MathJax LaTeX: http://greglus.com/blog/2011/11/29/integrate-MathJax-LaTeX-and-MathML-Markup-in-Octopress/ -->
+  <script type="text/javascript"
+    src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">tool monkey</a></h1>
+  
+    <h2>adventures of an unfrozen caveman programmer</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:erikerlandson.github.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Equality Constraints for Cubic B-Splines</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2018-09-08T14:32:00-07:00" pubdate data-updated="true">Sep 8<span>th</span>, 2018</time>
+        
+        
+         | <a href="#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>In my <a href="http://erikerlandson.github.io/blog/2018/09/02/putting-cubic-b-splines-into-standard-polynomial-form/">previous post</a>
+I derived the standard-form polynomial coefficients for cubic B-splines.
+As part of the <a href="https://github.com/erikerlandson/snowball">same project</a>,
+I also need to add a feature that allows the library user to declare equality constraints of the form <nobr>(x,y)</nobr>,
+where <nobr>S(x) = y</nobr>. Under the hood, I am invoking a <a href="https://github.com/erikerlandson/gibbous">convex optimization</a> library, and so I need to convert these
+user inputs to a linear equation form that is consumable by the optimizer.</p>
+
+<p>I expected this to be tricky, but it turns out I did most of the work <a href="http://erikerlandson.github.io/blog/2018/09/02/putting-cubic-b-splines-into-standard-polynomial-form/">already</a>.
+I can take one of my previously-derived expressions for S(x) and put it into a form that gives me coefficients for the four contributing knot points <nobr>K<sub>j-3</sub> &#8230; K<sub>j</sub></nobr>:</p>
+
+<p><img src="/assets/images/bspline/ybblhxfw.png" alt="eq" /></p>
+
+<p>Recall that by the convention from my previous post, <nobr>K<sub>j</sub></nobr> is the largest knot point that is <nobr>&lt;= x</nobr>.</p>
+
+<p>My linear constraint equation is with respect to the vector I am solving for, in particular vector (τ), and so the
+equation above yields the following:</p>
+
+<p><img src="/assets/images/bspline/y7jhvnmk.png" alt="eq" /></p>
+
+<p>In this form, it is easy to add into a <a href="https://github.com/erikerlandson/gibbous">convex optimization</a> problem as a linear equality constraint.</p>
+
+<p>Gradient constraints are another common equality constraint in convex optimization, and so I can apply very similar logic to get coefficient values corresponding to the gradient of S:</p>
+
+<p><img src="/assets/images/bspline/yd5fxmwk.png" alt="eq" /></p>
+
+<p>And so my linear equality constraint with respect to (τ) in this case is:</p>
+
+<p><img src="/assets/images/bspline/yalk3puu.png" alt="eq" /></p>
+
+<p>And that gives me the tools I need to let my users supply additional equality constraints as simple <nobr>(x,y)</nobr> pairs, and translate them into a form that can be consumed by convex optimization routines. Happy Computing!</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Erik Erlandson</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2018-09-08T14:32:00-07:00" pubdate data-updated="true">Sep 8<span>th</span>, 2018</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/computing/'>computing</a>, <a class='category' href='/blog/categories/constraints/'>constraints</a>, <a class='category' href='/blog/categories/convex-optimization/'>convex optimization</a>, <a class='category' href='/blog/categories/gradient/'>gradient</a>, <a class='category' href='/blog/categories/math/'>math</a>, <a class='category' href='/blog/categories/polynomial/'>polynomial</a>, <a class='category' href='/blog/categories/polynomials/'>polynomials</a>, <a class='category' href='/blog/categories/spline/'>spline</a>, <a class='category' href='/blog/categories/splines/'>splines</a>
+  
+</span>
+
+
+      <br>
+<a id="feedback"></a>Feedback • 
+ 
+    <script type="text/javascript" src="//platform.twitter.com/widgets.js"></script>
+    
+  <a href="https://twitter.com/intent/tweet?text=@manyangled%20re:%20http://erikerlandson.github.com/blog/2018/09/08/equality-constraints-for-cubic-b-splines/">Reply to this post on Twitter</a> • 
+ 
+<a href="mailto:erikerlandson@yahoo.com">Email the author</a>
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://erikerlandson.github.com/blog/2018/09/08/equality-constraints-for-cubic-b-splines/" data-via="manyangled" data-counturl="http://erikerlandson.github.com/blog/2018/09/08/equality-constraints-for-cubic-b-splines/" >Tweet</a>
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2018/09/02/putting-cubic-b-splines-into-standard-polynomial-form/" title="Previous Post: Putting Cubic B-Splines into Standard Polynomial Form">&laquo; Putting Cubic B-Splines into Standard Polynomial Form</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>About The Author</h1>
+  <p>Erik is a software engineer at <a href="http://www.redhat.com">Red Hat</a> where he contributes to the <a href="https://radanalytics.io/">radanalytics.io</a> upstream community.
+</section>
+<section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2018/09/08/equality-constraints-for-cubic-b-splines/">Equality Constraints for Cubic B-Splines</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2018/09/02/putting-cubic-b-splines-into-standard-polynomial-form/">Putting Cubic B-Splines into Standard Polynomial Form</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2018/06/03/solving-feasible-points-with-smooth-max/">Solving Feasible Points With Smooth-Max</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2018/05/28/computing-smooth-max-and-its-gradients-without-over-and-underflow/">Computing Smooth Max and its Gradients Without Over- and Underflow</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2018/05/27/the-gradient-and-hessian-of-the-smooth-max-over-functions/">The Gradient and Hessian of the Smooth Max Over Functions</a>
+      </li>
+    
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/erikerlandson">@erikerlandson</a> on GitHub
+  
+  <script type="text/javascript">
+    $.domReady(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'erikerlandson',
+            count: 0,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+
+<section>
+  <h1>Latest Tweets</h1>
+  <ul id="tweets">
+    <li class="loading">Status updating...</li>
+  </ul>
+  <script type="text/javascript">
+    $.domReady(function(){
+      getTwitterFeed("manyangled", 4, true);
+    });
+  </script>
+  <script src="/javascripts/twitter.js" type="text/javascript"> </script>
+  
+    <a href="http://twitter.com/manyangled" class="twitter-follow-button" data-show-count="false">Follow @manyangled</a>
+  
+</section>
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2018 - Erik Erlandson -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+
+
+
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>

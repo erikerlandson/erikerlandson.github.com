@@ -9,7 +9,7 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="In this post I will describe how to use HTCondor accounting groups with Wallaby. I will begin by walking through an accounting group configuration on &hellip;">
+  <meta name="description" content="The HTCondor semantic for accounting group quotas and slot weights is currently cpu-centric. This is an artifact of the historic primacy of cpu as &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,65 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2012/11/13/rethinking-the-semantics-of-group-quotas-and-slot-weights-for-heterogeneous-and-multidimensional-compute-resources/">Rethinking the Semantics of Group Quotas and Slot Weights for Heterogeneous and Multidimensional Compute Resources</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-11-13T15:31:00-07:00" pubdate data-updated="true">Nov 13<span>th</span>, 2012</time>
+        
+        
+         | <a href="/blog/2012/11/13/rethinking-the-semantics-of-group-quotas-and-slot-weights-for-heterogeneous-and-multidimensional-compute-resources/#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>The HTCondor semantic for accounting group quotas and slot weights is currently cpu-centric.  This is an artifact of the historic primacy of cpu as the most commonly-considered limiting resource in computations.  For example the <code>SlotWeight</code> attribute is currently defaulted to <code>Cpus</code>, and when slot weights are disabled, there is logic activated in matchmaking to sum the available cpus on slots to avoid &#8216;undercounting&#8217; total pool quotas.</p>
+
+<p>However, HTCondor slots &#8211; the core model of computational resources in an HTCondor pool &#8211; manage four resources by default: cpu, memory, disk and swap.  Furthermore, slots may now be configured with arbitrary custom resources.  As recently mentioned by <a href="http://spinningmatt.wordpress.com/2012/11/13/no-longer-thinking-in-slots-thinking-in-aggregate-resources-and-consumption-policies">Matthew Farrellee</a>, there is a growing pressure to provide robust support not just for traditional cpu-centric resource presentation, usage and allocation, but also seamlessly mediated with memory-centric, gpu-centric or &#8216;*&#8217;-centric resource allocation policies and more generally allocation policies that are simultaneously aware of all resource dimensions.</p>
+
+<p>This goal immediately raises some questions for the semantics of accounting groups and slot weights when matching jobs against slots during matchmaking.</p>
+
+<p>Consider a pool where 50% of the slots are &#8216;weighted&#8217; in a traditional cpu-centric way, but the other 50% are intended to be allocated in a memory-centric way.  This is currently possible, as the <code>SlotWeight</code> attribute can be configured appropriately to be a function of either <code>Cpus</code> or <code>Memory</code>.</p>
+
+<p>But in a scenario where slots are weighted as functions of heterogeneous resource dimensions, it raises a semantic question:  when we sum these weights to obtain the pool-wide available quota, what &#8216;real world&#8217; quantity does this total represent &#8211; if any?   Is it a purely heuristic numeric value with no well defined unit attached?</p>
+
+<p>This question has import.  Understanding what the answer is, or should be, impacts what story we tell to users about what their accounting group configuration actually means.  When I assign a quota to an accounting group in such a heterogeneous environment, what is that quota regulating?   When a job matches a cpu-centric slot, does the cost of that match have a different meaning than when matching against a memory-centric slot?   When the slots are partitionable, a match implies a certain multi-dimensional slice of resources allocated from that slot.  What is the cost of that slice?  Does the sum of costs add up to the original weight on the partitionable slot?  If not, how does that affect our understanding of quota semantics?</p>
+
+<p>It may be possible unify all of these ideas by adopting the perspective that a slot&#8217;s weight is a measure of the maximum number of jobs that can be matched against it.  The cost of a match is W(S)-W(S&#8217;), where W(S) is the weight function evaluated on the slot prior to match, and W(S&#8217;) is the corresponding weight after the match has extracted its requested resources.  The pool&#8217;s total quota is just the sum of W(S), over all slots S in the pool.  Note, this implies that the &#8216;unit&#8217; attached to both slot weights and accounting group quotas is &#8216;jobs&#8217;.</p>
+
+<p>Consider a simple example from the traditional cpu-centric configuration:   A partitionable slot is configured with 8 cpus, and <code>SlotWeight</code> is just its default <code>Cpus</code>.  Using this model, the allocation policy is: &#8216;each match must use >= 1 cpu&#8221;, and that other resource requests are assumed to be not limiting.  The maximum number of matches is 8 jobs, each requesting 1 cpu.   However, a job might also request 2 cpus.  In this case, note that the cost of the match is 2, since the remaining slot has 6 slots, and so W(S&#8217;) now evaluates to 6.   So, the cost of the match is how many fewer possible jobs the original slot can support after the match takes its requested resources.</p>
+
+<p>This approach can be applied equally well to a memory-centric strategy, or a disk centric strategy, or a gpu-based strategy, or any combination simultaneously.  All weights evaluate to a value with unit &#8216;jobs&#8217;.   All match costs are differences between weights (before and after match), and so their values are also in units of &#8216;jobs&#8217;.  Therefore, the semantics of the sum of weights over a pool is always well defined: it is a number of jobs, and spefically a measure of the maximum number of jobs that might match against all the slots in the pool.  When a match acquires resources that reduce this maximum by more than 1 job, that is not in any way inconsistent.  It means the job used resources that might have supported two or more &#8216;smaller&#8217; jobs.   This means that accounting group quotas (and submitter shares) also have a well defined unit and semantic, which is &#8216;how many (or what fraction of) the maximum possible jobs is this group guaranteed by my accounting policy&#8217;</p>
+
+<p>One implication of this proposed semantic for quotas and weights is that the measure for the maximum number of jobs that may match against any given slot must be some finite number.   It implies that all resource dimensions are quantized in some way by the allocation policy.   This scheme would not support a real-valued resource dimension that had no minimum quantization.  I do not think that this is a very heavy-weight requirement, and in fact we have already been moving in that direction with features such as MODIFY_REQUEST_EXPRS_xxx.</p>
+
+<p>When a slot&#8217;s resource allocation policy is defined over all its resources, what bounds this measure of maximum possible matches?  In a case where each job match <em>must</em> use at least one non-zero quantum of each resource dimension, then the limit is the resource with the mimimum quantized levels.   In a case where jobs may request a zero amount of resources, then the limit is the resource with the maximum quantized levels.  (note, it is required that each match use at least one quantum of at least one resource, otherwise the maximum is not properly bounded).</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1631,135 +1690,6 @@ $ cchist condor_history AccountingGroup LastJobStatus
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/06/27/maintaining-accounting-group-quotas-with-preemption-policy/">Maintaining Accounting Group Quotas With Preemption Policy</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-06-27T20:33:00-07:00" pubdate data-updated="true">Jun 27<span>th</span>, 2012</time>
-        
-        
-         | <a href="/blog/2012/06/27/maintaining-accounting-group-quotas-with-preemption-policy/#feedback">Feedback</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>There is a straightforward technique to leverage a Condor <a href="http://research.cs.wisc.edu/condor/manual/v7.8/3_3Configuration.html#20480">preemption policy</a> to direct preemptions in a way that helps maintain resource usages as close as possible to the defined <a href="http://research.cs.wisc.edu/condor/manual/v7.8/3_4User_Priorities.html#SECTION00447000000000000000">accounting group quotas</a>.</p>
-
-<p>I will begin by simply giving the configuration and then describe how it works, with a short demonstration.  The actual configuration is simply a clause that can be added to the preemption policy defined by <code>PREEMPTION_REQUIREMENTS</code>:</p>
-
-<pre><code>PREEMPTION_REQUIREMENTS = $(PREEMPTION_REQUIREMENTS) &amp;&amp; (((SubmitterGroupResourcesInUse &lt; SubmitterGroupQuota) &amp;&amp; (RemoteGroupResourcesInUse &gt; RemoteGroupQuota)) || (SubmitterGroup =?= RemoteGroup))
-</code></pre>
-
-<p>Unpacking the above logic: the term <code>(SubmitterGroupResourcesInUse &lt; SubmitterGroupQuota)</code> captures the idea that to best maintain quota-driven resource usage, we only want to allow preemption if the submitting accounting group has not yet reached its quota, as acquiring more resources moves the usage closer to the group&#8217;s quota.  Conversely, if the accounting group&#8217;s resource usage is <em>already</em> at or above its quota, acquiring more resources via preemption will only drive the usage <em>farther</em> from the configured quota.</p>
-
-<p>The term <code>(RemoteGroupResourcesInUse &gt; RemoteGroupQuota)</code> captures a similar idea from the &#8216;remote&#8217; side (the candidate for preemption).  Provided the remote&#8217;s resource usage is greater than its quota, allowing preemption will move its usage closer to the configured quota.</p>
-
-<p>The last term <code>(SubmitterGroup =?= RemoteGroup)</code> (a disjunction) ensures that with an accounting group preemption may always occur, deferring to any other clauses in the expression.</p>
-
-<p>A brief aside: in the following example, I use the &#8216;svhist&#8217; bash function for ease and clarity.  For example, the command <code>svhist AccountingGroup State Activity</code> is shorthand for: <code>condor_status -format "%s" 'AccountingGroup' -format " | %s" 'State' -format " | %s\n" 'Activity' -constraint 'True' | sort | uniq -c | awk '{ print $0; t += $1 } END { printf("%7d total\n",t) }'</code>  The svhist command is available <a href="https://github.com/erikerlandson/bash_condor_tools">here</a>.</p>
-
-<p>To demonstrate this preemption policy, consider the following example configuration:</p>
-
-<pre><code># turn off scheduler optimizations, as they can sometimes obscure the
-# negotiator/matchmaker behavior
-CLAIM_WORKLIFE = 0
-
-# for demonstration purposes, make sure basic preemption knobs are 'on'
-MAXJOBRETIREMENTTIME = 0
-PREEMPTION_REQUIREMENTS = True
-NEGOTIATOR_CONSIDER_PREEMPTION = True
-
-NUM_CPUS = 15
-
-# 3 accounting groups, each with equal quota
-GROUP_NAMES = A, B, C
-GROUP_QUOTA_A = 5
-GROUP_QUOTA_B = 5
-GROUP_QUOTA_C = 5
-
-# groups may use each others' surplus
-GROUP_ACCEPT_SURPLUS = TRUE
-# (an alternative way for groups to acquire surplus is to enable GROUP_AUTOREGROUP)
-# GROUP_AUTOREGROUP = TRUE
-
-# A preepmption policy clause that only allows preemptions that move usages closer to configured quotas
-PREEMPTION_REQUIREMENTS = $(PREEMPTION_REQUIREMENTS) &amp;&amp; (((SubmitterGroupResourcesInUse &lt; SubmitterGroupQuota) &amp;&amp; (RemoteGroupResourcesInUse &gt; RemoteGroupQuota)) || (SubmitterGroup =?= RemoteGroup))
-</code></pre>
-
-<p>Begin by submitting 5 jobs to accounting group A, and 10 jobs to group B:</p>
-
-<pre><code>universe = vanilla
-cmd = /bin/sleep
-args = 3600
-should_transfer_files = if_needed
-when_to_transfer_output = on_exit
-+AccountingGroup="A.user"
-queue 5
-+AccountingGroup="B.user"
-queue 10
-</code></pre>
-
-<p>Confirm that group B&#8217;s resource usage is 10 (note, this is over its quota of 5):</p>
-
-<pre><code>$ svhist AccountingGroup State Activity
-      5 A.user@localdomain | Claimed | Busy
-     10 B.user@localdomain | Claimed | Busy
-     15 total
-</code></pre>
-
-<p>Now set submitter priorities to allow preemption, provided preemption policy supports it</p>
-
-<pre><code>$ condor_userprio -setprio A.user@localdomain 10
-The priority of A.user@localdomain was set to 10.000000
-$ condor_userprio -setprio B.user@localdomain 10
-The priority of B.user@localdomain was set to 10.000000
-</code></pre>
-
-<p>Now submit 10 jobs to group C.</p>
-
-<pre><code>universe = vanilla
-cmd = /bin/sleep
-args = 3600
-should_transfer_files = if_needed
-when_to_transfer_output = on_exit
-+AccountingGroup="C.user"
-queue 10
-</code></pre>
-
-<p>Finally, we verify that our preemption policy drove the resource usages to quota:</p>
-
-<pre><code>$ svhist AccountingGroup State Activity
-      5 A.user@localdomain | Claimed | Busy
-      5 B.user@localdomain | Claimed | Busy
-      5 C.user@localdomain | Claimed | Busy
-     15 total
-</code></pre>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/6/">&larr; Older</a>
@@ -1781,6 +1711,10 @@ queue 10
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2018/09/08/equality-constraints-for-cubic-b-splines/">Equality Constraints for Cubic B-Splines</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2018/09/02/putting-cubic-b-splines-into-standard-polynomial-form/">Putting Cubic B-Splines into Standard Polynomial Form</a>
       </li>
     
@@ -1794,10 +1728,6 @@ queue 10
     
       <li class="post">
         <a href="/blog/2018/05/27/the-gradient-and-hessian-of-the-smooth-max-over-functions/">The Gradient and Hessian of the Smooth Max Over Functions</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2017/08/23/generalizing-the-concept-of-release-versioning/">Rethinking the Concept of Release Versioning</a>
       </li>
     
   </ul>
