@@ -4,7 +4,7 @@
   <title><![CDATA[Category: spline | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/spline/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2019-01-02T14:27:32-07:00</updated>
+  <updated>2019-01-02T15:14:42-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -25,7 +25,7 @@ in my feasible point solver while testing a couple new inequality constraints fo
 
 <p>The symptom was that when I added <a href="https://github.com/erikerlandson/snowball/pull/1">minimum and maximum constraints</a>,
 the feasible point solver began reporting failure.
-These failures made no sense to me, because they were in fact contraining my problem very little, if at all.
+These failures made no sense to me, because they were actually constraining my problem very little, if at all.
 For example, I if I added constraints for <code>s(x) &gt; 0</code> and <code>s(x) &lt; 1</code>, the solver began failing,
 even though my function (designed to behave as a CDF) was already meeting these constraints to within machine epsilon tolerance.</p>
 
