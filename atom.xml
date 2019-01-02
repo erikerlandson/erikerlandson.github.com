@@ -4,7 +4,7 @@
   <title><![CDATA[tool monkey]]></title>
   <link href="http://erikerlandson.github.com/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2018-09-11T08:00:55-07:00</updated>
+  <updated>2019-01-02T14:27:32-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,53 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[The Smooth-Max Minimum Incident of December 2018]]></title>
+    <link href="http://erikerlandson.github.com/blog/2019/01/02/the-smooth-max-minimum-incident-of-december-2018/"/>
+    <updated>2019-01-02T13:25:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2019/01/02/the-smooth-max-minimum-incident-of-december-2018</id>
+    <content type="html"><![CDATA[<p>In what is becoming an ongoing series where I climb the convex optimization learning curve by making dumb mistakes,
+I tripped over yet another <a href="https://github.com/erikerlandson/gibbous/issues/1">unexpected falure</a>
+in my feasible point solver while testing a couple new inequality constraints for my
+<a href="https://github.com/erikerlandson/snowball">monotonic splining project</a>.</p>
+
+<p>The symptom was that when I added <a href="https://github.com/erikerlandson/snowball/pull/1">minimum and maximum constraints</a>,
+the feasible point solver began reporting failure.
+These failures made no sense to me, because they were in fact contraining my problem very little, if at all.
+For example, I if I added constraints for <code>s(x) &gt; 0</code> and <code>s(x) &lt; 1</code>, the solver began failing,
+even though my function (designed to behave as a CDF) was already meeting these constraints to within machine epsilon tolerance.</p>
+
+<p>When I inspected its behavior, I discovered that my solver found a point <code>x</code> where the
+<a href="http://erikerlandson.github.io/blog/2018/06/03/solving-feasible-points-with-smooth-max/">smooth-max was minimized</a>,
+and reported this answer as also being the minimum possible value for the true maximum.
+As it happened, this value for <code>x</code> was positive (non-satisfying) for the true max, even though better locations <em>did</em> exist!</p>
+
+<p>This time, my error turned out to be that I had assumed the smooth-max function is &#8220;minimum preserving.&#8221;
+That is, I had assumed that the minimum of smooth-max is the same as the corresponding minimum for the true maximum.
+I cooked up a quick jupyter notebook to see if I could prove I was wrong about this, and sure enough came up with a simple
+visual counter-example:</p>
+
+<p><img src="http://erikerlandson.github.com/assets/images/smooth-max-plot.png" alt="Figure-1" /></p>
+
+<p>In this plot, the black dotted line identifies the minimum of the true maximum:
+the left intersection of the blue parabola and red line.
+The green dotted line shows the mimimum of soft-max, and it&#8217;s easy to see that they are completely different!</p>
+
+<p>I haven&#8217;t yet coded up a fix for this, but my basic plan is to allow the smooth-max alpha to increase whenever it
+fails to find a feasible point.
+Why? Increasing alpha causes the
+<a href="http://erikerlandson.github.io/blog/2018/05/28/computing-smooth-max-and-its-gradients-without-over-and-underflow/">smooth-max</a>
+to more closely approximate true max.
+If the soft-max approximation becomes sufficiently close to the true maximum, and no solution is found,
+then I can report an empty feasible region with more confidence.</p>
+
+<p>Why did I make this blunder?
+I suspect it is because I originally only visualized symmetric examples in my mind,
+where the mimimum of smooth-max and true maximum is the same.
+Visual intuitions are only as good as your imagination!</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[The Backtracking ULP Incident of 2018]]></title>
@@ -2390,113 +2437,6 @@ I intend to keep an eye out for applications of MDL to <em>other</em> learning m
 </span><span class='line'><span class="o">}</span>
 </span></code></pre></td></tr></table></div></figure>
 
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Very Fast Reservoir Sampling]]></title>
-    <link href="http://erikerlandson.github.com/blog/2015/11/20/very-fast-reservoir-sampling/"/>
-    <updated>2015-11-20T11:27:00-07:00</updated>
-    <id>http://erikerlandson.github.com/blog/2015/11/20/very-fast-reservoir-sampling</id>
-    <content type="html"><![CDATA[<p>In this post I will demonstrate how to do reservoir sampling orders of magnitude faster than the traditional &#8220;naive&#8221; reservoir sampling algorithm, using a fast high-fidelity approximation to the reservoir sampling-gap distribution.</p>
-
-<blockquote><p>The code I used to collect the data for this post can be viewed <a href="https://github.com/erikerlandson/silex/blob/blog/reservoir/src/main/scala/com/redhat/et/silex/sample/reservoir/reservoir.scala">here</a>.  I generated the plots using the <a href="https://github.com/quantifind/wisp">quantifind WISP</a> project.</p>
-
-<p>Update (April 4, 2016): my colleague <a href="http://rnowling.github.io/">RJ Nowling</a> ran across a <a href="http://www.ittc.ku.edu/~jsv/Papers/Vit87.RandomSampling.pdf">paper by J.S. Vitter</a> that shows Vitter developed the trick of accelerating sampling with a sampling-gap distribution in 1987 &#8211; I re-invented Vitter&#8217;s wheel 30 years after the fact!  I&#8217;m surprised it never caught on, as it is not much harder to implement than the naive version.</p></blockquote>
-
-<p>In a <a href="http://erikerlandson.github.io/blog/2014/09/11/faster-random-samples-with-gap-sampling/">previous post</a>, I showed that random Bernoulli and Poisson sampling could be made much faster by modeling the <em>sampling gap distribution</em> for the corresponding sampling distributions.  More recently, I also began exploring whether <a href="https://en.wikipedia.org/wiki/Reservoir_sampling">reservoir sampling</a> might also be optimized using the gap sampling technique, by deriving the <a href="http://erikerlandson.github.io/blog/2015/08/17/the-reservoir-sampling-gap-distribution/">reservoir sampling gap distribution</a>.  For a sampling reservoir of size (R), starting at data element (j), the probability distribution of the sampling gap is:</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/reservoir1/figure6.png" title="Figure 1" alt="Figure 1" /></p>
-
-<p>Modeling a sampling gap distribution is a powerful tool for optimizing a sampling algorithm, but it presupposes that you can actually draw values from that distribution substantially faster than just applying a random process to drawing each data element.  I was unable to come up with a &#8220;direct&#8221; algorithm for drawing samples from P(k) above (I suspect none exists), however I also know the CDF F(k), so it <em>is</em> possible to apply <a href="https://en.wikipedia.org/wiki/Inverse_transform_sampling">inversion sampling</a>, which runs in logarithmic time w.r.t the desired accuracy.  Although its logarithmic cost effectively guarantees that it will be a net efficiency win for sufficiently large (j), it still involves a substantial number of computations to yield its samples, and it seems unlikely to be competitive with straight &#8220;naive&#8221; reservoir sampling over many real-world data sizes, where (j) may never grow very large.</p>
-
-<p>Well, if exact computations are too expensive, we can always look for a fast approximation.  Consider the original &#8220;first principles&#8221; formula for the sampling gap P(k):</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/reservoir2/figure2.png" title="Figure 2" alt="Figure 2" /></p>
-
-<p>As the figure above alludes to, if (j) is relatively large compared to (k), then values (j+1),(j+2)&#8230;(j+k) are all going to be effectively &#8220;close&#8221; to (j), and so we can replace them all with (j) as an approximation.  Note that the resulting approximation is just the PMF of the <a href="https://en.wikipedia.org/wiki/Geometric_distribution">geometric distribution</a>, with probability of success p=(R/j), and we already saw how to efficiently draw values from a geometric distribution from our experience with Bernoulli sampling.</p>
-
-<p>Do we have any reason to hope that this approximation will be useful?  For reasons that are similar to those for Bernoulli gap sampling, it will only be efficient to employ gap sampling when the probability (R/j) becomes small enough.  From our experiences with Bernoulli sampling that is <em>at least</em> j>=2R.  So, we have some assurance that (j) itself will be never be <em>very</em> small.  What about (k)?  Note that a geometric distribution &#8220;favors&#8221; smaller values of (k) &#8211; that is, small values of (k) have the highest probabilities.  In fact, the smaller that (j) is, the larger the probability (R/j) is, and so the more likely that (k) values that are small relative to (j) will be the frequent ones.  It is also promising that the true distribution for P(k) <em>also</em> favors smaller values of (k) (in fact it favors them even a bit more strongly than the approximation).</p>
-
-<p>Although it is encouraging, it is also clear that my argument above is limited to heuristic hand-waving.  What does this approximation really <em>look</em> like, compared to the true distribution?  Fortunately, it is easy to plot both distributions numerically, since we now know the formulas for both:</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/reservoir2/CDFs_R=10.png" title="Figure 3" alt="Figure 3" /></p>
-
-<p>The plot above shows that, in fact, the geometric approximation is a <em>surprisingly good</em> approximation to the true distribution!  Furthermore, the approximation remains good as both (j) and (k) grow larger.</p>
-
-<p>Our numeric eye-balling looks quite promising.  Is there an effective way to <em>measure</em> how good this approximation is?  One useful measure is the <a href="https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test">Kolmogorov-Smirnov D statistic</a>, which is just the maximum absolute error between two cumulative distributions.  Here is a plot of the D statistic for reservoir size R=10, as (j) varies across several magnitudes:</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/reservoir2/R=10.png" title="Figure 4" alt="Figure 4" /></p>
-
-<p>This plot is also good news: we can see that deviation, as measured by D, remains bounded at a small value (less than 0.0262).  As this is for the specific value R=10, we also want to know how things change as reservoir size changes:</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/reservoir2/R=all.png" title="Figure 5" alt="Figure 5" /></p>
-
-<p>The news is still good!  As reservoir size grows, the approximation only gets better: the D values get smaller as R increases, and remain asymptotically bounded as (j) increases.</p>
-
-<p>Now we have some numeric assurance that the geometric approximation is a good one, and stays good as reservoir size grows and sampling runs get longer.  However, we should also verify that an actual implementation of the approximation works as expected.</p>
-
-<p>Here is pseudocode for an implementation of reservoir sampling using the fast geometric approximation:</p>
-
-<pre><code>// data is array to sample from
-// R is the reservoir size
-function reservoirFast(data: Array, R: Int) {
-  n = data.length
-  // Initialize reservoir with first R elements of data:
-  res = data[0 until R]
-  // Until this threshold, use traditional sampling.  This value may
-  // depend on performance characteristics of random number generation and/or
-  // numeric libraries:
-  t = 4 * R
-  j = 1 + R
-  while (j &lt; n  &amp;&amp;  j &lt;= t) {
-    k = randomInt(j) // random integer &gt;= 0 and &lt; j
-    if (k &lt; R) res[k] = data[j]
-    j = j + 1
-  }
-  // Once gaps become significant, it pays to do gap sampling
-  while (j &lt; n) {
-    // draw gap size (g) from geometric distribution with probability p = R/j
-    p = R / j
-    u = randomFloat() // random float &gt; 0 and &lt;= 1
-    g = floor(log(u) / log(1-p))
-    j = j + g
-    if (j &lt; n) {
-      k = randomInt(R)
-      res[k] = data[j]
-    }
-    j = j + 1
-  }
-  // return the reservoir
-  return res
-}
-</code></pre>
-
-<p>Following is a plot that shows two-sample D statistics, comparing the distribution in sample gaps between runs of the exact &#8220;naive&#8221; reservoir sampling with the fast geometric approximation:</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/reservoir2/D_naive_vs_fast.png" title="Figure 6" alt="Figure 6" /></p>
-
-<p>As expected, the measured difference in sampling characteristics between naive and fast approximation are small, confirming the numeric predictions.</p>
-
-<p>Since the point of this exercise was to achieve faster random sampling, it remains to measure what kind of speed improvements the fast approximation provides.  As a point of reference, here is a plot of run times for reservoir sampling over 10<sup>8</sup> integers:</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/reservoir2/naive_sample_time_vs_R.png" title="Figure 7" alt="Figure 7" /></p>
-
-<p>As expected, sample time remains constant at around 1.5 seconds, regardless of reservoir size, since the naive algorithm always samples from its RNG per each sample.</p>
-
-<p>Compare this to the corresponding plot for the fast geometric approximation:</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/reservoir2/gap_sample_times_vs_R.png" title="Figure 8" alt="Figure 8" /></p>
-
-<p>Firstly, we see that the sampling times are <em>much faster</em>, as originally anticipated in my <a href="http://erikerlandson.github.io/blog/2015/08/17/the-reservoir-sampling-gap-distribution/">previous post</a> &#8211; in the neighborhood of 3 orders of magnitude faster.  Secondly, we see that the sampling times do increase as a linear function of reservoir size.  Based on our experience with Bernoulli gap sampling, this is expected; the sampling probabilities are given by (R/j), and therefore the amount of sampling is proportional to R.</p>
-
-<p>Another property anticipated in my previous post was that the efficiency of gap sampling should continue to increase as the amount of data sampled grows; the sampling probability being (R/j), the probability of sampling decreases as j gets larger, and so the corresponding gap sizes grow.  The following plot verifies this property, holding reservoir size R constant, and increasing the data size:</p>
-
-<p><img src="http://erikerlandson.github.com/assets/images/reservoir2/gap_sampling_efficiency.png" title="Figure 9" alt="Figure 9" /></p>
-
-<p>The sampling time (per million elements) decreases as the sample size grows, as predicted by the formula.</p>
-
-<p>In conclusion, I have demonstrated that a geometric distribution can be used as a high quality approximation to the true sampling gap distribution for reservoir sampling, which allows reservoir sampling to be performed much faster than the naive algorithm while still retaining sampling quality.</p>
 ]]></content>
   </entry>
   

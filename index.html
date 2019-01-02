@@ -9,7 +9,8 @@
   <meta name="author" content="Erik Erlandson">
 
   
-  <meta name="description" content="This week I finally started applying my new convex optimization library to solve for interpolating splines with monotonic constraints. Things seemed &hellip;">
+  <meta name="description" content="In what is becoming an ongoing series where I climb the convex optimization learning curve by making dumb mistakes,
+I tripped over yet another &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +69,83 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2019/01/02/the-smooth-max-minimum-incident-of-december-2018/">The Smooth-Max Minimum Incident of December 2018</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2019-01-02T13:25:00-07:00" pubdate data-updated="true">Jan 2<span>nd</span>, 2019</time>
+        
+        
+         | <a href="/blog/2019/01/02/the-smooth-max-minimum-incident-of-december-2018/#feedback">Feedback</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>In what is becoming an ongoing series where I climb the convex optimization learning curve by making dumb mistakes,
+I tripped over yet another <a href="https://github.com/erikerlandson/gibbous/issues/1">unexpected falure</a>
+in my feasible point solver while testing a couple new inequality constraints for my
+<a href="https://github.com/erikerlandson/snowball">monotonic splining project</a>.</p>
+
+<p>The symptom was that when I added <a href="https://github.com/erikerlandson/snowball/pull/1">minimum and maximum constraints</a>,
+the feasible point solver began reporting failure.
+These failures made no sense to me, because they were in fact contraining my problem very little, if at all.
+For example, I if I added constraints for <code>s(x) &gt; 0</code> and <code>s(x) &lt; 1</code>, the solver began failing,
+even though my function (designed to behave as a CDF) was already meeting these constraints to within machine epsilon tolerance.</p>
+
+<p>When I inspected its behavior, I discovered that my solver found a point <code>x</code> where the
+<a href="http://erikerlandson.github.io/blog/2018/06/03/solving-feasible-points-with-smooth-max/">smooth-max was minimized</a>,
+and reported this answer as also being the minimum possible value for the true maximum.
+As it happened, this value for <code>x</code> was positive (non-satisfying) for the true max, even though better locations <em>did</em> exist!</p>
+
+<p>This time, my error turned out to be that I had assumed the smooth-max function is &#8220;minimum preserving.&#8221;
+That is, I had assumed that the minimum of smooth-max is the same as the corresponding minimum for the true maximum.
+I cooked up a quick jupyter notebook to see if I could prove I was wrong about this, and sure enough came up with a simple
+visual counter-example:</p>
+
+<p><img src="/assets/images/smooth-max-plot.png" alt="Figure-1" /></p>
+
+<p>In this plot, the black dotted line identifies the minimum of the true maximum:
+the left intersection of the blue parabola and red line.
+The green dotted line shows the mimimum of soft-max, and it&#8217;s easy to see that they are completely different!</p>
+
+<p>I haven&#8217;t yet coded up a fix for this, but my basic plan is to allow the smooth-max alpha to increase whenever it
+fails to find a feasible point.
+Why? Increasing alpha causes the
+<a href="http://erikerlandson.github.io/blog/2018/05/28/computing-smooth-max-and-its-gradients-without-over-and-underflow/">smooth-max</a>
+to more closely approximate true max.
+If the soft-max approximation becomes sufficiently close to the true maximum, and no solution is found,
+then I can report an empty feasible region with more confidence.</p>
+
+<p>Why did I make this blunder?
+I suspect it is because I originally only visualized symmetric examples in my mind,
+where the mimimum of smooth-max and true maximum is the same.
+Visual intuitions are only as good as your imagination!</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1211,108 +1289,6 @@ Note that the law <code>foldL(b, a) = b ++ foldL(e, a)</code> is a significant c
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2016/08/31/supporting-competing-apis-in-scala-can-better-package-factoring-help/">Supporting Competing APIs in Scala &#8211; Can Better Package Factoring Help?</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2016-08-31T17:55:00-07:00" pubdate data-updated="true">Aug 31<span>st</span>, 2016</time>
-        
-        
-         | <a href="/blog/2016/08/31/supporting-competing-apis-in-scala-can-better-package-factoring-help/#feedback">Feedback</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p> On and off over the last year, I&#8217;ve been working on a <a href="http://erikerlandson.github.io/blog/2015/09/26/a-library-of-binary-tree-algorithms-as-mixable-scala-traits/">library</a> of tree and map classes in Scala that happen to make use of some algebraic structures (mostly monoids or related concepts).
- In my initial implementations, I made use of the popular <a href="https://github.com/twitter/algebird">algebird</a> variations on monoid and friends.
- In their incarnation as an <a href="https://github.com/twitter/algebird/pull/496">algebird PR</a> this was uncontroversial to say the least, but lately I have been re-thinking them as a <a href="https://github.com/isarn/isarn/pull/1">third-party Scala package</a>.</p>
-
-<p>This immediately raised some interesting and thorny questions:
-in an ecosystem that contains not just <a href="https://github.com/twitter/algebird">algebird</a>, but other popular alternatives such as <a href="https://github.com/typelevel/cats">cats</a> and <a href="https://github.com/scalaz/scalaz">scalaz</a>, what algebra API should I use in my code?
-How best to allow the library user to interoperate with the algebra libray of their choice?
-Can I accomplish these things while also avoiding any problematic package dependencies in my library code?</p>
-
-<p>In Scala, the second question is relatively straightforward to answer.
-I can write my interface using <a href="http://docs.scala-lang.org/tutorials/tour/implicit-conversions">implicit conversions</a>, and provide sub-packages that provide such conversions from popular algebra libraries into the library I actually use in my code.
-A library user can import the predefined implicit conversions of their choice, or if necessary provide their own.</p>
-
-<p>So far so good, but that leads immediately back to the first question &#8211; what API should <strong><em>I</em></strong> choose to use internally in my own library?</p>
-
-<p>One obvious approach is to just pick one of the popular options (I might favor <code>cats</code>, for example) and write my library code using that.
-If a library user also prefers <code>cats</code>, great.
-Otherwise, they can import the appropritate implicit conversions from their favorite alternative into <code>cats</code> and be on their way.</p>
-
-<p>But this solution is not without drawbacks.
-Anybody using my library will now be including <code>cats</code> as a transitive dependency in their project, even if they are already using some other alternative.
-Although <code>cats</code> is not an enormous library, that represents a fair amount of code sucked into my users&#8217; projects, most of which isn&#8217;t going to be used at all.
-More insidiously, I have now introduced the possiblity that the <code>cats</code> version I package with is out of sync with the version my library users are building against.
-Version misalignment in transitive dependencies is a land-mine in project builds and very difficult to resolve.</p>
-
-<p>A second approach I might use is to define some abstract algebraic traits of my own.
-I can write my libraries in terms of this new API, and then provide implicit conversions from popular APIs into mine.</p>
-
-<p>This approach has some real advantages over the previous.  Being entirely abstract, my internal API will be lightweight.  I have the option of including only the algebraic concepts I need.  It does not introduce any possibly problematic 3rd-party dependencies that might cause code bloat or versioning problems for my library users.</p>
-
-<p>Although this is an effective solution, I find it dissatisfying for a couple reasons.
-Firstly, my new internal API effectively represents <em>yet another competing algebra API</em>, and so I am essentially contributing to the proliferating-standards antipattern.</p>
-
-<p><img src="https://imgs.xkcd.com/comics/standards.png" alt="standards" /></p>
-
-<p>Secondly, it means that I am not taking advantage of community knowledge.
-The <code>cats</code> library embodies a great deal of cumulative human expertise in both category theory and Scala library design.
-What does a good algebra library API look like?
-Well, <em>it&#8217;s likely to look a lot like <code>cats</code></em> of course!
-The odds that I end up doing an inferior job designing my little internal vanity API are rather higher than the odds that I do as well or better.
-The best I can hope for is to re-invent the wheel, with a real possibility that my wheel has corners.</p>
-
-<p>Is there a way to resolve this unpalatable situation?
-Can we design our projects to both remain flexible about interfacing with multiple 3rd-party alternatives, but avoid effectively writing <em>yet another alternative</em> for our own internal use?</p>
-
-<p>I hardly have any authoritative answers to this problem, but I have one idea that might move toward a solution.
-As I alluded to above, when I write my libraries, I am most frequently <em>only</em> interested in the API &#8211; the abstract interface.
-If I did go with writing my own algebra API, I would seek to define purely abstract traits.
-Since my intention is that my library users would supply their own favorite library alternative, I would have no need or desire to instantiate any of my APIs.
-That function would be provided by the separate sub-projects that provide implicit conversions from community alternatives into my API.</p>
-
-<p>On the other hand, what if <code>cats</code> and <code>algebird</code> factored <em>their</em> libraries in a similar way?
-What if I could include a sub-package like <code>cats-kernel-api</code>, or <code>algebird-core-api</code>, which contained <em>only</em> pure abstract traits for monoid, semigroup, etc?
-Then I could choose my favorite community API, and code against it, with much less code bloat, and a much reduced vulnerability to any versioning drift.
-I would still be free to provide implicit conversions and allow <em>my</em> users to make their own choice of library in their projects.</p>
-
-<p>Although I find this idea attractive, it is certainly not foolproof.
-For example, there is never a way to <em>guarantee</em> that versioning drift won&#8217;t break an API.
-APIs such as <code>cats</code> and <code>algebird</code> are likely to be unusually amenable to this kind of approach.
-After all, their interfaces are primarily driven by underlying mathematical definitions, which are generally as stable as such things ever get.
-However, APIs in general tend to be significantly more stable than underlying code.
-And the most-stable subsets of APIs might be encoded as traits and exposed this way, allowing other more experimental API components to change at a higher frequency.
-Perhaps library packages could even be factored in some way such as <code>library-stable-api</code> and <code>library-unstable-api</code>.
-That would clearly add a bit of complication to library trait hierarchies, but the payoff in terms of increased 3rd-party usability might be worth it.</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/2/">&larr; Older</a>
@@ -1332,6 +1308,10 @@ That would clearly add a bit of complication to library trait hierarchies, but t
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2019/01/02/the-smooth-max-minimum-incident-of-december-2018/">The Smooth-Max Minimum Incident of December 2018</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2018/09/11/the-backtracking-ulp-incident-of-2018/">The Backtracking ULP Incident of 2018</a>
       </li>
     
@@ -1345,10 +1325,6 @@ That would clearly add a bit of complication to library trait hierarchies, but t
     
       <li class="post">
         <a href="/blog/2018/06/03/solving-feasible-points-with-smooth-max/">Solving Feasible Points With Smooth-Max</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2018/05/28/computing-smooth-max-and-its-gradients-without-over-and-underflow/">Computing Smooth Max and its Gradients Without Over- and Underflow</a>
       </li>
     
   </ul>
@@ -1410,7 +1386,7 @@ That would clearly add a bit of complication to library trait hierarchies, but t
     </div>
   </div>
   <footer role="contentinfo"><p>
-  Copyright &copy; 2018 - Erik Erlandson -
+  Copyright &copy; 2019 - Erik Erlandson -
   <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
 </p>
 

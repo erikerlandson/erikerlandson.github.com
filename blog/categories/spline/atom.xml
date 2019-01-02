@@ -4,7 +4,7 @@
   <title><![CDATA[Category: spline | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/spline/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2018-09-11T08:00:55-07:00</updated>
+  <updated>2019-01-02T14:27:32-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -12,6 +12,53 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[The Smooth-Max Minimum Incident of December 2018]]></title>
+    <link href="http://erikerlandson.github.com/blog/2019/01/02/the-smooth-max-minimum-incident-of-december-2018/"/>
+    <updated>2019-01-02T13:25:00-07:00</updated>
+    <id>http://erikerlandson.github.com/blog/2019/01/02/the-smooth-max-minimum-incident-of-december-2018</id>
+    <content type="html"><![CDATA[<p>In what is becoming an ongoing series where I climb the convex optimization learning curve by making dumb mistakes,
+I tripped over yet another <a href="https://github.com/erikerlandson/gibbous/issues/1">unexpected falure</a>
+in my feasible point solver while testing a couple new inequality constraints for my
+<a href="https://github.com/erikerlandson/snowball">monotonic splining project</a>.</p>
+
+<p>The symptom was that when I added <a href="https://github.com/erikerlandson/snowball/pull/1">minimum and maximum constraints</a>,
+the feasible point solver began reporting failure.
+These failures made no sense to me, because they were in fact contraining my problem very little, if at all.
+For example, I if I added constraints for <code>s(x) &gt; 0</code> and <code>s(x) &lt; 1</code>, the solver began failing,
+even though my function (designed to behave as a CDF) was already meeting these constraints to within machine epsilon tolerance.</p>
+
+<p>When I inspected its behavior, I discovered that my solver found a point <code>x</code> where the
+<a href="http://erikerlandson.github.io/blog/2018/06/03/solving-feasible-points-with-smooth-max/">smooth-max was minimized</a>,
+and reported this answer as also being the minimum possible value for the true maximum.
+As it happened, this value for <code>x</code> was positive (non-satisfying) for the true max, even though better locations <em>did</em> exist!</p>
+
+<p>This time, my error turned out to be that I had assumed the smooth-max function is "minimum preserving."
+That is, I had assumed that the minimum of smooth-max is the same as the corresponding minimum for the true maximum.
+I cooked up a quick jupyter notebook to see if I could prove I was wrong about this, and sure enough came up with a simple
+visual counter-example:</p>
+
+<p><img src="/assets/images/smooth-max-plot.png" alt="Figure-1" /></p>
+
+<p>In this plot, the black dotted line identifies the minimum of the true maximum:
+the left intersection of the blue parabola and red line.
+The green dotted line shows the mimimum of soft-max, and it's easy to see that they are completely different!</p>
+
+<p>I haven't yet coded up a fix for this, but my basic plan is to allow the smooth-max alpha to increase whenever it
+fails to find a feasible point.
+Why? Increasing alpha causes the
+<a href="http://erikerlandson.github.io/blog/2018/05/28/computing-smooth-max-and-its-gradients-without-over-and-underflow/">smooth-max</a>
+to more closely approximate true max.
+If the soft-max approximation becomes sufficiently close to the true maximum, and no solution is found,
+then I can report an empty feasible region with more confidence.</p>
+
+<p>Why did I make this blunder?
+I suspect it is because I originally only visualized symmetric examples in my mind,
+where the mimimum of smooth-max and true maximum is the same.
+Visual intuitions are only as good as your imagination!</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Equality Constraints for Cubic B-Splines]]></title>
