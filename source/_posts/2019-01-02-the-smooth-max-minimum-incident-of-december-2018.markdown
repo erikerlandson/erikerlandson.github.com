@@ -13,7 +13,7 @@ in my feasible point solver while testing a couple new inequality constraints fo
 
 The symptom was that when I added [minimum and maximum constraints](https://github.com/erikerlandson/snowball/pull/1),
 the feasible point solver began reporting failure.
-These failures made no sense to me, because they were in fact contraining my problem very little, if at all.
+These failures made no sense to me, because they were actually constraining my problem very little, if at all.
 For example, I if I added constraints for `s(x) > 0` and `s(x) < 1`, the solver began failing,
 even though my function (designed to behave as a CDF) was already meeting these constraints to within machine epsilon tolerance.
 
