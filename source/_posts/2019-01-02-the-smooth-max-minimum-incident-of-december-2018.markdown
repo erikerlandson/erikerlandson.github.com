@@ -7,7 +7,7 @@ categories: [ computing, math, convex optimization, optimization, monotonic spli
 ---
 
 In what is becoming an ongoing series where I climb the convex optimization learning curve by making dumb mistakes,
-I tripped over yet another [unexpected falure](https://github.com/erikerlandson/gibbous/issues/1)
+I tripped over yet another [unexpected failure](https://github.com/erikerlandson/gibbous/issues/1)
 in my feasible point solver while testing a couple new inequality constraints for my
 [monotonic splining project](https://github.com/erikerlandson/snowball).
 
