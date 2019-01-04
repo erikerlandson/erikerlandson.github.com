@@ -6,7 +6,7 @@ comments: true
 categories: [ computing, math, convex optimization, optimization, monotonic spline, spline, algorithms ]
 ---
 
-In what is becoming an ongoing series where I climb the convex optimization learning curve by making dumb mistakes,
+In what is becoming an ongoing series where I climb the convex optimization learning curve by making rookie mistakes,
 I tripped over yet another [unexpected failure](https://github.com/erikerlandson/gibbous/issues/1)
 in my feasible point solver while testing a couple new inequality constraints for my
 [monotonic splining project](https://github.com/erikerlandson/snowball).
