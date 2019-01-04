@@ -4,7 +4,7 @@
   <title><![CDATA[Category: computing | tool monkey]]></title>
   <link href="http://erikerlandson.github.com/blog/categories/computing/atom.xml" rel="self"/>
   <link href="http://erikerlandson.github.com/"/>
-  <updated>2019-01-03T14:06:36-07:00</updated>
+  <updated>2019-01-04T07:57:28-07:00</updated>
   <id>http://erikerlandson.github.com/</id>
   <author>
     <name><![CDATA[Erik Erlandson]]></name>
@@ -18,7 +18,7 @@
     <link href="http://erikerlandson.github.com/blog/2019/01/02/the-smooth-max-minimum-incident-of-december-2018/"/>
     <updated>2019-01-02T13:25:00-07:00</updated>
     <id>http://erikerlandson.github.com/blog/2019/01/02/the-smooth-max-minimum-incident-of-december-2018</id>
-    <content type="html"><![CDATA[<p>In what is becoming an ongoing series where I climb the convex optimization learning curve by making dumb mistakes,
+    <content type="html"><![CDATA[<p>In what is becoming an ongoing series where I climb the convex optimization learning curve by making rookie mistakes,
 I tripped over yet another <a href="https://github.com/erikerlandson/gibbous/issues/1">unexpected failure</a>
 in my feasible point solver while testing a couple new inequality constraints for my
 <a href="https://github.com/erikerlandson/snowball">monotonic splining project</a>.</p>
