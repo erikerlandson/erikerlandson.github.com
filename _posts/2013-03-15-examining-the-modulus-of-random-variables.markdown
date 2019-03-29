@@ -17,8 +17,8 @@ Consider what happens to a random variable's modulus as its variance increases. 
 
 |  |  |
 | :---: | :---: |
-|  {% img /assets/images/rv_mod_study/normal_0.20.png 375 375 %}  |  {% img /assets/images/rv_mod_study/normal_0.30.png 375 375 %}  |
-|  {% img /assets/images/rv_mod_study/normal_0.40.png 375 375 %}  |  {% img /assets/images/rv_mod_study/normal_0.50.png 375 375 %}  |
+|  <img src="/assets/images/rv_mod_study/normal_0.20.png" width="375" height="375">  |  <img src="/assets/images/rv_mod_study/normal_0.30.png" width="375" height="375">  |
+|  <img src="/assets/images/rv_mod_study/normal_0.40.png" width="375" height="375">  |  <img src="/assets/images/rv_mod_study/normal_0.50.png" width="375" height="375">  |
 <br>
 
 
@@ -30,8 +30,8 @@ The following plots demonstrate the same effect with a one-tailed distribution (
 
 |  |  |
 | :---: | :---: |
-|  {% img /assets/images/rv_mod_study/exponential_01.png 375 375 %}  |  {% img /assets/images/rv_mod_study/exponential_04.png 375 375 %}  |
-|  {% img /assets/images/rv_mod_study/exponential_10.png 375 375 %}  |  {% img /assets/images/rv_mod_study/exponential_20.png 375 375 %}  |
+|  <img src="/assets/images/rv_mod_study/exponential_01.png" width="375" height="375">  |  <img src="/assets/images/rv_mod_study/exponential_04.png" width="375" height="375">  |
+|  <img src="/assets/images/rv_mod_study/exponential_10.png" width="375" height="375">  |  <img src="/assets/images/rv_mod_study/exponential_20.png" width="375" height="375" %}  |
 <br>
 
 
@@ -40,8 +40,8 @@ A third example, using a log-normal distribution.   The variance of the log-norm
 
 |  |  |
 | :---: | :---: |
-|  {% img /assets/images/rv_mod_study/lognormal_0.0_1.0.png 375 375 %}  |  {% img /assets/images/rv_mod_study/lognormal_0.5_1.0.png 375 375 %}  |
-|  {% img /assets/images/rv_mod_study/lognormal_1.0_1.0.png 375 375 %}  |  {% img /assets/images/rv_mod_study/lognormal_2.0_1.0.png 375 375 %}  |
+|  <img src="/assets/images/rv_mod_study/lognormal_0.0_1.0.png" width="375" height="375">  |  <img src="/assets/images/rv_mod_study/lognormal_0.5_1.0.png" width="375" height="375">  |
+|  <img src="/assets/images/rv_mod_study/lognormal_1.0_1.0.png" width="375" height="375">  |  <img src="/assets/images/rv_mod_study/lognormal_2.0_1.0.png" width="375" height="375">  |
 <br>
 
 
@@ -49,8 +49,8 @@ For a final examination of variance, I will again use log-normals and this time 
 
 |  |  |
 | :---: | :---: |
-|  {% img /assets/images/rv_mod_study/lognormal_0.0_0.5.png 375 375 %}  |  {% img /assets/images/rv_mod_study/lognormal_0.0_1.0.png 375 375 %}  |
-|  {% img /assets/images/rv_mod_study/lognormal_0.0_1.5.png 375 375 %}  |  {% img /assets/images/rv_mod_study/lognormal_0.0_2.0.png 375 375 %}  |
+|  <img src="/assets/images/rv_mod_study/lognormal_0.0_0.5.png width="375" height="375">  |  <img src="/assets/images/rv_mod_study/lognormal_0.0_1.0.png width="375" height="375">  |
+|  <img src="/assets/images/rv_mod_study/lognormal_0.0_1.5.png width="375" height="375">  |  <img src="/assets/images/rv_mod_study/lognormal_0.0_2.0.png width="375" height="375">  |
 <br>
 
 
@@ -59,9 +59,9 @@ The following table of plots demonstrates the decreasing effect that a distribut
 
 |  |  |  |
 | :---: | :---: | :---: |
-|  {% img /assets/images/rv_mod_study/normal_0.0_0.3.png 260 260 %}  |  {% img /assets/images/rv_mod_study/normal_0.5_0.3.png 260 260 %}  |  {% img /assets/images/rv_mod_study/normal_1.0_0.3.png 260 260 %}  |
-|  {% img /assets/images/rv_mod_study/normal_0.0_0.4.png 260 260 %}  |  {% img /assets/images/rv_mod_study/normal_0.5_0.4.png 260 260 %}  |  {% img /assets/images/rv_mod_study/normal_1.0_0.4.png 260 260 %}  |
-|  {% img /assets/images/rv_mod_study/normal_0.0_0.5.png 260 260 %}  |  {% img /assets/images/rv_mod_study/normal_0.5_0.5.png 260 260 %}  |  {% img /assets/images/rv_mod_study/normal_1.0_0.5.png 260 260 %}  |
+|  <img src="/assets/images/rv_mod_study/normal_0.0_0.3.png width="260" height="260">  |  <img src="/assets/images/rv_mod_study/normal_0.5_0.3.png width="260" height="260">  |  <img src="/assets/images/rv_mod_study/normal_1.0_0.3.png width="260" height="260">  |
+|  <img src="/assets/images/rv_mod_study/normal_0.0_0.4.png width="260" height="260">  |  <img src="/assets/images/rv_mod_study/normal_0.5_0.4.png width="260" height="260">  |  <img src="/assets/images/rv_mod_study/normal_1.0_0.4.png width="260" height="260">  |
+|  <img src="/assets/images/rv_mod_study/normal_0.0_0.5.png width="260" height="260">  |  <img src="/assets/images/rv_mod_study/normal_0.5_0.5.png width="260" height="260">  |  <img src="/assets/images/rv_mod_study/normal_1.0_0.5.png width="260" height="260">  |
 <br>
 
 

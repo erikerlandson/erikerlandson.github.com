@@ -9,7 +9,7 @@ The [HTCondor negotiator](http://research.cs.wisc.edu/htcondor/manual/v7.8/3_1In
 
 Consider the following diagram, which illustrates the utilization of a slot over the lifetime of a job.  When a job completes, its slot will remain empty until it can be assigned a new job on the next negotiation cycle.
 
-{% img /assets/images/slot_load_study/loading_factor_diagram.png 750 %}
+![fig1](/assets/images/slot_load_study/loading_factor_diagram.png)
 
 As the diagram above shows, the loading factor for a slot can be expressed as D/Z, where D is the duration of the job, and Z is the total time until the next cycle occurring after the job completes.  We can also write Z = D+I, where I is the "idle time" from job completion to the start of the next negotiation cycle.   Loading factor is always <= 1, where a value of 1 corresponds to ideal loading -- every slot is utilized 100% of the time.  In general, loading will be < 1, as jobs rarely complete exactly on a cycle boundary.
 
@@ -32,7 +32,7 @@ r = \\left( D / C \\right) - q \\\\
 
 The following plot illustrates how the loading factor changes with job duration, assuming a cadence of 300 seconds (5 minutes):
 
-{% img /assets/images/slot_load_study/load_factor_300s.png 750 %}
+![fig2](/assets/images/slot_load_study/load_factor_300s.png)
 
 We immediately see that there is a saw-tooth pattern to the plot.  As the job duration increases towards the boundary of a cycle, there is less and less idle time until the next cycle, and so the loading approaches 1.0.  However, once the job's end crosses the thresold to _just past_ the start of the cycle, it immediately drops to the worse possible case: the slot will be idle for nearly an entire cycle.
 
@@ -40,7 +40,7 @@ The other important pattern is that the bottom of the saw-tooth gradually increa
 
 Observe that the most important 'unit' in this plot is the number of negotiation cycles.  Since the saw-toothing scales with the cycle interval, we can express the same plot in units of cycles instead of seconds:
 
-{% img /assets/images/slot_load_study/load_factor_cu.png 750 %}
+![fig3](/assets/images/slot_load_study/load_factor_cu.png)
 
 The results above suggest a couple possible approaches for tuning negotiator cycle cadence to optimize slot loading in an HTCondor pool.  The first is to configure the negotiator interval to be small relative to a typical job duration, as the lower-bound on loading factor increases with the number of cycles a job's duration occupies.  For example, if a typical job duration is 10 minutes, then a cycle cadence of 60 seconds ensures that in general 9 out of 10 cycles will be fully utilized, and so loading will be around 90%.  However, if one has mostly very short jobs, this can be difficult, as negotiation cycle cadences much less than 60 seconds may risk causing performance problems even on a moderately loaded pool.  
 

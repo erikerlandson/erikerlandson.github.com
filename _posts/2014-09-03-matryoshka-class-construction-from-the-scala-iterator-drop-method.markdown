@@ -37,7 +37,7 @@ The nature of the problem is that `drop`, under the hood, invokes `slice`, which
 
 In the case where one is only calling `drop` once, this is not very consequential, but when the same method is used in a loop, the nesting is repeated, generating a nesting of anonymous classes that is ever-deeper -- rather like Matryoshka dolls:
 
-{% img /assets/images/matryoshka.jpg 400 %}
+<img src="/assets/images/matryoshka.jpg" height="400">
 
 This can be a substantial problem, as it generates quadratic complexity in what is logically a linear operation.  A simple example of looping code that can cause this nesting:
 
