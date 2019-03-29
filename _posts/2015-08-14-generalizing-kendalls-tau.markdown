@@ -16,12 +16,12 @@ Consider a sequence of (n) observations where each observation is a pair (x,y), 
 
 The commonly-used formulation of Kendall's Tau is the "Tau-B" statistic, which accounts for observed pairs having tied values in either x or y as being neither concordant nor discordant:
 
-######Figure 1: Kendall's Tau-B
+###### Figure 1: Kendall's Tau-B
 ![Kendall's Tau](/assets/images/kendalls_tau/figure_1.png "Kendall's Tau")
 
 The formulation above has quadratic complexity, with respect to data size (n).  It is possible to rearrange this computation in a way that can be computed in (n)log(n) time[1]:
 
-######Figure 2: An (n)log(n) formulation of Kendall's Tau-B
+###### Figure 2: An (n)log(n) formulation of Kendall's Tau-B
 ![Kendall's Tau](/assets/images/kendalls_tau/figure_2.png "Kendall's Tau")
 
 The details of performing this computation can be found at [1] or on the [Wikipedia entry](https://en.wikipedia.org/wiki/Kendall_rank_correlation_coefficient#Algorithms).  For my purposes, I'll note that it requires two (n)log(n) sorts of the data, which becomes relevant below.

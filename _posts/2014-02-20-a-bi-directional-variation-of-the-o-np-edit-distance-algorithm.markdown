@@ -7,13 +7,13 @@ categories: [ computing, edit distance, string distance, string difference, sequ
 ---
 The O(ND) edit distance algorithm [[1]](#ref1) is a standard for efficient computation of the edit distance between two sequences, appearing in applications such as the GNU diff tool.  There is also a variation [[2]](#ref2) that operates in O(NP) time, where P is the number of deletions in the shortest edit path, and which has lower computational complexity, since P <= D (and may be << D in some circumstances).  In order to apply these algorithms to obtain an _edit script_ in linear space, they must be adapted into a bidirectional form that enables recursive divide-and-conquer.   The basic principles of a bidirectional adaptation of the O(ND) algorithm are described in [[1]](#ref1).   However, no such discussion of a bidirectional O(NP) algorithm is provided in [[2]](#ref2).  Understanding this adaptation involves some observations that aren't immediately obvious.  In this post, I will describe these key observations.
 
-###Notation
+### Notation
 My code segments are written as C/C++, however written in a simplified style I hope will be clear regardless of what languages the reader is familiar with.  If you wish to port this (pseudo-ish)code, it may be worth keeping in mind that indexing is zero-based in C/C++.
 
-###Sequence Lengths
+### Sequence Lengths
 A brief note on the O(NP) algorithm and sequence lengths: the algorithm assumes that the length of its second sequence argument is >= its first (that is, N >= M).   In the following discussions, I will be making the same assumption, however the modification to address N < M is relatively easy, and can be seen in the references to actual source code below.
 
-###Indexing
+### Indexing
 A note on naming:  In [[2]](#ref2), the authors use 'fp' for the name of the array holding path endpoints.  I will use 'Vf' for the array holding forward endpoints, and 'Vr' for the corresponding array holding reverse endpoints.
 
 The O(ND) and O(NP) algorithms operate by iteratively extending the frontier of edit paths through the implicit graph of possible paths, where each iteration is computed as a function of the previous.  In the O(NP) algorithm, this computation has to proceed from the outside in, as described in the paper:
@@ -40,7 +40,7 @@ In order to implement a bi-directional algorithm, we must also run the algorithm
 
 In the above, 'rsnake' is the reverse-direction snake function.  A note on initialization:  whereas the forward algorithm initializes its Vf array to (-1), the symmetric initial value for the reverse algorithm Vr array is (N+1) (In the general case, 1 plus the length of the longest sequence).
 
-###Detecting Path Overlap
+### Detecting Path Overlap
 The uni-directional O(NP) algorithm halts when Vf[delta] == N.  However, the bi-directional algorithms halt when shortest opposing paths meet -- or overlap -- each other, as described in the O(ND) paper [[1]](#ref1).  The semantics of storing paths in working arrays is the same in both algorithms, with the exception that in the O(NP) algorithm it is the (y) values that are stored.  Myers describes the predicate for detecting meeting paths in O(ND) as: (x >= u)  &&  (x-y == u-v), where (x,y) are forward endpoints and (u,v) are reverse endpoints.  Observe that since y = x-k, then (x-y == u-v) is equivalent to "forward-k == reverse-k".  However, in operation one always checks the opposing path with the _same_ k index, and so this clause is redundant.  It is sufficient to check that (x >= u), or in the case of O(NP), that (y >= v).  In the code, this looks something like:
 
     y = max(Vf[k-1] + 1, Vf[k+1]);
@@ -50,7 +50,7 @@ The uni-directional O(NP) algorithm halts when Vf[delta] == N.  However, the bi-
 
 The other checks for forward and reverse are similar.  Note that these checks happen at the _beginning_ of each 'snake', that is prior to invoking the snake extension logic.  The semantic is that the opposing path overlaps the run (snake) one is about to start.
 
-###Computing Distance
+### Computing Distance
 When two overlapping paths are detected, we must compute the path distance associated with their union.  In the O(ND) algorithm, we know that distance implicitly, as the paths are extended over successive iterations of D.  In the O(NP) algorithm, however, the current path endpoints are associated with a particular value of P, and so we must consider how to obtain the actual distance.
 
 A little algebra comes to the rescue.  At iteration P, consider the number of deletions along the forward-path at the kth endpoint, which I will denote as 'vf' (the authors refer to it as V(x,y)).  In [[2]](#ref2), the authors show that P == vf when k < delta, and P == vf+k-delta, when k > delta (note that either formula applies for k == delta).  Solving for vf, we have:   vf == P for k < delta and vf == P+delta-k for k > delta.  The authors also show that: vf = (df-k)/2, where df is the total edit distance along the path up to the current endpoint (the authors refer to df as D(x,y)).   Therefore, we have: df = 2(vf)+k, where we can obtain vf from the expression we just derived.
@@ -80,14 +80,14 @@ A note on implementation: when one is advancing forward paths, an overlapping re
         d = 2*(vf+vr)+delta;
     }
 
-###Shortest Path
+### Shortest Path
 With respect to halting conditions, the O(NP) algorithm differs in one imporant way from the O(ND) algorithm: The O(ND) algorithm maintains path endpoints corresponding to increasing _distance_ (D) values.  Therefore, when two paths meet, they form a shortest-distance path by definition, and the algorithm can halt on the first such overlap it detects.  
 
 The same is _not true_ for the O(NP) algorithm.  It stores endpoints at a particular P value.  However, at a given value of P, actual _distances_ may vary considerably.  On a given iteration over P, actual path distances may vary from 2(P-1)+delta up to 4P+delta.  
 
 This problem is dealt with by maintaining a best-known distance, 'Dbest', which is initialized to its maximum possible value of N+M, the sum of both sequence lengths.  Whenever two overlapping paths are detected, their corresponding distance 'd' is computed as described earlier, and the running minimum is maintainted:  Dbest = min(Dbest,d).  As mentioned above, we know that the mimimum possible distance at a given iteration is Dmin = 2(P-1)+delta, and so when Dmin >= Dbest, we halt and return Dbest as our result.
 
-###Loop Bounding
+### Loop Bounding
 Some important computational efficiency can be obtained by reorganizing the looping over the endpoints.   As mentioned above, conceptually the looping proceeds from the outside, inward.  Suppose we organize the looping over k values such that we explore k = {-P, P+delta, -P+1, P+delta-1, -P+2, P+delta-2 ... }  Note that the symmetry breaks a bit when we get to k==delta, as here we stop iterating backward, but continue iterating forward until we hit delta from below.  In the code, this looping pattern looks something like:
 
     // advance forward paths: reverse path looping is similar
@@ -156,7 +156,7 @@ In the code, the forward path looping looks like this:
         kd -= 1;
     }
 
-###Implementation
+### Implementation
 In conclusion, I will display a code segment with all of the ideas presented above, coming together.  This segment was taken from my [working prototype code](https://github.com/erikerlandson/algorithm/blob/order_np_alg/include/boost/algorithm/sequence/detail/edit_distance.hpp#L342), with some syntactic clutter removed and variable names changed to conform a bit more closely to [[2]](#ref2).  The implementation of O(NP) below is performing about 25% faster than the corresponding O(ND) algorithm in my benchmarking tests, and also uses substantially less memory.
 
     // initialize this with the maximum possible distance:
@@ -270,6 +270,6 @@ In conclusion, I will display a code segment with all of the ideas presented abo
     }
 
 
-###References
+### References
 <a name="anchor1" id="ref1">[1] </a>[An O(ND) Difference Algorithm and its Variations](http://www.xmailserver.org/diff2.pdf), Eugene W. Myers<br>
 <a name="anchor2" id="ref2">[2] </a>[An O(NP) Sequence Comparison Algorithm](http://www.itu.dk/stud/speciale/bepjea/xwebtex/litt/an-onp-sequence-comparison-algorithm.pdf), Sun Wu, Udi Manber, Gene Myers

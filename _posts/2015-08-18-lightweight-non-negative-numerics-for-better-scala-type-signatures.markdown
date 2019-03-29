@@ -9,7 +9,7 @@ In this post I want to discuss several advantages of defining lightweight non-ne
 
 If the following ideas interest you at all, I highly recommend looking at the ['refined' project](https://github.com/fthomas/refined) authored by [Frank S. Thomas](http://timepit.eu/~frank/), which generalizes on the ideas below and supports additional static checking functionalities via macros.
 
-#####A Non-Negative Integer Type
+##### A Non-Negative Integer Type
 As a working example, I'll discuss a non-negative integer type `NonNegInt`.  My proposed definition is sufficiently lightweight to view as a single code block:
 
 ``` scala
@@ -42,7 +42,7 @@ The notable properties and features of `NonNegInt` are:
 
 The above properties work to make `NonNegInt` very lightweight with respect to size and runtime properties, and semantically safe in the sense that it is impossible to construct one with a negative value inside it.
 
-#####Application of `NonNegInt`
+##### Application of `NonNegInt`
 
 I primarily envision `NonNegInt` as an easy and informative way to declare function parameters that are only well defined for non-negative values, without the need to write any explicit checking code, and yet allowing the programmer to call the function with normal `Int` values, due to the implicit conversions:
 
@@ -59,5 +59,5 @@ object example {
 
 This short example demonstrates some appealing properties of `NonNegInt`.  Firstly, the constraint that index `j >= 0` is enforced via the type definition, and so the programmer does not have to write the usual `require(j >= 0, ...)` check (or worry about forgetting it).  Secondly, the implicit conversion from `Int` to `NonNegInt` means the programmer can just provide a regular integer value for parameter `j`, instead of having to explicitly say `NonNegInt(1)`.  Third, the implicit conversion from `NonNegInt` to `Int` means that `j` can easily be used anywhere a regular `Int` is used.  Last, and very definitely not least, the fact that function `element` requires a non-negative integer is obvious __right in the function signature__.  There is no need for a programmer to guess whether `j` can be negative, and no need for the author of `element` to document that `j` cannot be negative.  Its type makes that completely clear.
 
-#####Conclusions
+##### Conclusions
 In this post I've laid out some advantages of defining lightweight non-negative numeric types, in particular using `NonNegInt` as a working example.  Clearly, if you want to apply this idea, you'd want to also define `NonNegLong`, `NonNegDouble`, `NonNegFloat` and for that matter `PosInt`, `PosLong`, etc.  Happy computing!

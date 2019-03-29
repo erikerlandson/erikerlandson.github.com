@@ -155,7 +155,7 @@ The output demonstrates that the inner loop breaks whenever `k=="d"`, and so `"e
 Using `break` and `continue` with `BreakableIterator` for sequence comprehensions is that easy.  Enjoy!
 
 <a name="notesname" id="notes"></a>
-#####Notes
+##### Notes
 The helpful community on freenode #scala made some excellent observations:
 
 1: Iterators in Scala are not strictly monadic -- it would be more accurate to say they're "things with a flatMap and map method, also they can use filter or withFilter sometimes."  However, I personally still prefer to think of them as "monadic in spirit if not law."
@@ -163,5 +163,5 @@ The helpful community on freenode #scala made some excellent observations:
 2: The `break` function, as described in this post, is not truly functional in the sense of referential transparency, as the invocation `if break(loop) { condition }` involves a side-effect on the variable `loop`.  I would say that it does maintain "scoped functionality."  That is, the break in non-referential transparency is scoped by the variables in question.  The `for` statement containing them is referentially transparent with respect to its inputs (provided no other code is breaking referential transparency, of course).
 
 
-#####References
+##### References
 <a name="ref1name" id="ref1">[1] </a>_[Functional Programming in Scala](http://www.manning.com/bjarnason/)_, Paul Chiusano and Runar Bjarnason, (section 6.6)

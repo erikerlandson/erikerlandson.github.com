@@ -13,12 +13,12 @@ Modeling a sampling gap distribution is a powerful tool for optimizing a samplin
 
 With that goal in mind, I derived the probability mass function (pmf) and cumulative distribution function (cdf) for the sampling gap distribution of reservoir sampling.  In this post I will show the derivations.
 
-###The Sampling Gap Distribution
+### The Sampling Gap Distribution
 In the interest of making it easy to get at the actual answers, here are the pmf and cdf for the Reservoir Sampling Gap Distribution.  For a sampling reservoir of size (R), starting at data element (j), the probability distribution of the sampling gap is:
 
 ![Figure 6](/assets/images/reservoir1/figure6.png "Figure 6")
 
-###Conventions
+### Conventions
 In the derivations that follow, I will keep to some conventions:
 
 * R = the sampling reservoir size.  R > 0.
@@ -27,7 +27,7 @@ In the derivations that follow, I will keep to some conventions:
 
 P(k) is the probability that the gap between one sample and the next is of size k.  The support for P(k) is over all k>=0.  I will generally assume that j>R, as the first R samples are always loaded into the reservoir and the actual random sampling logic starts at j=R+1.  The constraint j>R will also be relevant to many binomial coefficient expressions, where it ensures the coefficient is well defined.
 
-###Deriving the Probability Mass Function, P(k)
+### Deriving the Probability Mass Function, P(k)
 Suppose we just chose (randomly) to sample data element (j-1).  Now we are interested in the probability distribution of the next sampling gap.  That is, the probability P(k) that we will _not_ sample the next (k) elements {j,j+1,...j+k-1}, and sample element (j+k):
 
 ![Figure 1](/assets/images/reservoir1/figure1.png "Figure 1")
@@ -42,7 +42,7 @@ Now we apply [Lemma A](#LemmaA).  The 2nd case (a<=b) of the Lemma applies, sinc
 
 And so we have now derived a compact, closed-form expression for P(k).
 
-###Deriving the Cumulative Distribution Function, F(k)
+### Deriving the Cumulative Distribution Function, F(k)
 Now that we have a derivation for the pmf P(k), we can tackle a derivation for the cdf.  First I will make note of this [useful identity](https://en.wikipedia.org/wiki/Binomial_coefficient#Series_involving_binomial_coefficients) that I scraped off of Wikipedia (I substituted (x) => (a) and (k) => (b)):
 
 ![identity 1](/assets/images/reservoir1/identity1.png "identity 1")
@@ -55,7 +55,7 @@ This is a closed-form solution, but we can apply a bit more simplification:
 
 ![Figure 5](/assets/images/reservoir1/figure5.png "Figure 5")
 
-###Conclusions
+### Conclusions
 
 We have derived closed-form expressions for the pmf and cdf of the Reservoir Sampling gap distribution:
 
@@ -63,11 +63,11 @@ We have derived closed-form expressions for the pmf and cdf of the Reservoir Sam
 
 In order to apply these results to a practical gap-sampling implementation of Reservoir Sampling, we would next need a way to efficiently sample from P(k), to obtain gap sizes to skip over.  How to accomplish this is an open question, but knowing a formula for P(k) and F(k) is a start.
 
-###Acknowledgements
+### Acknowledgements
 Many thanks to [RJ Nowling](http://rnowling.github.io/) and [Will Benton](http://chapeau.freevariable.com/) for proof reading and moral support!  Any remaining errors are my own fault.
 
 <a name="LemmaA"></a>
-###Lemma A, And Its Proof
+### Lemma A, And Its Proof
 ![Lemma A](/assets/images/reservoir1/lemmaA.png "Lemma A")
 
 ![Lemma A Proof](/assets/images/reservoir1/lemmaAproof.png "Lemma A Proof")

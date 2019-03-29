@@ -87,7 +87,7 @@ One or two lines of code may be sufficient.
 I hope this idea may be useful for any other implementations in the community.
 Happy sketching!
 
-###Appendix: Plots with Alternate Distributions
+### Appendix: Plots with Alternate Distributions
 
 ![plot3](/assets/images/tdsum/plot3.png)
 

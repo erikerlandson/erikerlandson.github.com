@@ -17,7 +17,7 @@ I have written an Octopress plugin to allow turnkey support for hosting a blog f
 * Display of full or summary content based on number of posts and/or post age
 
 
-###Install the feed_aggregator.rb plugin
+### Install the feed_aggregator.rb plugin
 Currently, you can obtain a copy of "feed_aggregator.rb" here:
 
 [feed_aggregator.rb](https://github.com/erikerlandson/octopress/blob/feed_aggregator/plugins/feed_aggregator.rb)
@@ -27,7 +27,7 @@ Simply copy this file into the plugins directory for your octopress repo:
     $ cp feed_aggregator.rb /path/to/your/octopress/repo/plugins
 
 
-###Install feed aggregator layout files
+### Install feed aggregator layout files
 You can obtain a copy of the layout files here:
 
 * [feed_aggregator.html](https://github.com/erikerlandson/octopress/blob/feed_aggregator/.themes/classic/source/_layouts/feed_aggregator.html)
@@ -41,7 +41,7 @@ Copy the layouts files to your '_layouts' directory:
     $ cp feed_aggregator_meta.xml /path/to/your/octopress/repo/source/_layouts
 
 
-###Add feedzirra dependency to the Octopress Gemfile
+### Add feedzirra dependency to the Octopress Gemfile
 Octopress wants its dependencies bundled, so you will want to add this dependency to /path/to/your/octopress/repo/Gemfile:
 
     gem 'feedzirra', '~> 0.1.3'
@@ -51,7 +51,7 @@ Then update the bundles:
     $ bundle update
 
 
-###Create a page for your feed aggregator
+### Create a page for your feed aggregator
 Here is an example feed aggregator:
 
     ---
@@ -115,13 +115,13 @@ If you want to update your feed automatically, you can set up a cron job:
     rake deploy
 
 
-###Screen Shot
+### Screen Shot
 
 Here is a screen shot of a feed aggregator.  It respects whatever style theme is configured for the site.  The aggregator title is at the top, and a list of contributing authors is automatically generated as an 'aside'.  Each author name links to the parent blog of the author's feed.  In addition to the standard date, the author's name is also included.  Post titles link back to the original post url.
 
 ![Aggregator Screen Shot]({{ root_url }}/assets/feed_aggregator/screen1.png)
 
-###Meta feed generation
+### Meta feed generation
 
 You may optionally request that a meta feed, created from the aggregated posts, be generated.  The meta feed is created in atom format.  Following are some examples of specifying meta feed files
 
@@ -140,6 +140,6 @@ You may optionally request that a meta feed, created from the aggregated posts, 
     # Supplying no file name is equivalent to 'meta_feed: atom.xml'
     meta_feed:
 
-###To Do
+### To Do
 
 * It might be nice to support the display of an avatar/icon for authors

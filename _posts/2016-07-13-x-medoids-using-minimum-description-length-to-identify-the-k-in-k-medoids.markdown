@@ -88,7 +88,7 @@ A final comment on Minimum Description Length approaches to clustering -- althou
 Any clustering model that involves a distance function from elements to some kind of cluster center should be a good candidate.
 I intend to keep an eye out for applications of MDL to _other_ learning models, as well.
 
-#####References
+##### References
 
 <a name="cite1"</a>
 [1] ["Novelty Detection Using Extreme Value Statistics"](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.49.1338&rep=rep1&type=pdf); Stephen J. Roberts; Feb 23, 1999

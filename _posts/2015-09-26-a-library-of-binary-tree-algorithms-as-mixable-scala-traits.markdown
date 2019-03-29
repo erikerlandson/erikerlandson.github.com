@@ -20,7 +20,7 @@ This post eventually became a bit more sprawling and "tl/dr" than I was expectin
 1. [Finale: Trait Mixing](#mixing)
 
 <a name="motivation"></a>
-#####A Motivating Use Case
+##### A Motivating Use Case
 The skeptical programmer may be wondering what the point of Yet Another Map Collection really is, much less an entire class hierarchy.  The use case that inspired this work was [my project](https://github.com/twitter/algebird/pull/495) of implementing the [t-digest algorithm](https://github.com/tdunning/t-digest/blob/master/docs/t-digest-paper/histo.pdf).  Discussion of t-digest is beyond the scope of this post, but suffice it to say that constructing a t-digest requires the maintenance of a collection of "cluster" objects, that needs to satisfy the following several properties:
 
 1. an entry contains one **or more** cluster objects at a given numeric location
@@ -39,7 +39,7 @@ Properties 4 and 5 -- nearest-entry queries and prefix-sum queries -- are also b
 A reader with their software engineering hat on will notice that these properties are _orthogonal_.  A programmer might be interested in a data structure supporting any one of them, or in some mixed combination.   This kind of situation fairly shouts "Scala traits" (or, alternatively, interfaces in Java, etc).  With that idea in mind, I designed a system of Scala collection traits that support all of the above properties, in a pure trait form that is fully "mixable" by the programmer, so that one can use exactly the properties needed, but not pay for anything else.
 
 <a name="overview"></a>
-#####Library Overview
+##### Library Overview
 The library consists broadly of 3 kinds of traits:
 
 * tree node traits -- implement core tree support for some functionality
@@ -104,7 +104,7 @@ The following diagram summarizes the organization and inheritance relationships 
 ![diagram](/assets/images/rbtraits/rbtraits.png)
 
 <a name="redblack"></a>
-#####A Red/Black Tree Base Class
+##### A Red/Black Tree Base Class
 The most fundamental trait in this hierarchy is the trait that embodies Red-Black balancing; a "red-black-ness" trait, as it were.  This trait supplies the axiomatic tree operations of insertion, deletion and key lookup, where the Red-Black balancing operations are encapsulated for insertion (due to [Chris Okasaki](http://journals.cambridge.org/action/displayAbstract?fromPage=online&aid=44273)) and deletion (due to [Stefan Kahrs](http://www.cs.kent.ac.uk/people/staff/smk/redblack/rb.html))  Note that Red-Black trees do not assume a separate value, as in a map, but require only keys (thus implementing an ordered set over the key type):
 
 ``` scala
@@ -163,7 +163,7 @@ Another detail to call out is the abstraction of the usual `key` with a `Data` e
 The other noteworthy detail is the abstract definition `def iNode(color: Color, d: Data[K], lsub: Node[K], rsub: Node[K]): INode[K]` - this is the function called to create any new tree node.  In fact, this function, when eventually instantiated, is what performs dependency injection of other tree node fields.
 
 <a name="nodemap"></a>
-#####Node Inheritance Example: NodeMap[K,V]
+##### Node Inheritance Example: NodeMap[K,V]
 A relatively simple example of node inheritance is hopefully instructive.  Here is the definition for tree nodes supporting a key/value map:
 
 ``` scala
@@ -192,7 +192,7 @@ Note that in this case very little is added to the red/black functionality alrea
 A tree node trait inherits from its own parent class _and_ the corresponding traits for any mixed-in functionality.  So for example `INodeMap[K,V]` inherits from `NodeMap[K,V]` but also `INode[K]`.
 
 <a name="orderedmaplike"></a>
-#####Collection Trait Example: OrderedMapLike[K,V,IN,M]
+##### Collection Trait Example: OrderedMapLike[K,V,IN,M]
 Continuing with the ordered map example, here is the definition of the collection trait for an ordered map:
 
 ``` scala
@@ -222,7 +222,7 @@ trait OrderedMapLike[K, V, IN <: INodeMap[K, V], M <: OrderedMapLike[K, V, IN, M
 You can see that this trait supplies collection API methods that a Scala programmer will recognize as being standard for any map-like collection.  Note that this trait also inherits other standard methods from `OrderedLike[K,IN,M]` (common to both sets and maps) and _also_ inherits from `NodeMap[K,V]`: In other words, a collection is effectively yet another kind of tree node, with additional collection API methods mixed in.   Note also the use of "self types" (the type parameter `M`), which allows the collection to return objects of its own kind.  This is crucial for allowing operations like data insertion to return an object that also supports node insertion, and to maintain consistency of type across operations.  The collection type is properly "closed" with respect to its own operations.
 
 <a name="orderedmap"></a>
-#####Collection Example: OrderedMap[K,V]
+##### Collection Example: OrderedMap[K,V]
 To conclude the ordered map example, consider the task of defining a concrete instantiation of an ordered map:
 ``` scala
 sealed trait OrderedMap[K, V] extends OrderedMapLike[K, V, INodeMap[K, V], OrderedMap[K, V]] {
@@ -294,7 +294,7 @@ Another example makes the implications more clear.  Here is the definition of in
 Here you can see that all logic for both "basic" internal nodes and also for maintaining prefix sums, and key min/max information for nearest-entry queries, must be supplied.  If there is a singularity in this design here is where it is.  The saving grace is that it is localized into a single well defined place, and any logic can be transcribed from a proper reference implementation of whatever traits are being mixed.
 
 <a name="mixing"></a>
-#####Finale: Trait Mixing
+##### Finale: Trait Mixing
 I will conclude by showing the code for mixing tree node traits and collection traits, which is elegant.  Here are type definitions for tree nodes and collection traits that inherit from incrementable values, nearest-key queries, and prefix-sum queries, and there is almost no code except the proper inheritances:
 
 ``` scala

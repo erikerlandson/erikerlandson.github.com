@@ -9,7 +9,7 @@ categories: [ computing, learning models, machine learning, random forests, deci
 In this post I am going to describe some results I obtained for [clustering](https://en.wikipedia.org/wiki/Cluster_analysis) machines by which [RPM packages](https://en.wikipedia.org/wiki/RPM_Package_Manager) that were installed on them.  The clustering technique I used was [Random Forest Clustering](https://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm#unsup).
 
 <a name="data"></a>
-#####The Data
+##### The Data
 The data I clustered consisted of 135 machines, each with a list of installed RPM packages.  The number of unique package names among all 135 machines was 4397.  Each machine was assigned a vector of Boolean values: a value of `1` indicates that the corresponding RPM was installed on that machine.  This means that the clustering data occupied a space of nearly 4400 dimensions.  I discuss the implications of this [later in the post](#payoff), and what it has to do with Random Forest Clustering in particular.
 
 For ease of navigation and digestion, the remainder of this post is organized in sections:
@@ -21,7 +21,7 @@ For ease of navigation and digestion, the remainder of this post is organized in
 &nbsp; &nbsp; &nbsp; &nbsp;  ([Outliers](#outliers)) <br>
 
 <a name="clustering"></a>
-#####Random Forests and Random Forest Clustering
+##### Random Forests and Random Forest Clustering
 
 Full explainations of [Random Forests](https://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm) and [Random Forest Clustering](https://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm#unsup) could easily occupy blog posts of their own, but I will attempt to summarize them briefly here.  Random Forest learning models _per se_ are well covered in the machine learning community, and available in most machine learning toolkits.  With that in mind, I will focus on their application to Random Forest Clustering, as it is less commonly used.
 
@@ -63,7 +63,7 @@ The [machine package configurations](#data) whose clustering I describe for this
 All of these factors make the machine package configuration data a good test of the strenghts of Random Forest Clustering.
 
 <a name="code"></a>
-#####Package Configuration Clustering Code
+##### Package Configuration Clustering Code
 
 The implementation of Random Forest Clustering I used for the results in this post is a library available from the [silex project](http://silex.freevariable.com/), a package of analytics libraries and utilities for [Apache Spark](http://spark.apache.org/).
 
@@ -138,7 +138,7 @@ val outlierStr = outliers.collect
 ```
 
 <a name="results"></a>
-#####Package Configuration Clustering Results
+##### Package Configuration Clustering Results
 
 The result of running the code in the [previous section](#code) is seven clusters of machines.  In the following files, the first column represents distance from the cluster center, and the second is the actual machine's node name.  A cluster distance of 0.0 indicates that the machine was indistinguishable from cluster center, as far as the Random Forest model was concerned.   The larger the distance, the more different from the cluster's center a machine was, in terms of its installed RPM packages.
 
@@ -169,7 +169,7 @@ Cluster 7 is by far the largest.  It is primarily a combination of OpenStack mac
 <script src="https://gist.github.com/erikerlandson/184d202560c628c0383c5050d9f4be24.js?file=cluster_7"></script>
 
 <a name="outliers"></a>
-#####Outliers
+##### Outliers
 
 This last grouping represents machines which were "far" from any of the previous cluster centers.  They may be interpreted as "outliers" - machines that don't fit any model category.  Of these the node `frodo` is clearly somebody's personal machine, likely with a customized or idiosyncratic package configuration.  Unsurprising that it is farthest of all machines from any cluster, with distance 9.0.   The `jenkins` machine is also somewhat unique among the nodes, and so perhaps not surprising that its registers as anomalous.  The remaining machines match node series from other clusters.   Their large distance is another indication of spurious configurations for IT to examine.
 

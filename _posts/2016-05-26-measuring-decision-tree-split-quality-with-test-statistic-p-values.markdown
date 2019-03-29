@@ -21,14 +21,14 @@ The remainder of this post is organized in the following sections:
 [Conclusion](#conclusion) <br>
 
 <a name="consistency"></a>
-#####Consistency
+##### Consistency
 
 Test statistic p-values have some appealing properties as a split quality measure.  The test statistic methodology has the advantage of working essentially the same way regardless of the particular test being used.  We begin with two sample populations; in our case, these are the left and right sub-populations created by a candidate split.  We want to assess whether these two populations have the same distribution (the null hypothesis) or different distributions.  We measure some test statistic 'S' ([Student's t](https://en.wikipedia.org/wiki/Student's_t-test), [Chi-Squared](https://en.wikipedia.org/wiki/Chi-squared_test#Example_chi-squared_test_for_categorical_data), etc).  We then compute the probability that |S| >= the value we actually measured.  This probability is commonly referred to as the p-value.  The smaller the p-value, the less likely it is that our two populations are the same.  **In our case, we can interpret this as: a smaller p-value indicates a better quality split.**
 
 This consistent methodology has a couple advantages contributing to user experience (UX).  If all measures of split quality work in the same way, then there is a lower cognitive load to move between measures once the user understands the common pattern of use.  A second advantage is better "unit analysis."  Since all such quality measures take the form of p-values, there is no risk of a chosen quality measure getting mis-aligned with a corresponding quality threshold.  They are all probabilities, on the interval [0,1], and "smaller threshold" always means "higher threshold of split quality."   By way of comparison, if an application is measuring [entropy](https://en.wikipedia.org/wiki/Entropy_%28information_theory%29) and then switches to using [Gini impurity](https://en.wikipedia.org/wiki/Decision_tree_learning#Gini_impurity), these measures are in differing units and care has to be taken that the correct quality threshold is used in each case or the model training policy will be broken.  Switching between differing statistical tests does not come with the same risk.  **A p-value quality threshold will have the same semantic regardless of which statistical test is being applied:** probability that left and right sub-populations are the same, given the particular statistic being measured.
 
 <a name="awareness"></a>
-#####Awareness of Sample Size
+##### Awareness of Sample Size
 
 Test statistics have another appealing property: many are "aware" of sample size in a way that captures the idea that the smaller the sample size, the larger the difference between populations should be to conclude a given significance.  For one example, consider [Welch's t-test](https://en.wikipedia.org/wiki/Welch's_t-test#Statistical_test), the two-sample variation of the t distribution that applies well to comparing left and right sub populations of candidate decision tree splits:
 
@@ -41,7 +41,7 @@ Visualizing the effects of sample sizes n1 and n2 on these equations directly is
 These simplified equations show clearly that (all else remaining equal) as sample size grows smaller, the measured t-statistic correspondingly grows smaller (proportional to sqrt(n)), and furthermore the corresponding variance of the t distribution to be applied grows larger.  For any given shift in left and right sub-populations, each of these trends yields a larger (i.e. weaker) p-value.   This behavior is desirable for a split quality metric.  **The less data there is at a given candidate split, the less confidence there _should_ be in split quality.**  Put another way: we would like to require a larger difference before a split is measured as being good quality when we have less data to work with, and that is exactly the behavior the t-test provides us.
 
 <a name="results"></a>
-#####Training Results
+##### Training Results
 
 These propreties are pleasing, but it remains to show that test statistics can actually improve decision tree training in practice.  In the following sections I will compare the effects of training with test statstics with other split quality policies based on entropy and gini index.
 
@@ -293,7 +293,7 @@ scala>
 ```
 
 <a name="conclusion"></a>
-#####Conclusion
+##### Conclusion
 
 In this post I have discussed some advantages of using test statstics and p-values as split quality metrics for decision tree training:
 
