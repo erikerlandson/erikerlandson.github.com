@@ -17,18 +17,15 @@ It is worth briefly noting that the [claim reuse](http://research.cs.wisc.edu/ht
 
 Given a particular negotiation cycle cadence, how does a slot's loading factor behave, as a function of job duration?  The loading factor can be expressed as:
 
-<div markdown="0">
-\\[
-\\text{Loading Factor} = \\frac{D}{C \\left( q + \\lceil r \\rceil \\right)} \\\\
- \\\\
-\\text{where:} \\\\
-D = \\text{job duration} \\\\
-C = \\text{cycle cadence} \\\\
-q = \\lfloor D / C \\rfloor \\\\
-r = \\left( D / C \\right) - q \\\\
-\\]
-</div>
-
+$$
+\text{Loading Factor} = \frac{D}{C \left( q + \lceil r \rceil \right)} \\
+ \\
+\text{where:} \\
+D = \text{job duration} \\
+C = \text{cycle cadence} \\
+q = \lfloor D / C \rfloor \\
+r = \left( D / C \right) - q \\
+$$
 
 The following plot illustrates how the loading factor changes with job duration, assuming a cadence of 300 seconds (5 minutes):
 
