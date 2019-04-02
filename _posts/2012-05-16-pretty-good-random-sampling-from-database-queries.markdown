@@ -3,7 +3,7 @@ layout: post
 title: "Pretty Good Random Sampling from Database Queries"
 date: 2012-05-16 07:05
 comments: true
-categories: [databases, mongodb, computing, pymongo, machine learning, random sampling]
+tags: [databases, mongodb, computing, pymongo, machine learning, random sampling]
 ---
 Suppose you want to add random sampling to a database query, but your database does not support it.  One known technique is to add a field, say "rk", that contains a random key value in [0,1), index on that field, and add a clause to the query:  `("rk" >= x  &&  "rk" < x+p)`, where p is your desired random sampling probability and x is randomly chosen from [0,1-p).
 

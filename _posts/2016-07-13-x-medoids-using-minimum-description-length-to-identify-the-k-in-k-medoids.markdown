@@ -4,7 +4,7 @@ title: "Using Minimum Description Length to Optimize the 'K' in K-Medoids"
 date: 2016-08-03 20:00
 comments: true
 published: true
-categories: [ computing, k-medoids, minimum description length, MDL, optimization, clustering, k-means, compression ]
+tags: [ computing, k-medoids, minimum description length, MDL, optimization, clustering, k-means, compression ]
 ---
 
 Applying many popular clustering models, for example [K-Means](https://en.wikipedia.org/wiki/K-means_clustering), [K-Medoids](https://en.wikipedia.org/wiki/K-medoids) and [Gaussian Mixtures](https://en.wikipedia.org/wiki/Expectation%E2%80%93maximization_algorithm#Gaussian_mixture), requires an up-front choice of the number of clusters -- the 'K' in K-Means, as it were.

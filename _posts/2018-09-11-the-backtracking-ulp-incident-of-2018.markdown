@@ -3,7 +3,7 @@ layout: post
 title: "The Backtracking ULP Incident of 2018"
 date: 2018-09-11 07:01
 comments: true
-categories: [ computing, math, floating point, ULP, unit in last place, numeric methods, error ]
+tags: [ computing, math, floating point, ULP, unit in last place, numeric methods, error ]
 ---
 
 This week I finally started applying my new [convex optimization](https://github.com/erikerlandson/gibbous/) library to solve for interpolating splines with [monotonic constraints](https://github.com/erikerlandson/snowball). Things seemed to be going well. My convex optimization was passing unit tests. My monotone splines were passing their unit tests too. I cut an initial release, and announced it to the world.

@@ -3,7 +3,7 @@ layout: post
 title: "The Impact of Negotiator Cycle Cadence on Slot Loading"
 date: 2013-03-21 15:10
 comments: true
-categories: [ computing, htcondor, negotiator, negotiation cycle, pool loading ]
+tags: [ computing, htcondor, negotiator, negotiation cycle, pool loading ]
 ---
 The [HTCondor negotiator](http://research.cs.wisc.edu/htcondor/manual/v7.8/3_1Introduction.html#8555) assigns jobs (resource requests) to slots (compute resources) at regular intervals, configured by the [NEGOTIATOR_INTERVAL](http://research.cs.wisc.edu/htcondor/manual/v7.8/3_3Configuration.html#20544) parameter.  This interval (the cycle _cadence_) has a fundamental impact on a pool _loading factor_ -- the fraction of time that slots are being productively utilized.
 

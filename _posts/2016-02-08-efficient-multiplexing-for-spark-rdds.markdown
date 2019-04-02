@@ -3,7 +3,7 @@ layout: post
 title: "Efficient Multiplexing for Spark RDDs"
 date: 2016-02-08 10:09
 comments: true
-categories: [ computing, spark, RDD, sampling, random sampling, optimization, multiplex, multiplexing ]
+tags: [ computing, spark, RDD, sampling, random sampling, optimization, multiplex, multiplexing ]
 ---
 In this post I'm going to propose a new abstract operation on [Spark RDDs](http://spark.apache.org/docs/latest/programming-guide.html#resilient-distributed-datasets-rdds) -- **multiplexing** -- that makes some categories of operations on RDDs both easier to program and in many cases much faster.
 

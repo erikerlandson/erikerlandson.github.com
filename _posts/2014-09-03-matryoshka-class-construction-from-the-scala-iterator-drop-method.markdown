@@ -3,7 +3,7 @@ layout: post
 title: "The Scala Iterator 'drop' Method Generates a Matryoshka Class Nesting"
 date: 2014-09-03 17:23
 comments: true
-categories: [ computing, scala, iterators, efficiency ]
+tags: [ computing, scala, iterators, efficiency ]
 ---
 The Scala Iterator `drop` method has a complexity bug that shows up when one calls `drop` repeatedly, for example when traversing over an iterator in a loop.
 

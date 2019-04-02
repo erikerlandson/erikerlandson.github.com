@@ -3,7 +3,7 @@ layout: post
 title: "Examining the Modulus of Random Variables"
 date: 2013-03-15 12:03
 comments: true
-categories: [ computing, htcondor, math, random variable, modulus, mean, standard deviation, distribution, uniform distribution, normal distribution, log-normal distribution, exponential distribution ]
+tags: [ computing, htcondor, math, random variable, modulus, mean, standard deviation, distribution, uniform distribution, normal distribution, log-normal distribution, exponential distribution ]
 ---
 
 ### Motivation

@@ -4,7 +4,7 @@ title: "Approximating a PDF of Distances With a Gamma Distribution"
 date: 2016-07-09 11:25
 comments: true
 published: true
-categories: [ computing, math, probability, density, PDF, dimensionality, gamma distribution ]
+tags: [ computing, math, probability, density, PDF, dimensionality, gamma distribution ]
 ---
 In a [previous post](http://erikerlandson.github.io/blog/2016/06/08/exploring-the-effects-of-dimensionality-on-a-pdf-of-distances/) I discussed some unintuitive aspects of the distribution of distances as spatial dimension changes.  To help explain this to myself I derived a formula for this distribution, assuming a unit multivariate Gaussian.  For distance (aka radius) r, and spatial dimension d, the PDF of distances is:
 

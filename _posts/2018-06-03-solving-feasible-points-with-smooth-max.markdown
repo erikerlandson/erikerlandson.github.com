@@ -3,7 +3,7 @@ layout: post
 title: "Solving Feasible Points With Smooth-Max"
 date: 2018-06-03 14:21
 comments: true
-categories: [ computing, math, optimization, feasible point, convex optimization ]
+tags: [ computing, math, optimization, feasible point, convex optimization ]
 ---
 
 ### Overture

@@ -3,7 +3,7 @@ layout: post
 title: "Rethinking the Semantics of Group Quotas and Slot Weights for Heterogeneous and Multidimensional Compute Resources"
 date: 2012-11-13 15:31
 comments: true
-categories: [ computing, htcondor, accounting groups, group quotas, slot weights ]
+tags: [ computing, htcondor, accounting groups, group quotas, slot weights ]
 ---
 The HTCondor semantic for accounting group quotas and slot weights is currently cpu-centric.  This is an artifact of the historic primacy of cpu as the most commonly-considered limiting resource in computations.  For example the `SlotWeight` attribute is currently defaulted to `Cpus`, and when slot weights are disabled, there is logic activated in matchmaking to sum the available cpus on slots to avoid 'undercounting' total pool quotas.
 

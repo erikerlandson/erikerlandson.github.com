@@ -3,7 +3,7 @@ layout: post
 title: "Implementing Parallel Prefix Scan as a Spark RDD Transform"
 date: 2014-08-12 11:37
 comments: true
-categories: [ computing, spark, RDD, scala, parallel prefix scan, algorithms ]
+tags: [ computing, spark, RDD, scala, parallel prefix scan, algorithms ]
 ---
 In my [previous post](/blog/2014/08/09/implementing-an-rdd-scanleft-transform-with-cascade-rdds/), I described how to implement the Scala `scanLeft` function as an RDD transform.  By definition `scanLeft` invokes a sequential-only prefix scan algorithm; it does not assume that either its input function `f` or its initial-value `z` can be applied in a parallel fashion.   Its companion function `scan`, however, computes a *parallel* prefix scan.  In this post I will describe an implementation of parallel prefix `scan` as an RDD transform.
 

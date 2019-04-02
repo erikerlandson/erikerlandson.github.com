@@ -3,7 +3,7 @@ layout: post
 title: "Rethinking the Semantics of Group Quotas and Slot Weights: Claim Capacity Model"
 date: 2012-11-15 17:22
 comments: true
-categories: [ computing, htcondor, accounting groups, group quotas, slot weights ]
+tags: [ computing, htcondor, accounting groups, group quotas, slot weights ]
 ---
 In my previous post about [Rethinking the Semantics of Group Quotas and Slot Weights](http://erikerlandson.github.com/blog/2012/11/13/rethinking-the-semantics-of-group-quotas-and-slot-weights-for-heterogeneous-and-multidimensional-compute-resources), I proposed a concept for unifying the semantics of accounting group quotas and slot weights across arbitrary resource allocation strategies.
 

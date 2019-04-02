@@ -3,7 +3,7 @@ layout: post
 title: "Random Forest Clustering of Machine Package Configurations in Apache Spark"
 date: 2016-05-05 15:05
 comments: true
-categories: [ computing, learning models, machine learning, random forests, decision trees, clustering, apache spark ]
+tags: [ computing, learning models, machine learning, random forests, decision trees, clustering, apache spark ]
 ---
 
 In this post I am going to describe some results I obtained for [clustering](https://en.wikipedia.org/wiki/Cluster_analysis) machines by which [RPM packages](https://en.wikipedia.org/wiki/RPM_Package_Manager) that were installed on them.  The clustering technique I used was [Random Forest Clustering](https://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm#unsup).

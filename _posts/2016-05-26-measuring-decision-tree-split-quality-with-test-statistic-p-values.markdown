@@ -3,7 +3,7 @@ layout: post
 title: "Measuring Decision Tree Split Quality with Test Statistic P-Values"
 date: 2016-05-26 14:39
 comments: true
-categories: [ computing, math, decision tree, statistics, learning models, random forests, apache spark ]
+tags: [ computing, math, decision tree, statistics, learning models, random forests, apache spark ]
 published: true
 ---
 

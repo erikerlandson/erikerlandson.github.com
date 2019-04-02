@@ -3,7 +3,7 @@ layout: post
 title: "A Library of Binary Tree Algorithms as Mixable Scala Traits"
 date: 2015-09-26 12:43
 comments: true
-categories: [ computing, scala, binary tree, algorithms, prefix sum, nearest entry, t-digest ]
+tags: [ computing, scala, binary tree, algorithms, prefix sum, nearest entry, t-digest ]
 ---
 In this post I am going to describe some work I've done recently on a system of Scala traits that support tree-based collection algorithms prefix-sum, nearest key query and value increment in a mixable format, all backed by Red-Black balanced tree logic, which is also a fully inheritable trait.
 

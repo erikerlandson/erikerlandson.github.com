@@ -3,7 +3,7 @@ layout: post
 title: "Very Fast Reservoir Sampling"
 date: 2015-11-20 11:27
 comments: true
-categories: [ computing, math, scala, sampling, random sampling, reservoir sampling, gap sampling ]
+tags: [ computing, math, scala, sampling, random sampling, reservoir sampling, gap sampling ]
 ---
 
 In this post I will demonstrate how to do reservoir sampling orders of magnitude faster than the traditional "naive" reservoir sampling algorithm, using a fast high-fidelity approximation to the reservoir sampling-gap distribution.

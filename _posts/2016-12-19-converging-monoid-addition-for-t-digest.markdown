@@ -3,7 +3,7 @@ layout: post
 title: "Converging Monoid Addition for T-Digest"
 date: 2016-12-19 13:29
 comments: true
-categories: [ computing, monoid, monoids, sketching, t-digest, algebra, data science ]
+tags: [ computing, monoid, monoids, sketching, t-digest, algebra, data science ]
 ---
 
 > In the days when Sussman was a novice,

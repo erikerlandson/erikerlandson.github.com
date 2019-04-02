@@ -3,7 +3,7 @@ layout: post
 title: "Parallel K-Medoids Using Scala ParSeq"
 date: 2015-05-06 16:33
 comments: true
-categories: [ computing, scala, clustering, parallel computing ]
+tags: [ computing, scala, clustering, parallel computing ]
 ---
 Scala supplies a [parallel collections library](http://docs.scala-lang.org/overviews/parallel-collections/overview.html) that was designed to make it easy for a programmer to add parallel computing over the elements in a collection.  In this post, I will describe a case study of applying Scala's parallel collections to cleanly implement multithreading support for training a K-Medoids clustering model.
 

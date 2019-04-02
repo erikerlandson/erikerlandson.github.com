@@ -3,7 +3,7 @@ layout: post
 title: "LIFO and FIFO Preemption Policies for a Condor Pool"
 date: 2012-07-19 13:57
 comments: true
-categories: [ computing, condor, preemption policy, condor negotiator, grid computing, MRG Grid, Red Hat ]
+tags: [ computing, condor, preemption policy, condor negotiator, grid computing, MRG Grid, Red Hat ]
 ---
 
 On a Condor pool, a Last In First Out (LIFO) preemption policy favors choosing the longest-running job from the available preemption options.  Correspondingly, a First In First Out (FIFO) policy favors the most-recent job for preemption.  

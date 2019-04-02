@@ -3,7 +3,7 @@ layout: post
 title: "Monadic 'break' and 'continue' for Scala Sequence Comprehensions"
 date: 2015-01-24 11:54
 comments: true
-categories: [ computing, scala, monads, break, continue ]
+tags: [ computing, scala, monads, break, continue ]
 ---
 
 **Author's note 0:** I have come up with better, more correct designs for monadic objects that implement

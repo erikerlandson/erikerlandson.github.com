@@ -3,7 +3,7 @@ layout: post
 title: "Rethinking the Semantics of Group Quotas and Slot Weights: Computing Claim Capacity from Consumption Policy"
 date: 2012-11-26 13:52
 comments: true
-categories: [ computing, htcondor, accounting groups, group quotas, slot weights, claim capacity, consumption policy ]
+tags: [ computing, htcondor, accounting groups, group quotas, slot weights, claim capacity, consumption policy ]
 ---
 In two previous posts, I made a case to motivate the need for a better definition of slot weights and group quotas that could accommodate use cases involving aggregate resources (partitionable slots) with heterogeneous consumption policies and also provide a principled unit analysis for weights and quotas.  These previous posts can be viewed here:
 

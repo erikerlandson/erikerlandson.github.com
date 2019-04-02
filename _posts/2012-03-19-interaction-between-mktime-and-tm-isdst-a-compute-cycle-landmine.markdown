@@ -3,7 +3,7 @@ layout: post
 title: "Interaction between mktime() and tm_isdst - a compute cycle landmine"
 date: 2012-03-19 13:18
 comments: true
-categories: [condor, computing]
+tags: [condor, computing]
 ---
 I was recently profiling the [Condor](http://research.cs.wisc.edu/condor/) collector, and was a bit stunned to discover that the standard C library function [mktime](http://www.cplusplus.com/reference/clibrary/ctime/mktime/)() was burning _60% of the collector's cycles_.
 

@@ -3,7 +3,7 @@ layout: post
 title: "Computing Simplex Vertex Locations From Pairwise Object Distances"
 date: 2016-03-26 16:22
 comments: true
-categories: [ computing, math, simplex, vertex, vertices, metric, metric space, distance ]
+tags: [ computing, math, simplex, vertex, vertices, metric, metric space, distance ]
 ---
 Suppose I have a collection of (N) objects, and distances d(j,k) between each pair of objects (j) and (k); that is, my objects are members of a [metric space](https://en.wikipedia.org/wiki/Metric_space).  I have no knowledge about my objects, beyond these pair-wise distances.  These objects could be construed as vertices in an (N-1) dimensional [simplex](https://en.wikipedia.org/wiki/Simplex).  However, since I have no spatial information about my objects, I first need a way to assign spatial locations to each object, in vector space R^(N-1), with only my object distances to work with.
 

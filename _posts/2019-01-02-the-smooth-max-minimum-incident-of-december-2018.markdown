@@ -3,7 +3,7 @@ layout: post
 title: "The Smooth-Max Minimum Incident of December 2018"
 date: 2019-01-02 13:25
 comments: true
-categories: [ computing, math, convex optimization, optimization, monotonic spline, spline, algorithms ]
+tags: [ computing, math, convex optimization, optimization, monotonic spline, spline, algorithms ]
 ---
 
 In what is becoming an ongoing series where I climb the convex optimization learning curve by making rookie mistakes,

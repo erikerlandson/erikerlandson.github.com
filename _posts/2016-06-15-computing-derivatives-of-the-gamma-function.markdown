@@ -4,7 +4,7 @@ title: "Computing Derivatives of the Gamma Function"
 date: 2016-06-15 16:37
 comments: true
 published: true
-categories: [ computing, math, gamma function, digamma function, trigamma function, polygamma function, derivative ]
+tags: [ computing, math, gamma function, digamma function, trigamma function, polygamma function, derivative ]
 ---
 
 In this post I'll describe a simple algorithm to compute the kth derivatives of the [Gamma function](https://en.wikipedia.org/wiki/Gamma_function).

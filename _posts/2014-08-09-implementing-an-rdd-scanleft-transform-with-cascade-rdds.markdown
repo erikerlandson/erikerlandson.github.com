@@ -3,7 +3,7 @@ layout: post
 title: "Implementing an RDD scanLeft Transform With Cascade RDDs"
 date: 2014-08-09 09:10
 comments: true
-categories: [ computing, spark, scala, RDD ]
+tags: [ computing, spark, scala, RDD ]
 ---
 In Scala, sequence (and iterator) data types support the `scanLeft` method for computing a sequential prefix scan on sequence elements:
 

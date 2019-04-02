@@ -3,7 +3,7 @@ layout: post
 title: "Configuring Minimum and Maximum Resources for Mission Critical Jobs in a Condor Pool"
 date: 2012-07-10 15:49
 comments: true
-categories: [ computing, condor, resources, preemption policy, accounting groups, concurrency limits, slot types, condor negotiator, grid computing, MRG Grid, Red Hat ]
+tags: [ computing, condor, resources, preemption policy, accounting groups, concurrency limits, slot types, condor negotiator, grid computing, MRG Grid, Red Hat ]
 ---
 
 Suppose you are administering a Condor pool for a company or organization where you want to support both "mission critical" (MC) jobs and "regular" (R) jobs.  Mission critical jobs might include IT functions such as backups, or payroll, or experiment submissions from high profile internal customers.  Regular jobs encompass any jobs that can be delayed, or preempted, with little or no consequence.

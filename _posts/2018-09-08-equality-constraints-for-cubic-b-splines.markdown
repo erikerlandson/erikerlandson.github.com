@@ -3,7 +3,7 @@ layout: post
 title: "Equality Constraints for Cubic B-Splines"
 date: 2018-09-08 14:32
 comments: true
-categories: [ computing, math, spline, splines, constraints, convex optimization, gradient, polynomial, polynomials ]
+tags: [ computing, math, spline, splines, constraints, convex optimization, gradient, polynomial, polynomials ]
 ---
 
 In my [previous post](http://erikerlandson.github.io/blog/2018/09/02/putting-cubic-b-splines-into-standard-polynomial-form/)

@@ -3,7 +3,7 @@ layout: post
 title: "Easy Histograms and Tables from Condor Jobs and Slots"
 date: 2012-06-29 09:46
 comments: true
-categories: [ computing, condor, condor jobs, condor slots, condor_q, condor_status, condor_history, classads, histogram, grid computing, MRG Grid, Red Hat ]
+tags: [ computing, condor, condor jobs, condor slots, condor_q, condor_status, condor_history, classads, histogram, grid computing, MRG Grid, Red Hat ]
 ---
 
 Several [Condor](http://research.cs.wisc.edu/condor/) commands, including condor_status, condor_q and condor_history, provide a nice feature for outputting formatted subsets of classad attributes: the `-format <format> <attr>` option.  In this post, I assume basic familiarity with `-format`.  You can read more [here](http://research.cs.wisc.edu/condor/manual/v7.8/condor_status.html#SECTION0011453000000000000000)

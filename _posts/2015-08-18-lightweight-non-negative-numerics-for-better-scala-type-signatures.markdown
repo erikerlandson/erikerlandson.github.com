@@ -3,7 +3,7 @@ layout: post
 title: "Lightweight Non-Negative Numerics for Better Scala Type Signatures"
 date: 2015-08-18 17:42
 comments: true
-categories: [ computing, scala, value class, type signature, functional programming ]
+tags: [ computing, scala, value class, type signature, functional programming ]
 ---
 In this post I want to discuss several advantages of defining lightweight non-negative numeric types in Scala, whose primary benefit is that they allow improved type signatures for Scala functions and methods.  I'll first describe the simple class definition, and then demonstrate how it can be used in function signatures and the benefits of doing so.
 

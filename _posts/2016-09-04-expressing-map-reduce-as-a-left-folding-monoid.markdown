@@ -3,7 +3,7 @@ layout: post
 title: "Encoding Map-Reduce As A Monoid With Left Folding"
 date: 2016-09-05 10:31
 comments: true
-categories: [ computing, map-reduce, mapreduce, algebra, monoid, fold, left-fold, parallel, scala ]
+tags: [ computing, map-reduce, mapreduce, algebra, monoid, fold, left-fold, parallel, scala ]
 ---
 
 In a [previous post](http://erikerlandson.github.io/blog/2015/11/24/the-prepare-operation-considered-harmful-in-algebird/) I discussed some scenarios where traditional map-reduce (directly applying a map function, followed by some monoidal reduction) could be inefficient.

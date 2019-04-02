@@ -3,7 +3,7 @@ layout: post
 title: "Hosting a Blog Feed Aggregator With Octopress"
 date: 2012-10-05 12:52
 comments: true
-categories: [ computing, octopress, feed aggregator, blog, blog feed ]
+tags: [ computing, octopress, feed aggregator, blog, blog feed ]
 ---
 
 I have written an Octopress plugin to allow turnkey support for hosting a blog feed aggregator, in Octopress idiomatic style.  I will describe the steps to install it and use it below.  Some of its current features are:

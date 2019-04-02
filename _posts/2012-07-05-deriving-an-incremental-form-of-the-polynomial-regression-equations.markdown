@@ -3,7 +3,7 @@ layout: post
 title: "Deriving an Incremental Form of the Polynomial Regression Equations"
 date: 2012-07-05 19:46
 comments: true
-categories: [ computing, machine learning, math, incremental, on-line learning, linear regression, polynomial regression ]
+tags: [ computing, machine learning, math, incremental, on-line learning, linear regression, polynomial regression ]
 ---
 
 Incremental, or on-line, algorithms are increasingly popular as data set sizes explode and web enabled applications create environments where new data arrive continuously (that is, incrementally) from clients out on the internet.

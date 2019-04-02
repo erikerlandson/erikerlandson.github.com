@@ -4,7 +4,7 @@ title: "Exploring the Effects of Dimensionality on a PDF of Distances"
 date: 2016-06-08 20:56
 comments: true
 published: true
-categories: [ computing, math, probability, density, PDF, dimensionality ]
+tags: [ computing, math, probability, density, PDF, dimensionality ]
 ---
 
 Every so often I'm reminded that the effects of changing dimensionality on objects and processes can be surprisingly counterintuitive.  Recently I ran across a great example of this, while I working on a model for the distribution of distances in spaces of varying dimension.

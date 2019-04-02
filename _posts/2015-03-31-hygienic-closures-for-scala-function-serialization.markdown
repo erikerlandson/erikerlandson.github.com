@@ -3,7 +3,7 @@ layout: post
 title: "Hygienic Closures for Scala Function Serialization"
 date: 2015-03-31 06:06
 comments: true
-categories: [ computing, scala, closures, functional programming, serialization, spark ]
+tags: [ computing, scala, closures, functional programming, serialization, spark ]
 ---
 In most use cases of Scala closures, what you see is what you get, but there are exceptions where looks can be deceiving and this can have a big impact on closure serialization.  Closure serialization is of more than academic interest.  Tools like Apache Spark cannot operate without serializing functions over the network.  In this post I'll describe some scenarios where closures include more than what is evident in the code, and then a technique for preventing unwanted inclusions.
 

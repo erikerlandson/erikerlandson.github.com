@@ -3,7 +3,7 @@ layout: post
 title: "Smooth Gradients for Cubic Hermite Splines"
 date: 2013-03-16 07:39
 comments: true
-categories: [ computing, math, spline, cubic hermite spline, gradient ]
+tags: [ computing, math, spline, cubic hermite spline, gradient ]
 ---
 One of the advantages of cubic Hermite splines is that their interval interpolation formula is an explicit function of gradients $$ m_0, m_1, ... m_{n-1} $$ at knot-points:
 

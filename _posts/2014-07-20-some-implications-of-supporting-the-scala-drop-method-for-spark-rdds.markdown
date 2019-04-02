@@ -3,7 +3,7 @@ layout: post
 title: "Some Implications of Supporting the Scala drop Method for Spark RDDs"
 date: 2014-07-27 17:08
 comments: true
-categories: [ computing, spark, scala, RDD ]
+tags: [ computing, spark, scala, RDD ]
 ---
 In Scala, sequence data types support the `drop` method for skipping (aka "dropping") the first elements of the sequence:
 

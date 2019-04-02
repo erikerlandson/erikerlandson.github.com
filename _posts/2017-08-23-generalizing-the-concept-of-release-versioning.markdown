@@ -3,7 +3,7 @@ layout: post
 title: "Rethinking the Concept of Release Versioning"
 date: 2017-08-23 17:22
 comments: true
-categories: [ computing, versioning, semantic versioning, release, software builds ]
+tags: [ computing, versioning, semantic versioning, release, software builds ]
 ---
 Recently I've been thinking about a few related problems with our current concepts of software release versioning, release dependencies and release building.
 These problems apply to software releases in all languages and build systems that I've experienced,

@@ -3,7 +3,7 @@ layout: post
 title: "The Mean of the Modulus Does Not Equal the Modulus of the Mean"
 date: 2013-01-02 08:55
 comments: true
-categories: [ computing, random variable, mean, modulus, expected value ]
+tags: [ computing, random variable, mean, modulus, expected value ]
 ---
 
 I've been considering models for the effects of HTCondor negotiation cycle cadence on pool loading and accounting group starvation, which led me to thinking about the effects of taking the modulus of a random variable, for reasons I plan to discuss in future posts.

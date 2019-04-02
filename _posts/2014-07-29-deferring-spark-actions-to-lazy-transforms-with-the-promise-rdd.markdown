@@ -3,7 +3,7 @@ layout: post
 title: "Deferring Spark Actions to Lazy Transforms With the Promise RDD"
 date: 2014-07-29 13:53
 comments: true
-categories: [ computing, spark, scala, RDD ]
+tags: [ computing, spark, scala, RDD ]
 ---
 In a [previous post](http://erikerlandson.github.io/blog/2014/07/27/some-implications-of-supporting-the-scala-drop-method-for-spark-rdds/) I described a method for implementing the Scala `drop` transform for Spark RDDs.  That implementation came at a cost of subverting the RDD lazy transform model; it forced the computation of one or more input RDD partitions at call time instead of deferring partition computation, and so behaved more like a Spark action than a transform.
 

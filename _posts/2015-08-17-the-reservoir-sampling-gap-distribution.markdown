@@ -3,7 +3,7 @@ layout: post
 title: "The Reservoir Sampling Gap Distribution"
 date: 2015-08-17 07:35
 comments: true
-categories: [ computing, math, reservoir sampling, sampling, gap sampling, probability ]
+tags: [ computing, math, reservoir sampling, sampling, gap sampling, probability ]
 ---
 In a [previous post](http://erikerlandson.github.io/blog/2014/09/11/faster-random-samples-with-gap-sampling/), I showed that random Bernoulli and Poisson sampling could be made much faster by modeling the _sampling gap distribution_ - that is, directly drawing random samples from the distribution of how many elements would be skipped over between actual samples taken.
 

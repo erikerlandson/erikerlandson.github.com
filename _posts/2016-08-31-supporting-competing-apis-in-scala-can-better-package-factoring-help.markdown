@@ -3,7 +3,7 @@ layout: post
 title: "Supporting Competing APIs in Scala -- Can Better Package Factoring Help?"
 date: 2016-08-31 17:55
 comments: true
-categories: [ computing, API, packaging, scala ]
+tags: [ computing, API, packaging, scala ]
 ---
 
  On and off over the last year, I've been working on a [library](http://erikerlandson.github.io/blog/2015/09/26/a-library-of-binary-tree-algorithms-as-mixable-scala-traits/) of tree and map classes in Scala that happen to make use of some algebraic structures (mostly monoids or related concepts).

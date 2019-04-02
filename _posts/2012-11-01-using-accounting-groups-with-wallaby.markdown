@@ -3,7 +3,7 @@ layout: post
 title: "Using Accounting Groups With Wallaby"
 date: 2012-11-01 07:41
 comments: true
-categories: [ computing, htcondor, condor, accounting groups, wallaby ]
+tags: [ computing, htcondor, condor, accounting groups, wallaby ]
 ---
 In this post I will describe how to use HTCondor accounting groups with [Wallaby](http://getwallaby.com).  I will begin by walking through an accounting group configuration on a pool managed by wallaby.  Following, I will demonstrate the configuration in action.
 

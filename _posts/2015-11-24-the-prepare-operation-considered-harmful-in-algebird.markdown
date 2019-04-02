@@ -3,7 +3,7 @@ layout: post
 title: "The 'prepare' operation considered harmful in Algebird aggregation"
 date: 2015-11-24 16:32
 comments: true
-categories: [ computing, scala, algebird, monoid, performance, algebra ]
+tags: [ computing, scala, algebird, monoid, performance, algebra ]
 ---
 I want to make an argument that the Algebird [Aggregator](http://twitter.github.io/algebird/#com.twitter.algebird.Aggregator) design, in particular its use of the `prepare` operation in a map-reduce context, has substantial inefficiencies, compared to an equivalent formulation that is more directly suited to taking advantage of Scala's [aggregate method on collections](http://www.scala-lang.org/api/current/index.html#scala.collection.Seq) method.
 
