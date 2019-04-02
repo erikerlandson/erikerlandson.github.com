@@ -15,61 +15,83 @@ I took a Monte Carlo approach to this study because a tractable theoretical fram
 ### Modulus and Variance
 Consider what happens to a random variable's modulus as its variance increases.  This sequence of plots shows that the modulus of a normal distribution tends toward a uniform distribution over the modulus interval, as the underlying variance increases:
 
-|  |  |
-| :---: | :---: |
-|  <img src="/assets/images/rv_mod_study/normal_0.20.png" width="375" height="375">  |  <img src="/assets/images/rv_mod_study/normal_0.30.png" width="375" height="375">  |
-|  <img src="/assets/images/rv_mod_study/normal_0.40.png" width="375" height="375">  |  <img src="/assets/images/rv_mod_study/normal_0.50.png" width="375" height="375">  |
-<br>
-
+<table>
+  <tr>
+    <td> <img src="/assets/images/rv_mod_study/normal_0.20.png" width="375" height="375"> </td>
+    <td> <img src="/assets/images/rv_mod_study/normal_0.30.png" width="375" height="375"> </td>
+  </tr>
+  <tr>
+    <td> <img src="/assets/images/rv_mod_study/normal_0.40.png" width="375" height="375"> </td>
+    <td> <img src="/assets/images/rv_mod_study/normal_0.50.png" width="375" height="375"> </td>
+  </tr>
+</table>
 
 From the above plots, we can see that in the case of a normal distribution, its modulus tends toward uniform rather quickly - by the time the underlying variance is half of the modulus interval.
 
-
 The following plots demonstrate the same effect with a one-tailed distribution (the exponential) -- it requires a larger variance for the effect to manifest.
 
-
-|  |  |
-| :---: | :---: |
-|  <img src="/assets/images/rv_mod_study/exponential_01.png" width="375" height="375">  |  <img src="/assets/images/rv_mod_study/exponential_04.png" width="375" height="375">  |
-|  <img src="/assets/images/rv_mod_study/exponential_10.png" width="375" height="375">  |  <img src="/assets/images/rv_mod_study/exponential_20.png" width="375" height="375" %}  |
-<br>
-
+<table>
+  <tr>
+    <td> <img src="/assets/images/rv_mod_study/exponential_01.png" width="375" height="375"> </td>
+    <td> <img src="/assets/images/rv_mod_study/exponential_04.png" width="375" height="375"> </td>
+  </tr>
+  <tr>
+    <td> <img src="/assets/images/rv_mod_study/exponential_10.png" width="375" height="375"> </td>
+    <td> <img src="/assets/images/rv_mod_study/exponential_20.png" width="375" height="375"> </td>
+  </tr>
+</table>
 
 A third example, using a log-normal distribution.   The variance of the log-normal increases as a function of both \\( \\mu \\) and \\( \\sigma \\).  In this example \\( \\mu \\) is increased systematically, holding \\( \\sigma \\) constant at 1:
 
-
-|  |  |
-| :---: | :---: |
-|  <img src="/assets/images/rv_mod_study/lognormal_0.0_1.0.png" width="375" height="375">  |  <img src="/assets/images/rv_mod_study/lognormal_0.5_1.0.png" width="375" height="375">  |
-|  <img src="/assets/images/rv_mod_study/lognormal_1.0_1.0.png" width="375" height="375">  |  <img src="/assets/images/rv_mod_study/lognormal_2.0_1.0.png" width="375" height="375">  |
-<br>
-
+<table>
+  <tr>
+    <td> <img src="/assets/images/rv_mod_study/lognormal_0.0_1.0.png" width="375" height="375"> </td>
+    <td> <img src="/assets/images/rv_mod_study/lognormal_0.5_1.0.png" width="375" height="375"> </td>
+  </tr>
+  <tr>
+    <td> <img src="/assets/images/rv_mod_study/lognormal_1.0_1.0.png" width="375" height="375"> </td>
+    <td> <img src="/assets/images/rv_mod_study/lognormal_2.0_1.0.png" width="375" height="375"> </td>
+  </tr>
+</table>
 
 For a final examination of variance, I will again use log-normals and this time vary \\( \\sigma \\), while holding \\( \\mu \\) constant at 0.  Here we see that the effect of increasing the log-normal variance via \\( \\sigma \\) does _not_ follow the pattern in previous examples -- the distribution does not 'spread' and its modulus does not evolve toward a uniform distribution!
 
-|  |  |
-| :---: | :---: |
-|  <img src="/assets/images/rv_mod_study/lognormal_0.0_0.5.png width="375" height="375">  |  <img src="/assets/images/rv_mod_study/lognormal_0.0_1.0.png width="375" height="375">  |
-|  <img src="/assets/images/rv_mod_study/lognormal_0.0_1.5.png width="375" height="375">  |  <img src="/assets/images/rv_mod_study/lognormal_0.0_2.0.png width="375" height="375">  |
-<br>
-
+<table>
+  <tr>
+    <td> <img src="/assets/images/rv_mod_study/lognormal_0.0_0.5.png" width="375" height="375"> </td>
+    <td> <img src="/assets/images/rv_mod_study/lognormal_0.0_1.0.png" width="375" height="375"> </td>
+  </tr>
+  <tr>
+    <td> <img src="/assets/images/rv_mod_study/lognormal_0.0_1.5.png" width="375" height="375"> </td>
+    <td> <img src="/assets/images/rv_mod_study/lognormal_0.0_2.0.png" width="375" height="375"> </td>
+  </tr>
+</table>
 
 ### Modulus and Mean
 The following table of plots demonstrates the decreasing effect that a distribution's location (mean) has, as its spread increases and its modulus approaches uniformity.   In fact, we see that _any_ distribution in the 'uniform modulus' parameter region is indistinguishable from any other, with respect to its modulus -- all changes to mean or variance _within_ this region have no affect on the distribution's modulus!
 
-|  |  |  |
-| :---: | :---: | :---: |
-|  <img src="/assets/images/rv_mod_study/normal_0.0_0.3.png width="260" height="260">  |  <img src="/assets/images/rv_mod_study/normal_0.5_0.3.png width="260" height="260">  |  <img src="/assets/images/rv_mod_study/normal_1.0_0.3.png width="260" height="260">  |
-|  <img src="/assets/images/rv_mod_study/normal_0.0_0.4.png width="260" height="260">  |  <img src="/assets/images/rv_mod_study/normal_0.5_0.4.png width="260" height="260">  |  <img src="/assets/images/rv_mod_study/normal_1.0_0.4.png width="260" height="260">  |
-|  <img src="/assets/images/rv_mod_study/normal_0.0_0.5.png width="260" height="260">  |  <img src="/assets/images/rv_mod_study/normal_0.5_0.5.png width="260" height="260">  |  <img src="/assets/images/rv_mod_study/normal_1.0_0.5.png width="260" height="260">  |
-<br>
-
+<table>
+  <tr>
+    <td> <img src="/assets/images/rv_mod_study/normal_0.0_0.3.png" width="260" height="260"> </td>
+    <td> <img src="/assets/images/rv_mod_study/normal_0.5_0.3.png" width="260" height="260"> </td>
+    <td> <img src="/assets/images/rv_mod_study/normal_1.0_0.3.png" width="260" height="260"> </td>
+  </tr>
+  <tr>
+    <td> <img src="/assets/images/rv_mod_study/normal_0.0_0.4.png" width="260" height="260"> </td>
+    <td> <img src="/assets/images/rv_mod_study/normal_0.5_0.4.png" width="260" height="260"> </td>
+    <td> <img src="/assets/images/rv_mod_study/normal_1.0_0.4.png" width="260" height="260"> </td>
+  </tr>
+  <tr>
+    <td> <img src="/assets/images/rv_mod_study/normal_0.0_0.5.png" width="260" height="260"> </td>
+    <td> <img src="/assets/images/rv_mod_study/normal_0.5_0.5.png" width="260" height="260"> </td>
+    <td> <img src="/assets/images/rv_mod_study/normal_1.0_0.5.png" width="260" height="260"> </td>
+  </tr>
+</table>
 
 ### Conclusions
 Generally, as the spread of a distribution increases, its modulus tends toward a uniform distribution on the modulus interval.   Although it was tempting to state this in terms of increasing variance, we see from the 2nd log-normal experiment that variance can increase without increasing 'spread' in a way that causes the trend toward uniform modulus.   Currently, I'm not sure what the true invariant is, that properly distinguishes the 2nd log-normal scenario from the others.
 
 For any distribution that _does_ reside in the 'uniform-modulus' parameter space, we see that neither changes to location nor spread (nor even category of distribution) can be distinguished by the distribution modulus.
-
 
 ### Tools
 I used the following software widgets:
