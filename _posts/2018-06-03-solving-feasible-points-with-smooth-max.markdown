@@ -183,5 +183,5 @@ Happy Computing!
 
 ### References
 
-<a name="cite1"</a>
+<a name="cite1"></a>
 [1] §11.3 of _Convex Optimization_, Boyd and Vandenberghe, Cambridge University Press, 2008
