@@ -30,6 +30,14 @@ theme: minima
 plugins:
   - jekyll-feed
 
+# jekyll-compose
+# https://github.com/jekyll/jekyll-compose
+jekyll_compose:
+  draft_default_front_matter:
+    tags:
+  post_default_front_matter:
+    tags:
+
 # Exclude from processing.
 # The following items will not be processed, by default. Create a custom list
 # to override the default setting.
