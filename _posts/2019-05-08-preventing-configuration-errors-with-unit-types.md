@@ -5,7 +5,7 @@ date: 2019-05-09 12:16 -0700
 tags: [ computing, coulomb, units, unit analysis ]
 ---
 
-Anyone who has worked with software or IT ("dev" and "ops" in modern buzzword parlance)
+Anyone who has worked with software
 has almost certainly had the experience of tracking down a software or systems problem to
 discover that it was caused by an incorrectly configured parameter.
 Settings get misconfigured for a variety of reasons, but one recurring pattern of error is a
