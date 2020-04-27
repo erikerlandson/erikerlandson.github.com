@@ -6,7 +6,7 @@ tags: [ computing, unit analysis, scala, data types ]
 ---
 
 In my various experiences with socializing the idea that our software should make more use of unit analysis,
-I'm often met with some skepticism. The most commom form of "unit analysis skepticism" goes something like this:
+I'm often met with some skepticism. The most common form of "unit analysis skepticism" goes something like this:
 
 > "I can see how this might be useful for data involved with science or engineering,
 but the data most software applications use doesn't really have units."
