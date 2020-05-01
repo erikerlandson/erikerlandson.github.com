@@ -69,17 +69,23 @@ $$
 \end{aligned}
 $$
 
-Now is a good time to introduce two other special unit signature symbols.
-The symbol $$ \breve 1 $$ represents "unitless signature" - for example, when units cancel.
-The symbol $$ \breve \emptyset $$ represents the state "has no defined unit signature."
-The following examples illustrate their use:
+Now is a good time to introduce a special unit signature symbol.
+As discussed above, the unit signature of a sum of terms is not always defined.
+If the terms in the sum do not all share the same unit signature, then the
+signature of the sum _does not exist._
+The symbol $$ \breve \emptyset $$ represents this condition.
+The following example illustrates its use on a sum with mismatched units:
 
 $$
 \large
-\begin{aligned}
-\Upsilon \frac{x\ meter}{ y\ meter} &= \breve 1 \quad \text{unitless ratio} \\
-\Upsilon (x\ meter + y\ second)     &= \breve \emptyset \quad \text{no unit signature exists} \\
-\end{aligned}
+\Upsilon (x\ meter + y\ second) = \breve \emptyset \quad \text{no unit signature exists} \\
+$$
+
+The symbol $$ \breve 1 $$ represents a "unitless signature" - for example, when units cancel:
+
+$$
+\large
+\Upsilon \frac{x\ meter}{ y\ meter} = \breve 1 \quad \text{unitless ratio} \\
 $$
 
 A final basic law before moving on to linear algebra signatures.
