@@ -102,10 +102,29 @@ two expressions can have the same units, but otherwise be completely different!
 
 #### Unit Analysis of Vector Products
 
+The unit signature of a vector is just the vector of the signatures of its components:
+
 $$
 \large
 \Upsilon [ x_1 u_1, x_2 u_2, \dots , x_n u_n ] = [ u_1, u_2, \dots , u_n ]
 $$
+
+What about the unit signature of an inner product?
+As we saw above, not all sums have a defined unit signature.
+The signature of the following inner product doesn't exist:
+
+$$
+\large
+\begin{aligned}
+& \Upsilon([x\ meter, y\ second] \cdot [z\ meter, w\ second]) \\
+= & \Upsilon(x z\ meter^2 + y w\ second^2) \\
+= & \breve \emptyset \\
+\end{aligned}
+$$
+
+However, we can define conditions that describe when the inner product _does_ exist.
+When the unit signatures of each individual element product are all the same,
+then we can add them up to get a defined inner product signature:
 
 $$
 \large
@@ -116,6 +135,9 @@ $$
 \end{aligned}
 $$
 
+A useful special case of the above is the inner product of two vectors each having the same signature
+in all of their elements, again yielding a well defined inner product:
+
 $$
 \large
 \begin{aligned}
@@ -124,6 +146,25 @@ $$
 \Upsilon x \cdot y & = uv \\
 \end{aligned}
 $$
+
+The outer product of two vectors always has a well defined signature,
+since no sums of terms are involved.
+
+$$
+\large
+\begin{aligned}
+\text{given } \Upsilon x & = [u_1, u_2, \dots , u_n] \\
+\text{ and }  \Upsilon y & = [v_1, v_2, \dots , v_n] \text{, then:} \\
+\Upsilon(x \times y)     & = 
+\begin{bmatrix}
+u_1 v_1 & u_1 v_2 & \dots & u_1 v_n \\
+u_2 v_1 & u_2 v_2 & \dots & u_2 v_n \\
+\vdots & & \ddots \\
+u_n v_1 & u_n v_2 & \dots & u_n v_n \\
+\end{bmatrix} \\
+\end{aligned}
+$$
+
 
 #### Unit Analysis of Matrix Product
 
