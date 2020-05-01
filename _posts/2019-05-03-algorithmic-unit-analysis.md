@@ -33,8 +33,10 @@ $$
 Equally important, we wish to define the idea that units may _not_ be compatible.
 
 $$
-1 \ meter / second ^ 2  \text{ <incompatible> } 1 \ foot / second \\
-1 \ liter \text{ <incompatible> } 1 \ meter ^ 2
+\begin{aligned}
+1 \ meter / second ^ 2  & \neq 1 \ foot / second \\
+1 \ liter & \neq 1 \ meter ^ 2
+\end{aligned}
 $$
 
 It turns out that there is a straightforward and efficient way to define such an algorithmic unit analysis.
@@ -54,7 +56,7 @@ Unit expressions may be constructed from these atomic base units, inductively:
 
 $$
 \begin{aligned}
-& \bullet \text{The atom } \emptyset \text{ (unitless) is a unit expression. } \\
+& \bullet \text{The atom } \breve 1 \text{ (unitless) is a unit expression. } \\
 & \bullet \text{An atom } u \text{ is a unit expression whenever } base(u) \text{ is declared. } \\
 & \bullet \text{An atom } d \text{ is a unit expresion whenever } derived(d, e, c) \text{ is declared and } \\
 & \quad e \text{ is a unit expression and } c \text{ is a numeric value > 0.} \\
@@ -66,8 +68,8 @@ $$
 \end{aligned}
 $$
 
-In our constructions above, we introduced a special atom $$ \emptyset $$ represents a _unitless_ expression where all units have canceled.
-For example $$ meter / meter $$ is equivalent to $$ \emptyset $$.
+In our constructions above, we introduced a special atom $$ \breve 1 $$ that represents a _unitless_ expression where all units have canceled.
+For example $$ meter / meter $$ is equivalent to $$ \breve 1 $$.
 We also introduced the idea of a _derived unit_, where a named unit _d_ is declared as equivalent to $$ c e $$.
 For example we can use a derived unit to define a _liter_ as a unit of volume:
 $$ derived(liter, meter^3, 1/1000) $$.
@@ -82,7 +84,7 @@ The canonical form of a unit expression $$ e \triangleq canonical(e) $$ is recur
 
 $$
 \begin{aligned}
-canonical(\emptyset) & = 1 \times \emptyset \\
+canonical(\breve 1) & = 1 \times \breve 1 \\
 \text{given } base(u) \text{, } canonical(u) & = 1 \times u ^ 1 \\
 \text{given } derived(d, e, c) \text{, } canonical(d) & = c \times canonical(e) \\
 canonical(u \times v) & = canonical(u) \times canonical(v) \\
@@ -91,9 +93,9 @@ canonical(u ^ p) &= (canonical(u))^p
 \end{aligned}
 $$
 
-By convention, a canonical form of $$ c \times \emptyset $$ represents the unitless state where all other
+By convention, a canonical form of $$ c \times \breve 1 $$ represents the unitless state where all other
 powers of unit atoms have canceled out to zero, and so for example
-$$ canonical(meter / meter) = 1 \ \emptyset $$, and $$ canonical(\emptyset \times second) = 1 \ second^1 $$
+$$ canonical(meter / meter) = 1 \ \breve 1 $$, and $$ canonical(\breve 1 \times second) = 1 \ second^1 $$
 
 We are now in a position to define some algorithmic unit analysis!
 A fundamental question of unit analysis is whether two unit expressions are _convertable_,
@@ -103,7 +105,7 @@ Using the above definition of _canonical forms_, it is straightforward to captur
 $$
 \begin{aligned}
 & \text{Unit expressions } u \text{ and } v \text{ are convertable if and only if } \\
-& \frac{canonical(u)}{canonical(v)} = c \times \emptyset \text{, and if so then: } \\
+& \frac{canonical(u)}{canonical(v)} = c \times \breve 1 \text{, and if so then: } \\
 & 1 \ u = c \ v \ \ \text{ and } \ \ 1 \ v = u / c \\
 \end{aligned}
 $$
@@ -113,7 +115,7 @@ Allowing that we've declared $$ base(meter) $$, $$ base(second) $$ and $$ derive
 
 $$
 \frac{canonical(foot / second / second)}{canonical(meter / second^2)}
-= \frac{0.3048 \ meter^1 second^{-2}}{1 \ meter^1 second^{-2}} = 0.3048 \ \emptyset
+= \frac{0.3048 \ meter^1 second^{-2}}{1 \ meter^1 second^{-2}} = 0.3048 \ \breve 1
 $$
 
 and so the answer is yes!
@@ -123,7 +125,7 @@ Likewise, this algorithm can conclude when units are _not_ compatible:
 
 $$
 \frac{canonical(foot / second)}{canonical(meter / second^2)}
-= \frac{0.3048 \ meter^1 second^{-1}}{1 \ meter^1 second^{-2}} = 0.3048 \ second \text{ (incompatible)}
+= \frac{0.3048 \ meter^1 second^{-1}}{1 \ meter^1 second^{-2}} = 0.3048 \ second \text{ (incompatible!)}
 $$
 
 This approach to the question of unit convertability is very amenable for use in computing.
