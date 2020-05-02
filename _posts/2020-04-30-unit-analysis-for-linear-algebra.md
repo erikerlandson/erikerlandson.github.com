@@ -157,18 +157,65 @@ $$
 \text{ and }  \Upsilon y & = [v_1, v_2, \dots , v_n] \text{, then:} \\
 \Upsilon(x \times y)     & = 
 \begin{bmatrix}
-u_1 v_1 & u_1 v_2 & \dots & u_1 v_n \\
-u_2 v_1 & u_2 v_2 & \dots & u_2 v_n \\
-\vdots & & \ddots \\
-u_n v_1 & u_n v_2 & \dots & u_n v_n \\
+u_1 v_1 & \dots & u_1 v_n \\
+\vdots & \ddots \\
+u_n v_1 & \dots & u_n v_n \\
 \end{bmatrix} \\
 \end{aligned}
 $$
 
-
 #### Unit Analysis of Matrix Product
 
-to-do
+The unit signature of a matrix is the matrix of the signatures of its elements.
+
+$$
+\large
+\Upsilon
+\begin{bmatrix}
+x_{11} u_{11} & \dots & x_{1m} u_{1m} \\
+\vdots & \ddots \\
+x_{n1} u_{n1} & \dots & x_{nm} u_{nm} \\
+\end{bmatrix}
+= 
+\begin{bmatrix}
+u_{11} & \dots & u_{1m} \\
+\vdots & \ddots \\
+u_{n1} & \dots & u_{nm} \\
+\end{bmatrix}
+$$
+
+It is relatively easy to define the unit signature of a matrix product, _if it exists_.
+For a matrix $$ X $$ described by its row vectors,
+and a matrix $$ Y $$ described by its column vectors,
+$$ \Upsilon XY $$ can be defined as follows:
+
+$$
+\large
+\begin{aligned}
+\text{given } X &=
+\begin{bmatrix}
+r_1 \\
+\vdots \\
+r_n \\
+\end{bmatrix}
+\quad \text{ and } \quad Y =
+\begin{bmatrix}
+c_1 \dots c_m \\
+\end{bmatrix} \\
+\Upsilon XY &=
+\begin{bmatrix}
+\Upsilon r_1 \cdot c_1 & \dots & \Upsilon r_1 \cdot c_m \\
+\vdots & \ddots \\
+\Upsilon r_n \cdot c_1 & \dots & \Upsilon r_n \cdot c_m \\
+\end{bmatrix}
+\end{aligned}
+$$
+
+This unit signature only exists when _every_ pairwise inner product in the result also has a defined unit signature!
+If there exists any $$ i,j $$ where $$ \Upsilon r_i \cdot c_j = \breve \emptyset $$,
+then $$ \Upsilon XY = \breve \emptyset $$ as well.
+In the section above we saw that many pairs of vectors do not have a defined unit signature for their inner products.
+In general one must prove that any given pair of matrices have a product with a defined unit signature.
 
 #### Tabular Data Matrices
 
