@@ -221,8 +221,13 @@ we have to show it for any pair of matrices we're interested in.
 
 #### Tabular Data Matrices
 
-Consider tabular data.
-Each column has a unit type.
+In the previous section we saw that $$ \Upsilon XY $$ is not guaranteed to exist.
+Can we characterize interesting sets of matrices whose product _does_ have a unit signature?
+
+Consider a matrix that represents tabular data.
+Matrices like this are widely used in computing.
+In a tabular data matrix, each row represents a data vector, and each vector component may have its own unit.
+The unit signature of a tabular data matrix looks like this:
 
 $$
 \large
@@ -235,6 +240,17 @@ u_1 & u_2 & \dots & u_m \\
 \end{bmatrix}
 $$
 
+Each matrix column represents one kind of data element with its own unit.
+As we can see above, the column vectors of this matrix have homogeneous units:
+the unit signature of the jth column looks like $$ [ u_j, u_j, \dots u_j] $$.
+
+One very common matrix operation in data science is to take a tabular matrix
+and multiply it by its transpose: $$ X^T X $$.
+This product is given by the pairwise inner products of the column vectors of X.
+But each column vector has homogeneous units,
+and so we know that all of these inner products have a unit signature, and that
+in turn gives us the product signature:
+
 $$
 \large
 \Upsilon X^TX =
@@ -245,6 +261,9 @@ u_1 u_2 & u_2 ^ 2 & \dots & u_2 u_m \\
 u_1 u_m & u_2 u_m  & \dots & u_m ^ 2 \\
 \end{bmatrix}
 $$
+
+So tabular data matrices and their "self-products" of the form $$ X^T X $$
+are one useful class of matrix product that has a well defined unit signature.
 
 #### Unit Analysis of Matrix Inverse
 
