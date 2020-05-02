@@ -207,15 +207,17 @@ c_1 \dots c_m \\
 \Upsilon r_1 \cdot c_1 & \dots & \Upsilon r_1 \cdot c_m \\
 \vdots & \ddots \\
 \Upsilon r_n \cdot c_1 & \dots & \Upsilon r_n \cdot c_m \\
-\end{bmatrix}
+\end{bmatrix} \\
+\text{iff } & \Upsilon r_i \cdot c_j \neq \breve \emptyset \ \forall r_i,r_j
 \end{aligned}
 $$
 
-This unit signature only exists when _every_ pairwise inner product in the result also has a defined unit signature!
+This unit signature only exists when _every_ pairwise inner product in the result also has a defined unit signature.
 If there exists any $$ i,j $$ where $$ \Upsilon r_i \cdot c_j = \breve \emptyset $$,
 then $$ \Upsilon XY = \breve \emptyset $$ as well.
 In the section above we saw that many pairs of vectors do not have a defined unit signature for their inner products.
-In general one must prove that any given pair of matrices have a product with a defined unit signature.
+As with the inner product, we cannot assume that the unit signature of a matrix product exists:
+we have to show it for any pair of matrices we're interested in.
 
 #### Tabular Data Matrices
 
