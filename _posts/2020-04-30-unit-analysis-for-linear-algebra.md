@@ -352,7 +352,7 @@ $$
 
 We know that (1) must be true since it is a necessary condition for the signature to be defined.
 The equalities in (2) are a consequence of the law for the sum of signatures,
-and (3) is simply solving each equation from (2) for $$ \Upsilon M_{ij} $$.
+and (3) is simply solving each equation from (2) for $$ \Upsilon M_{ij} \ \ \square $$
 
 One immediate consequence of the equations in (3) is that whenever $$ \Upsilon \det X $$ exists,
 we can apply them to get all of the elements of the adjoint $$ \Upsilon \text{adj}X $$.
@@ -375,13 +375,13 @@ $$
 $$
 
 Now consider an $$ n \times n $$ matrix X, where we know $$ \Upsilon \det X $$ exists.
-From (3) above, we know we may write:
+From equation (2) above, we know we may write:
 
 $$
 \begin{aligned}
-\Upsilon \det X &= u_{nn} \Upsilon M_{nn} \text{ (eqn (3) about n,n)} \\
+\Upsilon \det X &= u_{nn} \Upsilon M_{nn} \text{ (eqn (2) about n,n)} \\
                 &= u_{nn} (u_{11} u_{22} \dots u_{n-1 n-1}) \text{ (defn of minor & inductive step) } \\
-                &= u_{11} u_{22} \dots u_{nn} \\ 
+                &= u_{11} u_{22} \dots u_{nn} \ \ \square \\
 \end{aligned}
 $$
 
