@@ -354,8 +354,37 @@ We know that (1) must be true since it is a necessary condition for the signatur
 The equalities in (2) are a consequence of the law for the sum of signatures,
 and (3) is simply solving each equation from (2) for $$ \Upsilon M_{ij} $$.
 
-One immediate consequence of the above is that whenever $$ \Upsilon \det X $$ exists,
-we can apply (3) to get all of the elements of the adjoint $$ \Upsilon \text{adj}X $$.
+One immediate consequence of the equations in (3) is that whenever $$ \Upsilon \det X $$ exists,
+we can apply them to get all of the elements of the adjoint $$ \Upsilon \text{adj}X $$.
+
+Another important consequence of the relations above is that we can use them to prove the following
+formula:
+
+$$
+\begin{aligned}
+& \text{If } \ \Upsilon \det X \ \text{ exists, then it is the product of the diagonal units of } \Upsilon X:\\
+& \Upsilon \det X = u_{11} u_{22} ... u_{nn} \\
+\end{aligned}
+$$
+
+We can prove this by induction.
+The 1x1 basis case is simply:
+
+$$
+\Upsilon \det [x_{11} u_{11}] = \Upsilon x_{11} u_{11} = u_{11}
+$$
+
+Now consider an $$ n \times n $$ matrix X, where we know $$ \Upsilon \det X $$ exists.
+From (3) above, we know we may write:
+
+$$
+\begin{aligned}
+\Upsilon \det X &= u_{nn} \Upsilon M_{nn} \text{ (eqn (3) about n,n)} \\
+                &= u_{nn} (u_{11} u_{22} \dots u_{n-1 n-1}) \text{ (defn of minor & inductive step) } \\
+                &= u_{11} u_{22} \dots u_{nn} \\ 
+\end{aligned}
+$$
+
 
 #### Unit Signature of $$ (X^T X)^{-1} $$
 
