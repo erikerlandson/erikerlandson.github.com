@@ -31,7 +31,7 @@ $$
 In the following sections, I will develop properties of the $$ \Upsilon $$ operator and use them
 to derive formulas for the unit signatures of basic vector and matrix operations.
 
-#### Basic Unit Analysis Identities
+#### Basic Unit Signature Identities
 
 A word on notation.
 To help make it clear when I'm talking about units,
@@ -100,7 +100,7 @@ This law is useful for proving some theorems about unit signatures.
 Notice that the converse is definitely not true -
 two expressions can have the same units, but otherwise be completely different!
 
-#### Unit Analysis of Vector Products
+#### Unit Signature of Vector Products
 
 The unit signature of a vector is just the vector of the signatures of its components:
 
@@ -164,7 +164,7 @@ u_n v_1 & \dots & u_n v_n \\
 \end{aligned}
 $$
 
-#### Unit Analysis of Matrix Product
+#### Unit Signature of Matrix Products
 
 The unit signature of a matrix is the matrix of the signatures of its elements.
 
@@ -265,10 +265,98 @@ $$
 So tabular data matrices and their "self-products" of the form $$ X^T X $$
 are one useful class of matrix product that has a well defined unit signature.
 
-#### Unit Analysis of Matrix Inverse
+We can generalize the unit signature of $$ X^T X $$ a little bit,
+to get a unit signature for a left matrix with rows having homogeneous units and
+a right matrix with columns having homogeneous units:
 
-to-do
+$$
+\large
+\begin{aligned}
+\text{given } \Upsilon X &=
+\begin{bmatrix}
+  u_1 & \dots & u_1 \\
+  \vdots & \ddots \\
+  u_n & \dots & u_n \\
+\end{bmatrix}
+\quad \text{ and } \quad \Upsilon Y =
+\begin{bmatrix}
+  v_1 & \dots & v_m \\
+  \vdots & \ddots \\
+  v_1 & \dots & v_m \\
+\end{bmatrix} \\
+\Upsilon XY &=
+\begin{bmatrix}
+  u_1 v_1 & \dots & u_1 v_m \\
+  \vdots & \ddots \\
+  u_n v_1 & \dots & u_n v_m \\
+\end{bmatrix}
+\end{aligned}
+$$
 
-#### Unit Analysis of $$ (X^T X)^{-1} $$
+#### Unit Signature of Matrix Determinant
+
+As we have seen with other vector and matrix operations,
+the unit sigature of a matrix determinant isn't guaranteed to exist.
+For example, the determinant of the following matrix has no unit signature:
+
+$$
+\begin{aligned}
+\Upsilon \det
+\begin{bmatrix}
+a\ meter & b\ kilogram \\
+c\ second & d\ mole \\
+\end{bmatrix}
+= \Upsilon (a\ meter\ d\ mole - b\ kilogram\ c\ second)
+= \breve \emptyset
+\end{aligned}
+$$
+
+However, there are concrete things we can say about when a matrix determinant does exist,
+and some consequences.
+
+Recall the
+[Laplace formula](https://en.wikipedia.org/wiki/Minor_(linear_algebra)#Cofactor_expansion_of_the_determinant)
+(aka the minors / cofactors rule) for a matrix determinant.
+We can expand this formula along any row or column.
+Here is the formula for $$ \det X $$ expanded about some row i:
+
+$$
+\begin{aligned}
+\det X &= x_{i1} C_{i1} + \dots + x_{in} C_{in} \\
+       &= x_{i1} (-1)^{i+1} M_{i1} + \dots + x_{in} (-1)^{i+n} M_{in}
+\end{aligned}
+$$
+
+$$ M_{i,j} $$ is the "minor of X" about row i and column j:
+the determinant of the $$ (n-1)\times(n-1) $$ matrix resulting from removing the ith row and jth column
+from X.
+
+We can apply the laws of unit signatures to the formula for $$ \det X $$,
+and conclude the following useful and possibly surprising facts about $$ \Upsilon \det X $$:
+
+$$
+\begin{aligned}
+& \text{If } \ \Upsilon \det X \ \text{ exists, then by definition:} \\
+& \text{For any row i of X: } \ 
+  \Upsilon \det X = \Upsilon (x_{i1} (-1)^{i+1} M_{i1} + \dots + x_{in} (-1)^{i+n} M_{in}) \\
+& \text{and therefore the following must all hold:} \\
+& \text{(1)} \quad
+  \forall i,j \quad \Upsilon M_{ij} \neq \breve \emptyset \\
+& \text{(2)} \quad
+  \forall i \quad
+  \Upsilon \det X \ = \ u_{i1} \Upsilon M_{i1} \ = \ \dots \ = \ u_{in} \Upsilon M_{in} \\
+& \text{(3)} \quad
+  \forall i,j \quad \Upsilon M_{ij} = \frac{\Upsilon \det X}{u_{ij}}
+\end{aligned}
+$$
+
+We know that (1) must be true since it is a necessary condition for the signature to be defined.
+The equalities in (2) are a consequence of the law for the sum of signatures,
+and (3) is simply solving each equation from (2) for $$ \Upsilon M_{ij} $$.
+
+One immediate consequence of the above is that whenever $$ \Upsilon \det X $$ exists,
+we can apply (3) to get all of the elements of the adjoint $$ \Upsilon \text{adj}X $$.
+
+#### Unit Signature of $$ (X^T X)^{-1} $$
 
 to-do
