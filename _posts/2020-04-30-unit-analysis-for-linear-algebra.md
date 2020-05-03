@@ -265,6 +265,8 @@ $$
 So tabular data matrices and their "self-products" of the form $$ X^T X $$
 are one useful class of matrix product that has a well defined unit signature.
 
+#### Generalized Tabular Product
+
 We can generalize the unit signature of $$ X^T X $$ a little bit,
 to get a unit signature for a left matrix with rows having homogeneous units and
 a right matrix with columns having homogeneous units:
@@ -272,7 +274,7 @@ a right matrix with columns having homogeneous units:
 $$
 \large
 \begin{aligned}
-\text{given } \Upsilon X &=
+\text{given } \Upsilon X^T &=
 \begin{bmatrix}
   u_1 & \dots & u_1 \\
   \vdots & \ddots \\
@@ -284,7 +286,7 @@ $$
   \vdots & \ddots \\
   v_1 & \dots & v_m \\
 \end{bmatrix} \\
-\Upsilon XY &=
+\Upsilon X^T Y &=
 \begin{bmatrix}
   u_1 v_1 & \dots & u_1 v_m \\
   \vdots & \ddots \\
@@ -292,6 +294,12 @@ $$
 \end{bmatrix}
 \end{aligned}
 $$
+
+The matrices X and Y above are tabular matrices, as in the previous section,
+each having the same number of rows, but X has been transposed, and has
+different units in its columns than Y.
+For lack of a better term, I'll refer to this kind of product as a "generalized tabular product."
+The product $$ X^T X $$ from the previous section just a special case of the tabular product.
 
 #### Unit Signature of Matrix Determinant
 
@@ -385,7 +393,14 @@ $$
 \end{aligned}
 $$
 
+#### The Determinant of a Tabular Product
 
-#### Unit Signature of $$ (X^T X)^{-1} $$
+The results from the previous section mostly assume that $$ \Upsilon \det X $$ exists.
+We've seen that this unit signature is not guaranteed to exist.
+Are there any interesting classes of matrix whose determinant has a unit signature?
+
+Recall the [tabular product](#generalized-tabular-product) from earlier.
+
+#### Unit Signature of a Tabular Inverse $$ (X^T Y)^{-1} $$
 
 to-do
