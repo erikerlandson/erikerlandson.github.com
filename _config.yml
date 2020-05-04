@@ -32,6 +32,9 @@ plugins:
 
 # jekyll-compose
 # https://github.com/jekyll/jekyll-compose
+# bundle exec jekyll help
+# bundle exec jekyll post "post title"
+# bundle exec jekyll serve
 jekyll_compose:
   draft_default_front_matter:
     tags:
