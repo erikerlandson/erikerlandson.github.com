@@ -400,6 +400,80 @@ We've seen that this unit signature is not guaranteed to exist.
 Are there any interesting classes of matrix whose determinant has a unit signature?
 
 Recall the [tabular product](#generalized-tabular-product) from earlier.
+We are interested in square matrices of this form, as square matrices have determinants.
+Such a matrix has a unit signature that looks like:
+
+$$
+\large
+\Upsilon X^T Y =
+\begin{bmatrix}
+  u_1 v_1 & \dots & u_1 v_n \\
+  \vdots & \ddots \\
+  u_n v_1 & \dots & u_n v_n \\
+\end{bmatrix}
+$$
+
+Its unit signature can also be written as the outer product
+$$ [u_1 \dots u_n] \times [v_1 \dots v_n] $$.
+
+We wish to show that $$ \Upsilon \det X^T Y $$ exists,
+and therefore that
+
+$$
+\large
+\begin{aligned}
+\Upsilon \det X^T Y &= u_1 v_1 \ u_2 v_2 \dots u_n v_n \\
+                    &= u_1 u_2 \dots u_n \ v_1 v_2 \dots v_n \\
+\end{aligned}
+$$
+
+We can prove this by induction.
+The basis 1x1 basis case is
+
+$$
+\large
+\Upsilon \det [x_{11} u_{11} y_{11} v_{11}]
+= \Upsilon x_{11} y_{11} u_{11} v_{11}
+= u_{11} v_{11}
+$$
+
+Now consider the case of an $$ n \times n $$ matrix, and any one of its minors $$ M_{ij} $$.
+By the definition of a minor, its corresponding matrix is $$ X^T Y $$ with the ith row and jth column removed.
+Considering this, we can see that its unit signature looks like the outer product
+
+$$
+[u_1 \dots u_{i-1}, u_{i+1} \dots u_n ] \times [v_1 \dots v_{j-1}, v_{j+1} \dots v_n ]
+$$
+
+However, this is equivalent, up to variable renaming, with
+
+$$
+[u_1 \dots u_{n-1} ] \times [v_1 \dots v_{n-1} ]
+$$
+
+and so by induction we know that $$ \Upsilon M_{i,j} $$ exists,
+and furthermore from our earlier theorem we know its value:
+
+$$
+\large
+\begin{aligned}
+\Upsilon M_{i,j}
+&= u_1 u_2 \dots u_{i-1} u_{i+1} \dots u_n \ v_1 v_2 \dots v_{j-1} v_{j+1} \dots v_n \\
+&= \frac{u_1 \dots u_n \ v_1 \dots v_n}{u_i v_j} \\
+\end{aligned}
+$$
+
+We have now shown that $$ \Upsilon M_{i,j} $$ exists for all $$ i,j $$ and satisfies
+equations (2) from our theorem in the previous section.
+Therefore,
+
+$$
+\large
+\begin{aligned}
+& \Upsilon \det X^T Y = u_1 v_1 \ u_2 v_2 \dots u_n v_n \quad \text{and} \\
+& \forall i,j \quad \Upsilon M_{i,j} = \frac{\Upsilon \det X^T Y}{u_i v_j} \quad \square \\
+\end{aligned}
+$$
 
 #### Unit Signature of a Tabular Inverse $$ (X^T Y)^{-1} $$
 
