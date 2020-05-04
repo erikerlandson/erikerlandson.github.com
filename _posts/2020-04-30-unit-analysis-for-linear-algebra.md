@@ -89,12 +89,25 @@ $$
 $$
 
 A final basic law before moving on to linear algebra signatures.
-If two expressions are equal, then their unit signatures are also equal:
+If two expressions are equal, and reduced to
+[canonical form](http://erikerlandson.github.io/blog/2019/05/03/algorithmic-unit-analysis/),
+then their unit signatures are also equal:
 
 $$
 \large
 xu = yv \implies \Upsilon xu = \Upsilon yv \implies u = v
 $$
+
+In the sections that follow, I will be implicitly assuming (without loss of generality)
+that units are in canonical form, to avoid the kind of confusion caused by
+convertable unit expressions, such as:
+
+$$
+\large
+1 \ kilometer = 1000 \ meter \implies kilometer = meter \quad \text{(confusion!)}
+$$
+
+Alternatively, the reader may also imagine $$ \Upsilon $$ as yielding all unit signatures in canonical form.
 
 This law is useful for proving some theorems about unit signatures.
 Notice that the converse is definitely not true -
