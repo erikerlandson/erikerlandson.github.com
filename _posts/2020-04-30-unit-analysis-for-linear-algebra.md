@@ -69,6 +69,13 @@ $$
 \end{aligned}
 $$
 
+Note that this law is only defined over a sum of terms having _identical_ units (u).
+It is possible to consider the sum of units which are not identical, but are
+[convertable](http://erikerlandson.github.io/blog/2019/05/03/algorithmic-unit-analysis/),
+for example $$ 1\ mile + 1\ kilometer $$.
+However the unit analysis I will be developing in this post ignores considerations of convertability.
+Units are either identical, or they are not.
+
 Now is a good time to introduce a special unit signature symbol.
 As discussed above, the unit signature of a sum of terms is not always defined.
 If the terms in the sum do not all share the same unit signature, then the
@@ -87,31 +94,6 @@ $$
 \large
 \Upsilon \frac{x\ meter}{ y\ meter} = \breve 1 \quad \text{unitless ratio} \\
 $$
-
-A final basic law before moving on to linear algebra signatures.
-If two expressions are equal, and reduced to
-[canonical form](http://erikerlandson.github.io/blog/2019/05/03/algorithmic-unit-analysis/),
-then their unit signatures are also equal:
-
-$$
-\large
-xu = yv \implies \Upsilon xu = \Upsilon yv \implies u = v
-$$
-
-In the sections that follow, I will be implicitly assuming (without loss of generality)
-that units are in canonical form, to avoid the kind of confusion caused by
-convertable unit expressions, such as:
-
-$$
-\large
-1 \ kilometer = 1000 \ meter \implies kilometer = meter \quad \text{(confusion!)}
-$$
-
-Alternatively, the reader may also imagine $$ \Upsilon $$ as yielding all unit signatures in canonical form.
-
-This law is useful for proving some theorems about unit signatures.
-Notice that the converse is definitely not true -
-two expressions can have the same units, but otherwise be completely different!
 
 #### Unit Signature of Vector Products
 
