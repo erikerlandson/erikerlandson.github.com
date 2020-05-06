@@ -490,7 +490,7 @@ $$
 \Upsilon (X^T Y)^{-1}
 &= \left[ \frac{\Upsilon M_{ji}}{\Upsilon \det X^T Y} \right] \quad \forall i,j \\
 &= \left[ \frac{\left( \frac{\Upsilon \det X^T Y}{u_j v_i} \right) }{\Upsilon \det X^T Y} \right] \quad \forall i,j \\
-&= \left[ u_j^{-1} v_i^{-1} \right]  \quad \forall i,j
+&= \left[ (u_j v_i)^{-1} \right]  \quad \forall i,j
 \end{aligned}
 $$
 
@@ -501,10 +501,10 @@ $$
 \Upsilon (X^T Y)^{-1}
 =
 \begin{bmatrix}
-  u_1^{-1}v_1^{-1} & u_2^{-1} v_1^{-1} & \dots  & u_n^{-1} v_1^{-1} \\
-  u_1^{-1}v_2^{-1} & u_2^{-1} v_2^{-1} & \dots  & u_n^{-1} v_2^{-1} \\
-  \vdots           &                   & \ddots & \\
-  u_1^{-1}v_n^{-1} & u_2^{-1} v_n^{-1} & \dots  & u_n^{-1} v_n^{-1} \\  
+  (u_1 v_1)^{-1} & (u_2 v_1)^{-1} & \dots  & (u_n v_1)^{-1} \\
+  (u_1 v_2)^{-1} & (u_2 v_2)^{-1} & \dots  & (u_n v_2)^{-1} \\
+  \vdots         &                & \ddots & \\
+  (u_1 v_n)^{-1} & (u_2 v_n)^{-1} & \dots  & (u_n v_n)^{-1} \\  
 \end{bmatrix}
 $$
 
