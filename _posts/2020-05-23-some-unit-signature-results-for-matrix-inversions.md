@@ -81,8 +81,8 @@ $$
 \end{aligned}
 $$
 
-Some interesting things are evident in these unit signatures.
-Only the units from the columns of $$ X $$ are present in the first product,
+Some observations about the products above:
+Firstly, only the units from the columns of $$ X $$ are present in the first product,
 and similarly only units from $$ Y $$ appear in the second.
 So, while in traditional matrix algebra these products are both equal (to $$ I_n $$)
 their unit signatures are completely different!
@@ -93,7 +93,7 @@ their diagonals are unitless.
 This is intuitively pleasing, since these are signatures for identity matrices.
 
 However, the signatures off the diagonals are clearly _not_ unitless.
-Numerically, these elements are all zero, since these represent some identity matrix.
+Numerically, these off-diagonal elements are all zero, since these represent an identity matrix.
 Yet in general $$ I_n $$ has a defined and non-unitless signature!
 
 #### Products with Tabular Identity Matrices
