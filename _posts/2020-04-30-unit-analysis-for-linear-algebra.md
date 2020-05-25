@@ -248,12 +248,12 @@ in turn gives us the product signature:
 
 $$
 \large
-\Upsilon X^TX =
+\Upsilon X^T X =
 \begin{bmatrix}
-u_1 ^ 2 & u_1 u_2 & \dots & u_1 u_m \\
-u_1 u_2 & u_2 ^ 2 & \dots & u_2 u_m \\
+u_1 u_1 & u_1 u_2 & \dots & u_1 u_m \\
+u_2 u_1 & u_2 u_2 & \dots & u_2 u_m \\
 \vdots & & \ddots \\
-u_1 u_m & u_2 u_m  & \dots & u_m ^ 2 \\
+u_m u_1 & u_m u_2 & \dots & u_m u_m \\
 \end{bmatrix}
 $$
 
