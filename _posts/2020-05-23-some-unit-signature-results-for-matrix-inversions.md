@@ -33,9 +33,9 @@ $$
 \end{bmatrix}
 \quad \text{ and } \quad \Upsilon Y =
 \begin{bmatrix}
-  v_1 & \dots & v_m \\
+  v_1 & \dots & v_n \\
   \vdots & \ddots \\
-  v_1 & \dots & v_m \\
+  v_1 & \dots & v_n \\
 \end{bmatrix} \\
 \Upsilon X^T Y &=
 \begin{bmatrix}
