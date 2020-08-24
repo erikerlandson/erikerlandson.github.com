@@ -185,7 +185,7 @@ where lower-level automatic optimizations can actually make algorithm developmen
 From a user perspective, performance features like hardware branch prediction are nothing but up-side:
 if these features can take advantage of certain execution or data patterns to make your code run faster,
 then life is good!
-On the other hand, when you are _developing_ an algorithm, these kinds of pattern-dependent optimization can
+On the other hand, when you are _developing_ an algorithm, these kinds of pattern-dependent optimizations can
 skew your intuitions about what is really happening in your code, and what kinds of algorithmic choices you are making.
 My benchmark results _might_ have caused me to draw incorrect conclusions about the behavior of my algorithm,
 had I taken them at face value, without drilling down to fully understand how the hardware was
