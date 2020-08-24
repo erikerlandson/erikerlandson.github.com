@@ -163,21 +163,33 @@ res1: Array[(Double, Unit)] = Array((0.057,()), (0.054,()), (0.059,()), (0.054,(
 I found these results fascinating, and not just because they provided some hard evidence that what I'm seeing is an effect of branch prediction rates on ordered versus unordered data.
 Although the error rate is 100x larger for unsorted data, in absolute terms _it is not very large_.
 Even on unordered inputs, the branch predictors are guessing right well over 90% of the time!
-While discussing these results with Will, he mentioned that the cost of a branch prediction error is quite high,
-and can easily exceed 100 cycles or more.
+While discussing these results with Will, he mentioned that the cost of a branch prediction error is quite high:
+the CPU's instruction pipeline must be flushed, and the total delay will end up being 100 cycles or worse.
 I had never really thought through the math on branch prediction costs,
 and this experiment was a concrete lesson in how critical good branch prediction is for modern hardware performance.
 
 It has also caused me to reconsider how I think about the "cost" of if/then tests in code.
-I habitually think about how much a boolean clause costs at the logical level,
+I habitually think about how much a boolean clause costs to compute at the logical level,
 but this experience has made it clear that the performance hit from branch prediction errors can easily dominate any "real" computation costs.
+In this sense, the cost of an if/then test should arguably be measured in terms of how hard it is to predict,
+instead of what it costs to compute the actual test value.
 
-An equally interesting implication is that _any_ if/then code is an opportunity for branch prediction failures,
-and corresponding performance hits!
+An equally interesting implication is that _any_ if/then statement in our code might be viewed as an opportunity for branch prediction failures.
 My title for this post - "branch prediction considered harmful" - is tongue in cheek,
 but when considering different possible algorithm optimizations and variations,
-completely _avoiding_ if/then tests in performance critical code altogether can clearly have a high payoff!
-You can't take a branch performance hit if you aren't branching!
+completely _avoiding_ if/then tests in performance critical code can clearly have a high payoff:
+You can't take a branch-prediction performance hit if you aren't branching!
+
+A final observation: this episode is reminiscent of some other situations I've encountered over my career,
+where lower-level automatic optimizations can actually make algorithm development _harder_.
+From a user perspective, performance features like hardware branch prediction are nothing but up-side:
+if these features can take advantage of certain execution or data patterns to make your code run faster,
+then life is good!
+On the other hand, when you are _developing_ an algorithm, these kinds of pattern-dependent optimization can
+skew your intuitions about what is really happening in your code, and what kinds of algorithmic choices you are making.
+My benchmark results _might_ have caused me to draw incorrect conclusions about the behavior of my algorithm,
+had I taken them at face value, without drilling down to fully understand how the hardware was
+influencing my performance.
 
 In the future I will definitely have increased respect for the importance of branch prediction, and
 I'll be keeping `perf` in mind for testing the impacts of my algorithm micro optimizations!
