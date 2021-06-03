@@ -30,6 +30,18 @@ theme: minima
 plugins:
   - jekyll-feed
 
+# installation:
+# $ sudo dnf install ruby ruby-devel
+# $ sudo dnf install @development-tools
+# $ sudo dnf install @rpm-development-tools
+
+# configure bundling dir
+# $ cd /path/to/toolmonkey
+# $ rm -rf .bundle vendor
+# possibly also rm Gemfile.lock?
+# $ bundle config set path 'vendor/bundle'
+# $ bundle install
+
 # jekyll-compose
 # https://github.com/jekyll/jekyll-compose
 # bundle exec jekyll help
