@@ -25,7 +25,10 @@ In this post I will use an alternative representation of unit signatures that I 
 Given a
 [tabular matrix](https://erikerlandson.github.io/blog/2020/05/01/unit-analysis-for-linear-algebra/#tabular-data-matrices)
 $$ X $$, we can write $$ X $$ as a "unit factorization" of a unitless matrix
-$$ \overset{1}{X} $$ and a signature matrix $$ \overset{\Upsilon}{X} $$:
+$$ \overset{1}{X} $$ and a signature matrix $$ \overset{\Upsilon}{X} $$.
+Both $$ X $$ and $$ \overset{1}{X} $$ are $$ n \times m $$ matrices, where $$ n >= m $$,
+and the signature matrix $$ \overset{\Upsilon}{X} $$ is a diagonal $$ m \times m $$ matrix.
+The definition of this unit factorization is as follows:
 
 $$
 \text{Given a tabular matrix X where} \\
@@ -117,11 +120,22 @@ z_{m1} {u_m}^{-1} & z_{m2} {u_m}^{-1} & \dots & z_{mm} {u_m}^{-1} \\
 \text{} \\
 \text{and so the unit signature} \quad \Upsilon X^{-1} =
 \begin{bmatrix}
-{u_1}^{-1} & {u_1}^{-1} & \dots & {u_1}^{-1} \\
-{u_2}^{-1} & {u_2}^{-1} & \dots & {u_2}^{-1} \\
-\vdots & & \ddots \\
-{u_m}^{-1} & {u_m}^{-1} & \dots & {u_m}^{-1} \\
+\dots & {u_1}^{-1} & \dots \\
+\dots & {u_2}^{-1} & \dots \\
+ & \vdots & \\
+\dots & {u_m}^{-1} & \dots \\
 \end{bmatrix}
+$$
+
+Applying the definitions above, we can see that:
+
+$$
+\begin{aligned}
+& \quad X^{-1} X \\
+= & \quad {\overset{\Upsilon}{X}}^{-1} \quad {\overset{1}{X}}^{-1} \overset{1}{X} \quad \overset{\Upsilon}{X} \\
+= & \quad diag(1/u_1 \dots 1/u_m) \quad I_{m \times m} \quad diag(u_1 \dots u_m) \\
+= & \quad I_{m \times m} \\
+\end{aligned}
 $$
 
 From the above derivation I will also note that in general when we multiply by a signature matrix
@@ -149,3 +163,60 @@ u_1 & u_2 & \dots & u_m \\
 \end{aligned}
 $$
 
+#### Left pseudo-inverse of tabular matrices
+
+Consider a tabular $$ n \times m $$ matrix $$ X = \overset{1}{X} \overset{\Upsilon}{X} $$, where $$ n > m $$.
+This is a common matrix configuration in data science, where frequently $$ n >> m $$.
+Recall that in this unit factorization, $$ \overset{1}{X} $$ is $$ n \times \m $$ but
+the signature matrix $$ \overset{\Upsilon}{X} $$ is an $$ m \times m $$ diagonal matrix.
+
+Since $$ n > m $$, our matrix has no true inverse, but it is often the case that some variety of
+[left pseudoinverse](https://en.wikipedia.org/wiki/Generalized_inverse)
+$$ X^{+L} $$ exists, which has dimensions $$ m \times n $$.
+
+We can derive the unit signature of $$ X^{+L} $$ in a way similar to the previous square matrix case.
+
+$$
+\text{Let left-inverse} \quad {\overset{1}{X}}^{+L} \quad \text{exist and have elements} \quad
+\begin{bmatrix}
+z_{11} & z_{12} & \dots & z_{1n} \\
+z_{21} & z_{22} & \dots & z_{2n} \\
+\vdots & & \ddots \\
+z_{m1} & z_{m2} & \dots & z_{mn} \\
+\end{bmatrix}
+\\
+\text{} \\
+\begin{aligned}
+X^{+L} & = {\overset{\Upsilon}{X}}^{-1} {\overset{1}{X}}^{+L} \\
+& =
+\begin{bmatrix}
+z_{11} {u_1}^{-1} & z_{12} {u_1}^{-1} & \dots & z_{1n} {u_1}^{-1} \\
+z_{21} {u_2}^{-1} & z_{22} {u_2}^{-1} & \dots & z_{2n} {u_2}^{-1} \\
+\vdots & & \ddots \\
+z_{m1} {u_m}^{-1} & z_{m2} {u_m}^{-1} & \dots & z_{mn} {u_m}^{-1} \\
+\end{bmatrix}
+\end{aligned}
+\\
+\text{} \\
+\text{and so the unit signature} \quad \Upsilon X^{+L} =
+\begin{bmatrix}
+\dots & {u_1}^{-1} & \dots \\
+\dots & {u_2}^{-1} & \dots \\
+ & \vdots & \\
+\dots & {u_m}^{-1} & \dots \\
+\end{bmatrix}
+\\
+\text{} \\
+\text{where } \quad X^{+L} \quad \text{has dimensions} \quad m \times n
+$$
+
+Applying the definitions above, we can see that:
+
+$$
+\begin{aligned}
+& \quad X^{+L} X \\
+= & \quad {\overset{\Upsilon}{X}}^{-1} \quad {\overset{1}{X}}^{+L} \overset{1}{X} \quad \overset{\Upsilon}{X} \\
+= & \quad diag(1/u_1 \dots 1/u_m) \quad I_{m \times m} \quad diag(u_1 \dots u_m) \\
+= & \quad I_{m \times m} \\
+\end{aligned}
+$$
