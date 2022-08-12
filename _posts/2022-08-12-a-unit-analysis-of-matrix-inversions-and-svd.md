@@ -220,3 +220,19 @@ $$
 = & \quad I_{m \times m} \\
 \end{aligned}
 $$
+
+#### Unit signature of Moore Penrose pseudo-inverse
+
+TODO
+
+#### Unit signature of SVD
+
+TODO
+
+#### Unit signature of SVD pseudo-inverse
+
+TODO
+
+#### Unit signature of tabular product
+
+TODO
