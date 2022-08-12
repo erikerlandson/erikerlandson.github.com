@@ -167,7 +167,7 @@ $$
 
 Consider a tabular $$ n \times m $$ matrix $$ X = \overset{1}{X} \overset{\Upsilon}{X} $$, where $$ n > m $$.
 This is a common matrix configuration in data science, where frequently $$ n >> m $$.
-Recall that in this unit factorization, $$ \overset{1}{X} $$ is $$ n \times \m $$ but
+Recall that in this unit factorization, $$ \overset{1}{X} $$ is $$ n \times m $$ but
 the signature matrix $$ \overset{\Upsilon}{X} $$ is an $$ m \times m $$ diagonal matrix.
 
 Since $$ n > m $$, our matrix has no true inverse, but it is often the case that some variety of
