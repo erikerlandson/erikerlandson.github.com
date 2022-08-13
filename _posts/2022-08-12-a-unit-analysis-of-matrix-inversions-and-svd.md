@@ -221,9 +221,37 @@ $$
 \end{aligned}
 $$
 
-#### Unit signature of Moore Penrose pseudo-inverse
+#### Unit signature of Moore Penrose pseudoinverse
 
-TODO
+The left sided
+[Moore Penrose pseudoinverse](https://en.wikipedia.org/wiki/Moore%E2%80%93Penrose_inverse)
+is defined as
+$$ X^{+L} = (X^T X)^{-1}X^T $$.
+
+Since it is a left pseudoinverse, we already know its signature from our derivation above,
+but for completeness we can work it out from its definition:
+
+$$
+\begin{aligned}
+X^{+L} & = (X^T X)^{-1}X^T \\
+& = (\overset{\Upsilon}{X} {\overset{1}{X}}^T \overset{1}{X} \overset{\Upsilon}{X})^{-1}\overset{\Upsilon}{X} {\overset{1}{X}}^T \\
+& = {\overset{\Upsilon}{X}}^{-1} ({\overset{1}{X}}^T \overset{1}{X})^{-1} {\overset{\Upsilon}{X}}^{-1} \overset{\Upsilon}{X} {\overset{1}{X}}^T \\
+& = {\overset{\Upsilon}{X}}^{-1} ({\overset{1}{X}}^T \overset{1}{X})^{-1} {\overset{1}{X}}^T \\
+\end{aligned}
+$$
+
+We have a single left-hand multiplication by the inverse signature matrix,
+and so the unit signature is:
+
+$$
+\Upsilon X^{+L} =
+\begin{bmatrix}
+\dots & {u_1}^{-1} & \dots \\
+\dots & {u_2}^{-1} & \dots \\
+ & \vdots & \\
+\dots & {u_m}^{-1} & \dots \\
+\end{bmatrix}
+$$
 
 #### Unit signature of SVD
 
