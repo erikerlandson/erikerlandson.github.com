@@ -145,7 +145,7 @@ $$ diag(u_1 \dots u_m) $$
 on the right, we obtain a standard tabular matrix with homogeneous column units,
 and if we multiply on the left, we obtain a matrix with homogeneous row units.
 
-For an $$ n \times m $$ matrix $$ M $$:
+For an $$ n \times m $$ matrix $$ M $$ having a unitless signature:
 
 $$
 \begin{aligned}
