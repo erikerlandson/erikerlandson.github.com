@@ -138,21 +138,25 @@ $$
 \end{aligned}
 $$
 
+#### Left and right hand multiplication of signature matrices
+
 From the above derivation I will also note that in general when we multiply by a signature matrix
-$$ \overset{\Upsilon}{X} $$
+$$ diag(u_1 \dots u_m) $$
 on the right, we obtain a standard tabular matrix with homogeneous column units,
-and if we multiply on the left, we obtain a matrix with homogeneous row units:
+and if we multiply on the left, we obtain a matrix with homogeneous row units.
+
+For an $$ n \times m $$ matrix $$ M $$:
 
 $$
 \begin{aligned}
-\Upsilon \overset{1}{X} \overset{\Upsilon}{X} &=
+\Upsilon (M \times diag(u_1 \dots u_m)) &=
 \begin{bmatrix}
 \vdots & \vdots & & \vdots \\
 u_1 & u_2 & \dots & u_m \\
 \vdots & \vdots & & \vdots \\
 \end{bmatrix}
 \\
-\Upsilon \overset{\Upsilon}{X} \overset{1}{X} &=
+\Upsilon (diag(u_1 \dots u_m) \times M^T) &=
 \begin{bmatrix}
 \dots & u_1 & \dots \\
 \dots & u_2 & \dots \\
@@ -221,6 +225,82 @@ $$
 \end{aligned}
 $$
 
+
+#### Unit signatures of generalized tabular products
+
+In a
+[previous post](https://erikerlandson.github.io/blog/2020/05/01/unit-analysis-for-linear-algebra/#unit-signature-of-matrix-determinant)
+I derived unit signature laws for determinants, minors and cofactors,
+and used these to derive the inverse of a generalized tabular product $$ X^T Y $$.
+
+Making use of the patterns above, we can write alternative derivations for signatures
+of tabular products and their inverses that do not require first principles derivation
+from the definition of determinants, minors and cofactors.
+
+Consider two $$ n \times m $$ matrixes $$ X $$ and $$ Y $$ with corresponding unit factorizations
+$$ \overset{1}{X} \overset{\Upsilon}{X} $$ and $$ \overset{1}{Y} \overset{\Upsilon}{Y} $$,
+where $$ \overset{\Upsilon}{X} = diag(u_1 \dots u_m) $$ and $$ \overset{\Upsilon}{Y} = diag(v_1 \dots v_m) $$.
+
+The tabular product $$ X^T Y $$ can be expanded:
+
+$$
+X^T Y = \overset{\Upsilon}{X} {\overset{1}{X}}^T \overset{1}{Y} \overset{\Upsilon}{Y} \\
+$$
+
+And so from the rules we observed above the corresponding unit signature is of the form:
+
+$$
+\Upsilon (X^T Y) = 
+\begin{bmatrix}
+\dots & u_1 & \dots \\
+\dots & u_2 & \dots \\
+ & \vdots & \\
+\dots & u_m & \dots \\
+\end{bmatrix}
+\times
+\begin{bmatrix}
+\vdots & \vdots & & \vdots \\
+v_1 & v_2 & \dots & v_m \\
+\vdots & \vdots & & \vdots \\
+\end{bmatrix}
+=
+\begin{bmatrix}
+u_1 v_1 & \dots & u_1 v_m \\
+\vdots & \ddots \\
+u_m v_1 & \dots & u_m v_m \\
+\end{bmatrix}
+$$
+
+Similarly, whenever the inverse (or pseudoinverse) $$ ({\overset{1}{X}}^T \overset{1}{Y})^{-1}  $$ exists we may write the tabular inverse as:
+
+$$
+(X^T Y)^{-1} = {\overset{\Upsilon}{Y}}^{-1} ({\overset{1}{X}}^T \overset{1}{Y})^{-1} {\overset{\Upsilon}{X}}^{-1}
+$$
+
+and therefore the unit signature of this inverse is of the form
+
+$$
+\Upsilon (X^T Y)^{-1} =
+\begin{bmatrix}
+\dots & 1/v_1 & \dots \\
+\dots & 1/v_2 & \dots \\
+ & \vdots & \\
+\dots & 1/v_m & \dots \\
+\end{bmatrix}
+\times
+\begin{bmatrix}
+\vdots & \vdots & & \vdots \\
+1/u_1 & 1/u_2 & \dots & 1/u_m \\
+\vdots & \vdots & & \vdots \\
+\end{bmatrix}
+=
+\begin{bmatrix}
+1/(u_1 v_1) & \dots & 1/(u_m v_1) \\
+\vdots & \ddots \\
+1/(u_1 v_m) & \dots & 1/(u_m v_m) \\
+\end{bmatrix}
+$$
+
 #### Unit signature of Moore Penrose pseudoinverse
 
 The left sided
@@ -253,14 +333,110 @@ $$
 \end{bmatrix}
 $$
 
-#### Unit signature of SVD
-
-TODO
-
 #### Unit signature of SVD pseudo-inverse
 
-TODO
+For a tabular matrix with a unit factorization
+$$ X = \overset{1}{X} \overset{\Upsilon}{X} $$
+we can define a "unit aware"
+[Singular Value Decomposition](https://en.wikipedia.org/wiki/Singular_value_decomposition)
+(SVD) as follows:
 
-#### Unit signature of tabular product
+$$
+X = U \Sigma V^T \overset{\Upsilon}{X} 
+\quad \text{where} \quad 
+\overset{1}{X} = U \Sigma V^T \\
+$$
 
-TODO
+The left pseudoinverse of this SVD is given by
+
+$$
+X^{+L} = {\overset{\Upsilon}{X}}^{-1} V \Sigma^{+} U^T \\
+$$
+
+Where $$ \Sigma^{+} $$ is the standard SVD
+[pseudoinverse](https://en.wikipedia.org/wiki/Singular_value_decomposition#Pseudoinverse)
+of $$ \Sigma $$ obtained by replacing non-zero (or k largest non-zero) entries $$ \sigma_j $$ with $$ 1/\sigma_j $$.
+
+As with the Moore-Penrose inverse above,
+we can know the unit signature simply by the fact that this is a left pseudoinverse,
+however from the definition of SVD inverse above it is also easy to see that
+the unit signature is:
+
+$$
+\Upsilon X^{+L} =
+\begin{bmatrix}
+\dots & {u_1}^{-1} & \dots \\
+\dots & {u_2}^{-1} & \dots \\
+ & \vdots & \\
+\dots & {u_m}^{-1} & \dots \\
+\end{bmatrix}
+$$
+
+Recall the
+[relation](https://en.wikipedia.org/wiki/Singular_value_decomposition#Relation_to_eigenvalue_decomposition)
+between the right singular vectors $$ V $$ and the tabular product $$ X^T X $$:
+
+$$
+\begin{aligned}
+X^T X & = {\overset{\Upsilon}{X}}^T V \Sigma^T U^T U \Sigma V^T \overset{\Upsilon}{X} \\
+& = {\overset{\Upsilon}{X}} V \Sigma^2 V^T \overset{\Upsilon}{X} \\ 
+\end{aligned}
+$$
+
+and therefore if we multiply this out we find that the resulting unit signature has the form
+
+$$
+\Upsilon X^T X = 
+\begin{bmatrix}
+\dots & u_1 & \dots \\
+\dots & u_2 & \dots \\
+ & \vdots & \\
+\dots & u_m & \dots \\
+\end{bmatrix}
+\times 
+\begin{bmatrix}
+\vdots & \vdots & & \vdots \\
+u_1 & u_2 & \dots & u_m \\
+\vdots & \vdots & & \vdots \\
+\end{bmatrix}
+=
+\begin{bmatrix}
+u_1 u_1 & u_1 u_2 & \dots & u_1 u_m \\
+u_2 u_1 & u_2 u_2 & \dots & u_2 u_m \\
+\vdots & & \ddots \\
+u_m u_1 & u_m u_2 & \dots & u_m u_m \\
+\end{bmatrix}
+$$
+
+The corresponding pseudoinverse is given by
+
+$$
+({X^T X})^{+} = {\overset{\Upsilon}{X}}^{-1} V ({\Sigma^2})^{+} V^T {\overset{\Upsilon}{X}}^{-1}
+$$
+
+and its unit signature has the form
+
+$$
+\Upsilon (X^T X)^{+} = 
+\begin{bmatrix}
+\dots & 1/u_1 & \dots \\
+\dots & 1/u_2 & \dots \\
+ & \vdots & \\
+\dots & 1/u_m & \dots \\
+\end{bmatrix}
+\times 
+\begin{bmatrix}
+\vdots & \vdots & & \vdots \\
+1/u_1 & 1/u_2 & \dots & 1/u_m \\
+\vdots & \vdots & & \vdots \\
+\end{bmatrix}
+=
+\begin{bmatrix}
+1/(u_1 u_1) & 1/(u_1 u_2) & \dots & 1/(u_1 u_m) \\
+1/(u_2 u_1) & 1/(u_2 u_2) & \dots & 1/(u_2 u_m) \\
+\vdots & & \ddots \\
+1/(u_m u_1) & 1/(u_m u_2) & \dots & 1/(u_m u_m) \\
+\end{bmatrix}
+$$
+
+
