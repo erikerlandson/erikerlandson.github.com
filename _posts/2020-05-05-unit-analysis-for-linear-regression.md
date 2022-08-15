@@ -120,10 +120,10 @@ u_{1} & u_{2} & \dots & u_{m} \\
 \quad \quad
 \Upsilon Y =
 \begin{bmatrix}
-v_1 \\
-v_2 \\
+v \\
+v \\
 \vdots \\
-v_n \\
+v \\
 \end{bmatrix}
 $$
 
