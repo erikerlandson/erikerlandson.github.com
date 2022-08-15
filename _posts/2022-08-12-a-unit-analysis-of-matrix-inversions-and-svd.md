@@ -329,7 +329,8 @@ is in fact solving our potentially non-square linear system using the Moore Penr
 $$
 \begin{aligned}
 \hat \beta & = (X^T X) ^ {-1} X^T Y \\
-& = X^{+L} Y
+& = X^{+L} Y \\
+& = {\overset{\Upsilon}{X}}^{-1} {\overset{1}{X}}^{+L} Y \\
 \end{aligned}
 $$
 
