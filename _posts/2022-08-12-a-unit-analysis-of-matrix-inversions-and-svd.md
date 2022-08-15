@@ -179,42 +179,29 @@ Since $$ n > m $$, our matrix has no true inverse, but it is often the case that
 $$ X^{+L} $$ exists, which has dimensions $$ m \times n $$.
 
 We can derive the unit signature of $$ X^{+L} $$ in a way similar to the previous square matrix case.
+Whenever the left inverse $$ {\overset{1}{X}}^{+L} $$ exists we can write:
 
 $$
-\text{Let left-inverse} \quad {\overset{1}{X}}^{+L} \quad \text{exist and have elements} \quad
-\begin{bmatrix}
-z_{11} & z_{12} & \dots & z_{1n} \\
-z_{21} & z_{22} & \dots & z_{2n} \\
-\vdots & & \ddots \\
-z_{m1} & z_{m2} & \dots & z_{mn} \\
-\end{bmatrix}
-\\
-\text{} \\
 \begin{aligned}
 X^{+L} & = {\overset{\Upsilon}{X}}^{-1} {\overset{1}{X}}^{+L} \\
-& =
-\begin{bmatrix}
-z_{11} {u_1}^{-1} & z_{12} {u_1}^{-1} & \dots & z_{1n} {u_1}^{-1} \\
-z_{21} {u_2}^{-1} & z_{22} {u_2}^{-1} & \dots & z_{2n} {u_2}^{-1} \\
-\vdots & & \ddots \\
-z_{m1} {u_m}^{-1} & z_{m2} {u_m}^{-1} & \dots & z_{mn} {u_m}^{-1} \\
-\end{bmatrix}
+& = diag(1/u_1 \dots 1/u_m) \times {\overset{1}{X}}^{+L} \\
 \end{aligned}
-\\
-\text{} \\
-\text{and so the unit signature} \quad \Upsilon X^{+L} =
+$$
+
+From our observations above about left handed multiplication by signature matrices,
+we can conclude that the unit signature of this inverse is:
+
+$$
+\Upsilon X^{+L} =
 \begin{bmatrix}
 \dots & {u_1}^{-1} & \dots \\
 \dots & {u_2}^{-1} & \dots \\
  & \vdots & \\
 \dots & {u_m}^{-1} & \dots \\
 \end{bmatrix}
-\\
-\text{} \\
-\text{where } \quad X^{+L} \quad \text{has dimensions} \quad m \times n
 $$
 
-Applying the definitions above, we can see that:
+Applying the definitions above, we can also verify that:
 
 $$
 \begin{aligned}
@@ -333,6 +320,45 @@ $$
 \end{bmatrix}
 $$
 
+In a
+[previous post](https://erikerlandson.github.io/blog/2020/05/06/unit-analysis-for-linear-regression/)
+I derived the unit signature for linear reression,
+however we can obtain a cleaner derivation simply by noting that the linear regression formula
+is in fact solving our potentially non-square linear system using the Moore Penrose left inverse:
+
+$$
+\begin{aligned}
+\hat \beta & = (X^T X) ^ {-1} X^T Y \\
+& = X^{+L} Y
+\end{aligned}
+$$
+
+and so the unit signature is of the form:
+
+$$
+\Upsilon \hat \beta =
+\begin{bmatrix}
+\dots & {u_1}^{-1} & \dots \\
+\dots & {u_2}^{-1} & \dots \\
+ & \vdots & \\
+\dots & {u_m}^{-1} & \dots \\
+\end{bmatrix}
+\times
+\begin{bmatrix}
+v \\
+v \\
+\vdots \\
+v \\
+\end{bmatrix}
+=
+\begin{bmatrix}
+v / u_1 \\
+v / u_2 \\
+\vdots \\
+v / u_m \\
+\end{bmatrix}
+$$
+
 #### Unit signature of SVD pseudo-inverse
 
 For a tabular matrix with a unit factorization
@@ -439,4 +465,5 @@ $$
 \end{bmatrix}
 $$
 
+Note that these are just the signatures we derived above for a tabular $$ X^T Y $$ and its inverse, where $$ Y = X $$.
 
