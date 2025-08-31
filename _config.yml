@@ -21,7 +21,6 @@ baseurl: "" # the subpath of your site, e.g. /blog
 permalink: "/blog/:year/:month/:day/:title/"
 
 email: erikerlandson@yahoo.com
-twitter_username: manyangled
 github_username:  erikerlandson
 
 # Build settings
